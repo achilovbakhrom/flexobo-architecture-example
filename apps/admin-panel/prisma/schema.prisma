@@ -1,0 +1,73 @@
+// Admin Panel Database Schema
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../../../node_modules/.prisma/admin-client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("ADMIN_PANEL_DATABASE_URL")
+}
+
+// Admin users
+model AdminUser {
+    id           String    @id @default(uuid())
+    email        String    @unique
+    passwordHash String    @map("password_hash")
+    name         String
+    role         String // SUPER_ADMIN, ADMIN, VIEWER
+    isActive     Boolean   @default(true) @map("is_active")
+    lastLoginAt  DateTime? @map("last_login_at")
+    createdAt    DateTime  @default(now()) @map("created_at")
+    updatedAt    DateTime  @updatedAt @map("updated_at")
+
+    auditLogs AuditLog[]
+
+    @@index([email])
+    @@index([role])
+    @@map("admin_users")
+}
+
+// Audit log for admin actions
+model AuditLog {
+    id          String   @id @default(uuid())
+    adminUserId String   @map("admin_user_id")
+    action      String
+    entityType  String   @map("entity_type")
+    entityId    String   @map("entity_id")
+    changes     Json?
+    ipAddress   String?  @map("ip_address")
+    userAgent   String?  @map("user_agent")
+    timestamp   DateTime @default(now())
+
+    adminUser AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+    @@index([adminUserId])
+    @@index([entityType, entityId])
+    @@index([timestamp])
+    @@map("audit_logs")
+}
+
+// System configuration
+model SystemConfig {
+    id        String   @id @default(uuid())
+    key       String   @unique
+    value     Json
+    updatedBy String   @map("updated_by")
+    updatedAt DateTime @updatedAt @map("updated_at")
+
+    @@map("system_config")
+}
+
+// Feature flags
+model FeatureFlag {
+    id          String   @id @default(uuid())
+    name        String   @unique
+    enabled     Boolean  @default(false)
+    description String?
+    metadata    Json?
+    updatedAt   DateTime @updatedAt @map("updated_at")
+
+    @@map("feature_flags")
+}

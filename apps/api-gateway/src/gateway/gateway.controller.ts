@@ -8,13 +8,14 @@ import {
   Controller,
   Req,
   Res,
+  Next,
   HttpException,
   HttpStatus,
   Logger,
   Post,
   Body,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
 import { AggregationService } from './aggregation.service';
@@ -36,13 +37,22 @@ export class GatewayController {
    */
   @All('*')
   @Traced('GatewayController.proxyRequest')
-  async proxyRequest(@Req() req: Request, @Res() res: Response): Promise<void> {
+  async proxyRequest(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Next() next: NextFunction
+  ): Promise<void> {
     try {
       const path = req.path;
 
-      // Skip aggregation endpoint
-      if (path === '/api/aggregate') {
-        return;
+      // Skip internal gateway endpoints - pass to next handler
+      if (
+        path === '/api/aggregate' ||
+        path.startsWith('/api/docs') ||
+        path === '/api/docs-json' ||
+        path.startsWith('/health')
+      ) {
+        return next();
       }
 
       this.logger.debug(`Incoming request: ${req.method} ${path}`);

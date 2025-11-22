@@ -1,34 +1,81 @@
-# Flexobo Microservice Example
+# Flexobo Microservices Architecture
 
-Enterprise-grade microservices architecture with event sourcing, CQRS, and domain-driven design patterns.
-
-## 📚 Documentation
-
-- [Architecture & Setup Guide](docs/README.md) - Complete architecture overview, patterns, and setup instructions
-- [Adding a New Service](docs/ADDING-NEW-SERVICE.md) - Step-by-step guide to create a new microservice
-- [HMR Development Guide](docs/HMR-GUIDE.md) - Hot module reload setup for development
-- [Order Service Guide](docs/ORDER-SERVICE.md) - Detailed order service documentation with API examples
+Enterprise-grade microservices example with event sourcing, CQRS, and domain-driven design.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 yarn install
 
-# Start infrastructure (PostgreSQL, Redis, RabbitMQ)
+# 2. Start infrastructure
 yarn infra:up
 
-# Build all services
-yarn build:all
+# 3. Setup databases
+yarn db:setup && yarn db:migrate:all
 
-# Run all services with HMR
+# 4. Start all services with hot reload
 yarn dev
 ```
 
-## Services
+## Services & Documentation
 
-- **Order Service** - Port 3000
-- **API Gateway** - Port 3001  
-- **Admin Panel** - Port 3002
+- **Order Service** → `http://localhost:3000/api`
+- **API Gateway** → `http://localhost:3001/api`
+- **Admin Panel** → `http://localhost:3002/api`
 
-For detailed information, see [docs/README.md](docs/README.md).
+**📖 Unified Swagger API Docs:** `http://localhost:3001/api/docs` (Select service from dropdown)
+
+**📚 Complete Developer Guide:** [DEVELOPER-GUIDE.md](DEVELOPER-GUIDE.md)
+
+## Development
+
+```bash
+# Run individual service with HMR
+yarn dev:order:watch
+yarn dev:gateway:watch
+yarn dev:admin:watch
+
+# Database
+yarn db:generate          # Generate Prisma clients
+yarn db:migrate:all       # Run migrations
+yarn db:studio:order      # Open Prisma Studio
+
+# Build & Test
+yarn build:all            # Build all services
+yarn test:all             # Run tests
+yarn lint:all             # Lint code
+```
+
+## Tech Stack
+
+- **Runtime:** Node.js 20
+- **Framework:** NestJS
+- **Language:** TypeScript (strict mode)
+- **Database:** PostgreSQL + Prisma
+- **Message Queue:** RabbitMQ
+- **Cache:** Redis
+- **Monorepo:** Nx
+- **API Docs:** Swagger/OpenAPI
+
+## Architecture Patterns
+
+✅ Event Sourcing • CQRS • Hexagonal Architecture • Saga Pattern  
+✅ Outbox Pattern • Circuit Breaker • API Versioning
+
+## Project Structure
+
+```
+apps/
+├── order-service/     # Order management with event sourcing
+├── api-gateway/       # Entry point, routing, resilience
+└── admin-panel/       # Admin UI and system management
+
+libs/
+├── core/             # Shared CQRS, event sourcing, DDD patterns
+└── shared-kernel/    # Common utilities and types
+```
+
+## License
+
+MIT

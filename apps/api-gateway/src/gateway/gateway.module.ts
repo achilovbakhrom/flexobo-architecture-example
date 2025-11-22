@@ -9,6 +9,8 @@ import { ObservabilityModule } from '@flexobo/core';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
 import { AggregationService } from './aggregation.service';
+import { SwaggerAggregatorService } from './swagger-aggregator.service';
+import { SwaggerController } from './swagger.controller';
 import { GatewayController } from './gateway.controller';
 import { GatewayConfig } from './gateway.types';
 
@@ -41,8 +43,14 @@ import { GatewayConfig } from './gateway.types';
       global: true,
     }),
   ],
-  controllers: [GatewayController],
-  providers: [ProxyService, RoutingService, AggregationService],
+  controllers: [SwaggerController, GatewayController],
+  providers: [
+    ProxyService,
+    RoutingService,
+    AggregationService,
+    SwaggerAggregatorService,
+  ],
+  exports: [SwaggerAggregatorService],
 })
 export class GatewayModule implements OnModuleInit {
   constructor(
