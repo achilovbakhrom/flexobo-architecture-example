@@ -8,7 +8,7 @@ import { GatewayModule } from './gateway/gateway.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(GatewayModule);
-  const port = process.env.PORT || 3000;
+  const port = process.env.API_GATEWAY_PORT || 3001;
 
   // Enable CORS
   app.enableCors({

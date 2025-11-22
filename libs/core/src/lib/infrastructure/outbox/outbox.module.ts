@@ -147,7 +147,11 @@ export class OutboxModule {
     return {
       module: OutboxModule,
       providers,
-      exports: [OutboxService, 'IOutboxRepository', OutboxWorker],
+      exports: [
+        OutboxService,
+        'IOutboxRepository',
+        ...(messagePublisher ? [OutboxWorker] : []),
+      ],
       global: true, // Make outbox available globally
     };
   }

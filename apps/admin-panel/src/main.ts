@@ -24,7 +24,7 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT || 3002;
+  const port = process.env.ADMIN_PANEL_PORT || 3002;
   await app.listen(port);
 
   Logger.log(`🚀 Admin Panel Service is running on: http://localhost:${port}`);

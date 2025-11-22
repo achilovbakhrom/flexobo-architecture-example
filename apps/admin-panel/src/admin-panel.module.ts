@@ -4,6 +4,7 @@
 
 import { Module } from '@nestjs/common';
 import { AuthModule } from '@flexobo/core';
+import { HealthController } from './presentation/health.controller';
 import { UserController } from './presentation/user.controller';
 import { AuditLogController } from './presentation/audit-log.controller';
 import {
@@ -34,6 +35,7 @@ import { SystemMetricsService } from './application/system-metrics.service';
     }),
   ],
   controllers: [
+    HealthController,
     UserController,
     AuditLogController,
     MetricsController,

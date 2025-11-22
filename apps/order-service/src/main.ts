@@ -9,7 +9,7 @@ import { OrderModule } from './order.module';
 async function bootstrap() {
   const app = await NestFactory.create(OrderModule);
   const globalPrefix = 'api';
-  const port = process.env.PORT || 3000;
+  const port = process.env.ORDER_SERVICE_PORT || 3000;
 
   // Enable CORS
   app.enableCors();

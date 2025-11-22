@@ -6,16 +6,13 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
       "options": {
-        "command": "webpack-cli build",
-        "args": ["--node-env=production"],
-        "cwd": "apps/flexobo-microservice-example"
-      },
-      "configurations": {
-        "development": {
-          "args": ["--node-env=development"]
-        }
+        "outputPath": "dist/apps/flexobo-microservice-example",
+        "main": "apps/flexobo-microservice-example/src/main.ts",
+        "tsConfig": "apps/flexobo-microservice-example/tsconfig.app.json",
+        "assets": ["apps/flexobo-microservice-example/src/assets"]
       }
     },
     "prune-lockfile": {
@@ -46,21 +43,10 @@
       "executor": "nx:noop"
     },
     "serve": {
-      "continuous": true,
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
+      "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "buildTarget": "flexobo-microservice-example:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "flexobo-microservice-example:build:development"
-        },
-        "production": {
-          "buildTarget": "flexobo-microservice-example:build:production"
-        }
+        "command": "node dist/apps/flexobo-microservice-example/src/main.js"
       }
     },
     "test": {

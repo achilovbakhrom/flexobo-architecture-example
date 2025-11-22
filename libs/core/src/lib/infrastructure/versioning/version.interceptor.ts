@@ -9,6 +9,7 @@ import {
   CallHandler,
   BadRequestException,
   GoneException,
+  Optional,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -21,10 +22,14 @@ import { parseVersion } from './version.utils';
  */
 @Injectable()
 export class VersionInterceptor implements NestInterceptor {
+  private readonly strategy: VersioningStrategy;
+
   constructor(
     private readonly versionManager: VersionManager,
-    private readonly strategy: VersioningStrategy = VersioningStrategy.URI
-  ) {}
+    @Optional() strategy?: VersioningStrategy
+  ) {
+    this.strategy = strategy ?? VersioningStrategy.URI;
+  }
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();

@@ -41,56 +41,71 @@ This project demonstrates a complete microservices ecosystem with:
 
 ## 🚀 Quick Start
 
-### Prerequisites
+**New Developer?** Follow our comprehensive setup guide:
 
-- Node.js 20+
-- Docker & Docker Compose
-- PostgreSQL 15
-- RabbitMQ 3.12
-- Redis 7
+👉 **[Complete Developer Guide](docs/DEVELOPER_GUIDE.md)** 👈
 
-### Installation
+### TL;DR - Get Running in 5 Minutes
 
 ```bash
-# Clone repository
+# 1. Clone and install
 git clone <repository-url>
 cd flexobo-microservice-example
+npm install
 
+# 2. Create environment file
+cp .env.example .env
+
+# 3. One-command setup (automated)
+npm run setup
+
+# 4. Start all services
+npm run dev
+
+# 5. Verify everything works
+npm run health
+```
+
+**Service URLs:**
+- Order Service: http://localhost:3000
+- API Gateway: http://localhost:3001  
+- Admin Panel: http://localhost:3002
+- RabbitMQ UI: http://localhost:15672 (guest/guest)
+
+### Manual Setup (Step-by-Step)
+
+```bash
 # Install dependencies
 npm install
 
-# Start infrastructure (PostgreSQL, RabbitMQ, Redis)
-docker-compose -f docker-compose.dev.yml up -d
+# Start infrastructure
+npm run infra:up
 
-# Run database migrations
-npx prisma migrate dev
+# Setup database
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+
+# Start services (choose one)
+npm run dev              # All services
+npm run dev:order        # Order Service only (port 3000)
+npm run dev:gateway      # API Gateway only (port 3001)
+npm run dev:admin        # Admin Panel only (port 3002)
 ```
 
-### Run Services
+## 📚 Documentation
 
-```bash
-# Order Service (Port 3000)
-npx nx serve order-service
+**Complete documentation is in the [`docs/`](docs/) folder:**
 
-# API Gateway (Port 3001)
-npx nx serve api-gateway
-
-# Admin Panel (Port 3002)
-npx nx serve admin-panel
-```
-
-### Run with Docker
-
-```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
+| Document | Description |
+|----------|-------------|
+| **[Developer Guide](docs/DEVELOPER_GUIDE.md)** | 🎯 Complete setup & development workflow |
+| [Architecture](docs/ARCHITECTURE.md) | System design & patterns |
+| [API Documentation](docs/API.md) | REST API reference |
+| [Kubernetes Guide](docs/KUBERNETES.md) | K8s deployment |
+| [Docker Guide](docs/DOCKER.md) | Docker deployment |
+| [E2E Testing](docs/E2E_TESTING.md) | End-to-end testing |
+| [Integration Testing](docs/INTEGRATION_TESTING.md) | Integration testing |
 
 ## 📦 Services
 

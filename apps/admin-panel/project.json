@@ -6,15 +6,19 @@
   "tags": [],
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
       "options": {
-        "command": "webpack-cli build",
-        "args": ["--node-env=production"],
-        "cwd": "apps/admin-panel"
+        "outputPath": "dist/apps/admin-panel",
+        "main": "apps/admin-panel/src/main.ts",
+        "tsConfig": "apps/admin-panel/tsconfig.app.json",
+        "assets": ["apps/admin-panel/src/assets"]
       },
       "configurations": {
-        "development": {
-          "args": ["--node-env=development"]
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
         }
       }
     },
@@ -44,24 +48,10 @@
       "executor": "nx:noop"
     },
     "serve": {
-      "continuous": true,
-      "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
+      "executor": "nx:run-commands",
       "dependsOn": ["build"],
       "options": {
-        "buildTarget": "admin-panel:build",
-        "runBuildTargetDependencies": false,
-        "env": {
-          "PORT": "3002"
-        }
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "admin-panel:build:development"
-        },
-        "production": {
-          "buildTarget": "admin-panel:build:production"
-        }
+        "command": "node dist/apps/admin-panel/src/main.js"
       }
     },
     "test": {

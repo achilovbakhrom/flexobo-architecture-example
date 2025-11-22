@@ -106,12 +106,13 @@ export class EventStoreModule {
         provide: 'IEventStore',
         useClass: PrismaEventStore,
       },
+      // Always provide EventUpcasterRegistry (even if upcasting is disabled)
+      EventUpcasterRegistry,
     ];
 
     // Add upcasting support if enabled
-    if (enableUpcasting) {
+    if (enableUpcasting && upcasters.length > 0) {
       providers.push(
-        EventUpcasterRegistry,
         ...upcasters,
         {
           provide: 'UPCASTERS',
