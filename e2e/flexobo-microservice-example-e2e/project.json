@@ -8,7 +8,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
       "options": {
-        "jestConfig": "apps/flexobo-microservice-example-e2e/jest.config.cts",
+        "jestConfig": "e2e/flexobo-microservice-example-e2e/jest.config.cts",
         "passWithNoTests": true
       },
       "dependsOn": [

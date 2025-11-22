@@ -8,7 +8,7 @@
       "executor": "@nx/jest:jest",
       "outputs": ["{workspaceRoot}/coverage/{e2eProjectRoot}"],
       "options": {
-        "jestConfig": "apps/admin-panel-e2e/jest.config.cts",
+        "jestConfig": "e2e/admin-panel-e2e/jest.config.cts",
         "passWithNoTests": true
       },
       "dependsOn": ["admin-panel:build", "admin-panel:serve"]

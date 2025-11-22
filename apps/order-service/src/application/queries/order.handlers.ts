@@ -1,7 +1,3 @@
-/**
- * Order query handlers
- */
-
 import {
   QueryHandler,
   IQueryHandler,
@@ -86,7 +82,7 @@ export class GetRecentOrdersHandler
   async execute(query: GetRecentOrdersQuery): Promise<unknown> {
     // In a real implementation, you'd query a read model
     return {
-      limit: query.limit,
+      limit: query.limit ?? 10,
       orders: [],
       message: 'Read model not implemented - use projections in production',
     };

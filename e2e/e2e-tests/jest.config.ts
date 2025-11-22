@@ -6,7 +6,7 @@ export default {
     '^.+\\.[tj]s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
-  coverageDirectory: '../../coverage/apps/e2e-tests',
+  coverageDirectory: '../../coverage/e2e/e2e-tests',
   testMatch: ['**/src/**/*.e2e-spec.ts'],
   testTimeout: 60000, // E2E tests may take longer
   bail: 1, // Stop on first failure
