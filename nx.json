@@ -37,7 +37,22 @@
       "options": {
         "targetName": "test"
       },
-      "exclude": ["apps/flexobo-microservice-example-e2e/**/*"]
+      "exclude": [
+        "apps/flexobo-microservice-example-e2e/**/*",
+        "apps/admin-panel-e2e/**/*"
+      ]
     }
-  ]
+  ],
+  "targetDefaults": {
+    "@nx/js:tsc": {
+      "cache": true,
+      "dependsOn": ["^build"],
+      "inputs": ["production", "^production"]
+    }
+  },
+  "release": {
+    "version": {
+      "preVersionCommand": "npx nx run-many -t build"
+    }
+  }
 }

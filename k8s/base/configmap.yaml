@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: flexobo-config
+  namespace: flexobo
+data:
+  # Infrastructure
+  POSTGRES_HOST: postgres-service
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: flexobo
+  RABBITMQ_HOST: rabbitmq-service
+  RABBITMQ_PORT: "5672"
+  REDIS_HOST: redis-service
+  REDIS_PORT: "6379"
+  
+  # Application
+  NODE_ENV: production
+  LOG_LEVEL: info
+  
+  # Services
+  ORDER_SERVICE_URL: http://order-service:3000
+  ADMIN_PANEL_URL: http://admin-panel:3002
+  
+  # Rate Limiting
+  RATE_LIMIT_TTL: "60"
+  RATE_LIMIT_MAX: "100"

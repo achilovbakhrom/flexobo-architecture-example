@@ -1,0 +1,89 @@
+# Docker ignore patterns for Flexobo microservices
+
+# Node modules
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist
+build
+.next
+out
+
+# Test coverage
+coverage
+.nyc_output
+
+# Nx cache
+.nx
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+*.tmp
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs
+README*
+CHANGELOG*
+
+# Test files
+*.test.ts
+*.spec.ts
+*.e2e-spec.ts
+**/test/**
+**/__tests__/**
+apps/*-e2e
+apps/e2e-tests
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.circleci
+azure-pipelines.yml
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Prisma
+prisma/migrations
+*.db
+
+# Tools
+tools
+
+# Config files (keep only necessary ones)
+.prettierrc
+.prettierignore
+.eslintrc*
+jest.config.*
+jest.preset.js
+tsconfig.spec.json

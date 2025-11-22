@@ -1,0 +1,60 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: flexobo-prod
+
+bases:
+  - ../../base
+
+nameSuffix: -prod
+
+commonLabels:
+  environment: production
+
+patches:
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 1Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+    target:
+      kind: Deployment
+      name: order-service
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 512Mi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 1Gi
+    target:
+      kind: Deployment
+      name: api-gateway
+  - patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 1Gi
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 2Gi
+    target:
+      kind: Deployment
+      name: admin-panel
+
+configMapGenerator:
+  - name: flexobo-config
+    behavior: merge
+    literals:
+      - LOG_LEVEL=info
+      - NODE_ENV=production
+      - RATE_LIMIT_MAX=1000
+
+images:
+  - name: flexobo/order-service
+    newTag: v1.0.0
+  - name: flexobo/api-gateway
+    newTag: v1.0.0
+  - name: flexobo/admin-panel
+    newTag: v1.0.0

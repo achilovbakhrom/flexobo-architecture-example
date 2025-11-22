@@ -14,7 +14,10 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "baseUrl": ".",
-    "paths": {}
+    "paths": {
+      "@flexobo/core": ["libs/core/src/index.ts"],
+      "@flexobo/shared-kernel": ["libs/shared-kernel/src/index.ts"]
+    }
   },
   "exclude": ["node_modules", "tmp"]
 }
