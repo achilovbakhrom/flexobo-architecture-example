@@ -13,6 +13,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Request, Response, NextFunction } from 'express';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
@@ -31,6 +32,7 @@ export class GatewayController {
    * Handle all requests and proxy to appropriate service
    */
   @All('*')
+  @ApiExcludeEndpoint()
   @Traced('GatewayController.proxyRequest')
   async proxyRequest(
     @Req() req: Request,
@@ -40,14 +42,12 @@ export class GatewayController {
     try {
       const path = req.path;
 
-      // Skip Swagger and health endpoints
       if (path.startsWith('/api/docs') || path.startsWith('/health')) {
         return next();
       }
 
       this.logger.debug(`Proxying: ${req.method} ${path}`);
 
-      // Find the route and forward the request
       const route = this.routingService.findRoute(path);
       const response = await this.proxyService.forward(route, {
         method: req.method,
@@ -57,7 +57,6 @@ export class GatewayController {
         query: req.query as Record<string, string>,
       });
 
-      // Set response headers and send
       Object.entries(response.headers).forEach(([key, value]) => {
         res.setHeader(key, value);
       });
