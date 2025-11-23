@@ -42,7 +42,11 @@ export class GatewayController {
     try {
       const path = req.path;
 
-      if (path.startsWith('/api/docs') || path.startsWith('/health')) {
+      if (
+        path.startsWith('/api/docs') ||
+        path.startsWith('/api/discovery') ||
+        path.startsWith('/health')
+      ) {
         return next();
       }
 

@@ -9,6 +9,7 @@ import { ObservabilityModule } from '@flexobo/core';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
 import { GatewayController } from './gateway.controller';
+import { DiscoveryController } from './discovery.controller';
 import { GatewayConfig } from './gateway.types';
 
 @Module({
@@ -40,7 +41,7 @@ import { GatewayConfig } from './gateway.types';
       global: true,
     }),
   ],
-  controllers: [GatewayController],
+  controllers: [GatewayController, DiscoveryController],
   providers: [ProxyService, RoutingService],
 })
 export class GatewayModule implements OnModuleInit {

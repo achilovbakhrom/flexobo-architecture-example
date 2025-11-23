@@ -23,10 +23,14 @@ async function bootstrap() {
     process.env.ORDER_SERVICE_URL || 'http://localhost:3000';
   const adminPanelUrl = process.env.ADMIN_PANEL_URL || 'http://localhost:3002';
 
+  const gatewayUrl =
+    process.env.GATEWAY_SERVICE_URL || `http://localhost:${port}`;
+
   const config = new DocumentBuilder()
     .setTitle('Flexobo API Gateway')
     .setDescription('Unified API documentation aggregating all microservices')
     .setVersion('1.0')
+    .addServer(gatewayUrl, 'Api Gateway')
     .addServer(orderServiceUrl, 'Order Service')
     .addServer(adminPanelUrl, 'Admin Panel')
     .addBearerAuth({
