@@ -8,6 +8,7 @@
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
+      "cache": false,
       "options": {
         "outputPath": "dist/apps/admin-panel",
         "main": "apps/admin-panel/src/main.ts",
@@ -23,10 +24,14 @@
       }
     },
     "serve": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/js:node",
       "dependsOn": ["build"],
+      "cache": false,
       "options": {
-        "command": "node dist/apps/admin-panel/src/main.js"
+        "buildTarget": "admin-panel:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9230
       }
     },
     "test": {

@@ -8,9 +8,6 @@ import { HealthModule } from '@flexobo/core';
 import { ObservabilityModule } from '@flexobo/core';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
-import { AggregationService } from './aggregation.service';
-import { SwaggerAggregatorService } from './swagger-aggregator.service';
-import { SwaggerController } from './swagger.controller';
 import { GatewayController } from './gateway.controller';
 import { GatewayConfig } from './gateway.types';
 
@@ -43,14 +40,8 @@ import { GatewayConfig } from './gateway.types';
       global: true,
     }),
   ],
-  controllers: [SwaggerController, GatewayController],
-  providers: [
-    ProxyService,
-    RoutingService,
-    AggregationService,
-    SwaggerAggregatorService,
-  ],
-  exports: [SwaggerAggregatorService],
+  controllers: [GatewayController],
+  providers: [ProxyService, RoutingService],
 })
 export class GatewayModule implements OnModuleInit {
   constructor(
@@ -77,21 +68,6 @@ export class GatewayModule implements OnModuleInit {
             delay: 1000,
           },
         },
-        // Add more services here as they are created
-        // {
-        //   name: 'inventory-service',
-        //   baseUrl: this.configService.get('INVENTORY_SERVICE_URL') || 'http://localhost:3002',
-        //   prefix: '/api/v1/inventory',
-        //   healthCheckPath: '/api/health',
-        //   enabled: true,
-        // },
-        // {
-        //   name: 'payment-service',
-        //   baseUrl: this.configService.get('PAYMENT_SERVICE_URL') || 'http://localhost:3003',
-        //   prefix: '/api/v1/payments',
-        //   healthCheckPath: '/api/health',
-        //   enabled: true,
-        // },
       ],
     };
 

@@ -3,10 +3,14 @@
  */
 
 import { Controller, Get } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('Health')
 @Controller()
 export class HealthController {
   @Get()
+  @ApiOperation({ summary: 'Service information', description: 'Returns basic service information and available endpoints' })
+  @ApiResponse({ status: 200, description: 'Service information retrieved' })
   getRoot() {
     return {
       service: 'Admin Panel',
@@ -23,6 +27,8 @@ export class HealthController {
   }
 
   @Get('api/health')
+  @ApiOperation({ summary: 'Health check', description: 'Returns service health status and uptime' })
+  @ApiResponse({ status: 200, description: 'Service is healthy' })
   getHealth() {
     return {
       status: 'ok',

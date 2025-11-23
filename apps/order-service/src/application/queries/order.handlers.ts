@@ -12,7 +12,6 @@ import {
 } from './order.queries';
 import { Inject } from '@nestjs/common';
 
-// Helper function to convert StoredEvent[] to DomainEvent[]
 function toDomainEvents(
   stored: {
     eventData: Record<string, unknown>;
@@ -61,8 +60,6 @@ export class GetOrdersByUserHandler
   ) {}
 
   async execute(query: GetOrdersByUserQuery): Promise<unknown> {
-    // In a real implementation, you'd have a read model/projection
-    // For this example, we'll return a placeholder
     return {
       userId: query.userId,
       orders: [],
@@ -80,7 +77,6 @@ export class GetRecentOrdersHandler
   ) {}
 
   async execute(query: GetRecentOrdersQuery): Promise<unknown> {
-    // In a real implementation, you'd query a read model
     return {
       limit: query.limit ?? 10,
       orders: [],

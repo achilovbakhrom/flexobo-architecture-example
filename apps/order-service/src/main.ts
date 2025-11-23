@@ -13,7 +13,14 @@ async function bootstrap() {
   const port = process.env.ORDER_SERVICE_PORT || 3000;
 
   // Enable CORS
-  app.enableCors();
+  app.enableCors({
+    origin: [
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3000',
+    ],
+    credentials: true,
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -28,21 +35,16 @@ async function bootstrap() {
   // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Order Service API')
-    .setDescription('Order management with event sourcing and CQRS')
+    .setDescription('Order management with event sourcing and CQRS pattern.')
     .setVersion('1.0')
-    .addTag('orders')
-    .addServer(`http://localhost:${port}`, 'Order Service')
-    .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup(`${globalPrefix}/docs`, app, document);
 
-  // Expose JSON spec for aggregation
-  app.use(
-    `${globalPrefix}/docs-json`,
-    (_req: never, res: { json: (data: unknown) => void }) => {
-      res.json(document);
-    }
-  );
+    .build();
+
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup(`api/docs`, app, documentFactory, {
+    jsonDocumentUrl: `/api/docs-json`,
+  });
 
   await app.listen(port);
   Logger.log(

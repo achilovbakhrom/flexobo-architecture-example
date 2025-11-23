@@ -21,7 +21,11 @@ async function bootstrap() {
 
   // Enable CORS
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
+    origin: process.env.CORS_ORIGIN || [
+      'http://localhost:3001',
+      'http://localhost:3002',
+      'http://localhost:3000',
+    ],
     credentials: true,
   });
 
@@ -30,22 +34,23 @@ async function bootstrap() {
   // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Admin Panel API')
-    .setDescription('System administration and monitoring')
+    .setDescription('System administration and monitoring.')
     .setVersion('1.0')
-    .addTag('admin')
-    .addBearerAuth()
-    .addServer(`http://localhost:${port}`, 'Admin Panel')
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Enter JWT token (ADMIN role required)',
+      },
+      'JWT'
+    )
     .build();
-  const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
 
-  // Expose JSON spec for aggregation
-  app.use(
-    'api/docs-json',
-    (_req: never, res: { json: (data: unknown) => void }) => {
-      res.json(document);
-    }
-  );
+  const documentFactory = () => SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('api/docs', app, documentFactory, {
+    jsonDocumentUrl: '/api/docs-json',
+  });
 
   await app.listen(port);
 
