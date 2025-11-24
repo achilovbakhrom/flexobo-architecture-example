@@ -20,9 +20,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
-  ApiProperty,
 } from '@nestjs/swagger';
-import { IsString, IsNumber, IsPositive, Min } from 'class-validator';
 import { CommandBus, QueryBus } from '@flexobo/core';
 import { VersionInterceptor, ApiVersion } from '@flexobo/core';
 import { Traced } from '@flexobo/core';
@@ -37,79 +35,14 @@ import {
   GetOrderByIdQuery,
   GetOrdersByUserQuery,
 } from '../application/queries/order.queries';
-
-// ============================================================
-// DTOs
-// ============================================================
-
-export class CreateOrderDto {
-  @ApiProperty({
-    description: 'User ID who is creating the order',
-    example: 'user-123',
-  })
-  @IsString()
-  userId!: string;
-}
-
-export class CreateOrderResponseDto {
-  @ApiProperty({
-    description: 'Created order ID',
-    example: 'order-1234567890-abc123',
-  })
-  orderId!: string;
-}
-
-export class AddOrderItemDto {
-  @ApiProperty({ description: 'Product ID', example: 'product-456' })
-  @IsString()
-  productId!: string;
-
-  @ApiProperty({ description: 'Product name', example: 'Laptop' })
-  @IsString()
-  productName!: string;
-
-  @ApiProperty({
-    description: 'Quantity of the product',
-    example: 2,
-    minimum: 1,
-  })
-  @IsNumber()
-  @IsPositive()
-  @Min(1)
-  quantity!: number;
-
-  @ApiProperty({ description: 'Price per unit', example: 999.99, minimum: 0 })
-  @IsNumber()
-  @IsPositive()
-  price!: number;
-
-  @ApiProperty({ description: 'Currency code', example: 'USD' })
-  @IsString()
-  currency!: string;
-}
-
-export class SuccessResponseDto {
-  @ApiProperty({ description: 'Operation success status', example: true })
-  success!: boolean;
-}
-
-export class CancelOrderDto {
-  @ApiProperty({
-    description: 'Reason for cancellation',
-    example: 'Customer requested cancellation',
-  })
-  @IsString()
-  reason!: string;
-}
-
-export class ShipOrderDto {
-  @ApiProperty({
-    description: 'Shipping tracking number',
-    example: 'TRACK123456789',
-  })
-  @IsString()
-  trackingNumber!: string;
-}
+import {
+  CreateOrderDto,
+  CreateOrderResponseDto,
+  AddOrderItemDto,
+  SuccessResponseDto,
+  CancelOrderDto,
+  ShipOrderDto,
+} from './order.dto';
 
 // ============================================================
 // Controller v1
@@ -130,7 +63,7 @@ export class OrderController {
    */
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @Traced('OrderController.createOrder')
+  // @Traced('OrderController.createOrder')
   @ApiOperation({
     summary: 'Create a new order',
     description: 'Creates a new order for a specific user',
@@ -159,7 +92,6 @@ export class OrderController {
    * Get order by ID
    */
   @Get(':orderId')
-  @Traced('OrderController.getOrder')
   @ApiOperation({
     summary: 'Get order by ID',
     description: 'Retrieves detailed information about a specific order',
@@ -172,6 +104,7 @@ export class OrderController {
   })
   @ApiResponse({ status: 200, description: 'Order found' })
   @ApiResponse({ status: 404, description: 'Order not found' })
+  @Traced('OrderController.getOrder')
   async getOrder(@Param('orderId') orderId: string) {
     const order = await this.queryBus.execute(new GetOrderByIdQuery(orderId));
 
@@ -186,7 +119,6 @@ export class OrderController {
    * Get orders by user
    */
   @Get('user/:userId')
-  @Traced('OrderController.getOrdersByUser')
   @ApiOperation({
     summary: 'Get orders by user',
     description: 'Retrieves all orders for a specific user',
@@ -194,6 +126,7 @@ export class OrderController {
   })
   @ApiParam({ name: 'userId', description: 'User ID', example: 'user-123' })
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
+  @Traced('OrderController.getOrdersByUser')
   async getOrdersByUser(@Param('userId') userId: string) {
     return await this.queryBus.execute(new GetOrdersByUserQuery(userId));
   }
@@ -202,7 +135,6 @@ export class OrderController {
    * Add item to order
    */
   @Post(':orderId/items')
-  @Traced('OrderController.addItem')
   @ApiOperation({
     summary: 'Add item to order',
     description: 'Adds a new item to an existing order',
@@ -216,6 +148,7 @@ export class OrderController {
     type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
+  @Traced('OrderController.addItem')
   async addItem(
     @Param('orderId') orderId: string,
     @Body() dto: AddOrderItemDto
@@ -240,7 +173,6 @@ export class OrderController {
    * Confirm order
    */
   @Put(':orderId/confirm')
-  @Traced('OrderController.confirmOrder')
   @ApiOperation({
     summary: 'Confirm order',
     description: 'Confirms an order and prepares it for processing',
@@ -253,6 +185,7 @@ export class OrderController {
     type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
+  @Traced('OrderController.confirmOrder')
   async confirmOrder(
     @Param('orderId') orderId: string
   ): Promise<SuccessResponseDto> {
@@ -264,7 +197,6 @@ export class OrderController {
    * Cancel order
    */
   @Delete(':orderId')
-  @Traced('OrderController.cancelOrder')
   @ApiOperation({
     summary: 'Cancel order',
     description: 'Cancels an existing order with a reason',
@@ -278,6 +210,7 @@ export class OrderController {
     type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
+  @Traced('OrderController.cancelOrder')
   async cancelOrder(
     @Param('orderId') orderId: string,
     @Body() dto: CancelOrderDto
@@ -290,7 +223,6 @@ export class OrderController {
    * Ship order
    */
   @Put(':orderId/ship')
-  @Traced('OrderController.shipOrder')
   @ApiOperation({
     summary: 'Ship order',
     description: 'Marks an order as shipped with tracking information',
@@ -304,6 +236,7 @@ export class OrderController {
     type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
+  @Traced('OrderController.shipOrder')
   async shipOrder(
     @Param('orderId') orderId: string,
     @Body() dto: ShipOrderDto

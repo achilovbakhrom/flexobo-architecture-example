@@ -6,6 +6,7 @@ import { Module } from '@nestjs/common';
 import { CqrsModule } from '@flexobo/core';
 import { EventStoreModule } from '@flexobo/core';
 import { OutboxModule } from '@flexobo/core';
+import { PrismaClient } from '@prisma/client';
 import {
   VersioningModule,
   VersioningStrategy,
@@ -35,6 +36,11 @@ import {
 
 @Module({
   imports: [
+    // Event Store for event sourcing (MUST be before CqrsModule)
+    EventStoreModule.forRoot({
+      enableUpcasting: false,
+    }),
+
     // Core CQRS infrastructure
     CqrsModule.forRoot({
       commandHandlers: [
@@ -49,12 +55,6 @@ import {
         GetOrdersByUserHandler,
         GetRecentOrdersHandler,
       ],
-    }),
-
-    // Event Store for event sourcing
-    EventStoreModule.forRoot({
-      // PrismaClient will be created automatically
-      enableUpcasting: false,
     }),
 
     // Outbox pattern for reliable messaging

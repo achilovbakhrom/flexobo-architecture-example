@@ -52,8 +52,10 @@ export class CreateOrderHandler
   async execute(command: CreateOrderCommand): Promise<Result<void, Error>> {
     try {
       const order = Order.create(command.orderId, command.userId);
+      console.log(JSON.stringify(order, null, 2));
 
       // Save events
+      console.log('Saving events to event store...');
       await this.eventStore.append(
         command.orderId,
         order.getUncommittedEvents(),
@@ -61,8 +63,10 @@ export class CreateOrderHandler
       );
 
       order.markEventsAsCommitted();
+      console.log('Order created and saved to event store successfully');
       return new Success(undefined);
     } catch (error) {
+      console.error('ERROR saving order to event store:', error);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }

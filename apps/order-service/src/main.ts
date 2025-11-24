@@ -2,6 +2,11 @@
  * Order Service Entry Point
  */
 
+import { config } from 'dotenv';
+
+// Load environment variables from order-service .env
+config({ path: 'apps/order-service/.env' });
+
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';

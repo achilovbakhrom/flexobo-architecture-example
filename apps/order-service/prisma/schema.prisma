@@ -7,7 +7,7 @@ generator client {
 
 datasource db {
     provider = "postgresql"
-    url      = env("ORDER_SERVICE_DATABASE_URL")
+    url      = env("DATABASE_URL")
 }
 
 // Event Store - stores all domain events for Order Service
