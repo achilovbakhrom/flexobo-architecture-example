@@ -14,7 +14,14 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiProperty,
+} from '@nestjs/swagger';
 import { IsString, IsNumber, IsPositive, Min } from 'class-validator';
 import { CommandBus, QueryBus } from '@flexobo/core';
 import { VersionInterceptor, ApiVersion } from '@flexobo/core';
@@ -36,13 +43,19 @@ import {
 // ============================================================
 
 export class CreateOrderDto {
-  @ApiProperty({ description: 'User ID who is creating the order', example: 'user-123' })
+  @ApiProperty({
+    description: 'User ID who is creating the order',
+    example: 'user-123',
+  })
   @IsString()
   userId!: string;
 }
 
 export class CreateOrderResponseDto {
-  @ApiProperty({ description: 'Created order ID', example: 'order-1234567890-abc123' })
+  @ApiProperty({
+    description: 'Created order ID',
+    example: 'order-1234567890-abc123',
+  })
   orderId!: string;
 }
 
@@ -55,7 +68,11 @@ export class AddOrderItemDto {
   @IsString()
   productName!: string;
 
-  @ApiProperty({ description: 'Quantity of the product', example: 2, minimum: 1 })
+  @ApiProperty({
+    description: 'Quantity of the product',
+    example: 2,
+    minimum: 1,
+  })
   @IsNumber()
   @IsPositive()
   @Min(1)
@@ -77,13 +94,19 @@ export class SuccessResponseDto {
 }
 
 export class CancelOrderDto {
-  @ApiProperty({ description: 'Reason for cancellation', example: 'Customer requested cancellation' })
+  @ApiProperty({
+    description: 'Reason for cancellation',
+    example: 'Customer requested cancellation',
+  })
   @IsString()
   reason!: string;
 }
 
 export class ShipOrderDto {
-  @ApiProperty({ description: 'Shipping tracking number', example: 'TRACK123456789' })
+  @ApiProperty({
+    description: 'Shipping tracking number',
+    example: 'TRACK123456789',
+  })
   @IsString()
   trackingNumber!: string;
 }
@@ -111,16 +134,18 @@ export class OrderController {
   @ApiOperation({
     summary: 'Create a new order',
     description: 'Creates a new order for a specific user',
-    operationId: 'createOrder'
+    operationId: 'createOrder',
   })
   @ApiResponse({
     status: 201,
     description: 'Order created successfully',
-    type: CreateOrderResponseDto
+    type: CreateOrderResponseDto,
   })
   @ApiResponse({ status: 400, description: 'Invalid input data' })
   @ApiBody({ type: CreateOrderDto })
-  async createOrder(@Body() dto: CreateOrderDto): Promise<CreateOrderResponseDto> {
+  async createOrder(
+    @Body() dto: CreateOrderDto
+  ): Promise<CreateOrderResponseDto> {
     const orderId = `order-${Date.now()}-${Math.random()
       .toString(36)
       .substring(2, 11)}`;
@@ -138,9 +163,13 @@ export class OrderController {
   @ApiOperation({
     summary: 'Get order by ID',
     description: 'Retrieves detailed information about a specific order',
-    operationId: 'getOrderById'
+    operationId: 'getOrderById',
   })
-  @ApiParam({ name: 'orderId', description: 'Order ID', example: 'order-1234567890-abc123' })
+  @ApiParam({
+    name: 'orderId',
+    description: 'Order ID',
+    example: 'order-1234567890-abc123',
+  })
   @ApiResponse({ status: 200, description: 'Order found' })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async getOrder(@Param('orderId') orderId: string) {
@@ -161,7 +190,7 @@ export class OrderController {
   @ApiOperation({
     summary: 'Get orders by user',
     description: 'Retrieves all orders for a specific user',
-    operationId: 'getOrdersByUser'
+    operationId: 'getOrdersByUser',
   })
   @ApiParam({ name: 'userId', description: 'User ID', example: 'user-123' })
   @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
@@ -177,14 +206,14 @@ export class OrderController {
   @ApiOperation({
     summary: 'Add item to order',
     description: 'Adds a new item to an existing order',
-    operationId: 'addItemToOrder'
+    operationId: 'addItemToOrder',
   })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
   @ApiBody({ type: AddOrderItemDto })
   @ApiResponse({
     status: 200,
     description: 'Item added successfully',
-    type: SuccessResponseDto
+    type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async addItem(
@@ -202,6 +231,8 @@ export class OrderController {
       )
     );
 
+    console.log('Test');
+
     return { success: true };
   }
 
@@ -213,16 +244,18 @@ export class OrderController {
   @ApiOperation({
     summary: 'Confirm order',
     description: 'Confirms an order and prepares it for processing',
-    operationId: 'confirmOrder'
+    operationId: 'confirmOrder',
   })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
   @ApiResponse({
     status: 200,
     description: 'Order confirmed successfully',
-    type: SuccessResponseDto
+    type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  async confirmOrder(@Param('orderId') orderId: string): Promise<SuccessResponseDto> {
+  async confirmOrder(
+    @Param('orderId') orderId: string
+  ): Promise<SuccessResponseDto> {
     await this.commandBus.execute(new ConfirmOrderCommand(orderId));
     return { success: true };
   }
@@ -235,14 +268,14 @@ export class OrderController {
   @ApiOperation({
     summary: 'Cancel order',
     description: 'Cancels an existing order with a reason',
-    operationId: 'cancelOrder'
+    operationId: 'cancelOrder',
   })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
   @ApiBody({ type: CancelOrderDto })
   @ApiResponse({
     status: 200,
     description: 'Order cancelled successfully',
-    type: SuccessResponseDto
+    type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async cancelOrder(
@@ -261,14 +294,14 @@ export class OrderController {
   @ApiOperation({
     summary: 'Ship order',
     description: 'Marks an order as shipped with tracking information',
-    operationId: 'shipOrder'
+    operationId: 'shipOrder',
   })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
   @ApiBody({ type: ShipOrderDto })
   @ApiResponse({
     status: 200,
     description: 'Order shipped successfully',
-    type: SuccessResponseDto
+    type: SuccessResponseDto,
   })
   @ApiResponse({ status: 404, description: 'Order not found' })
   async shipOrder(
