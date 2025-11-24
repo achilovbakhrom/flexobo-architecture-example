@@ -31,7 +31,9 @@
         "buildTarget": "order-service:build",
         "watch": true,
         "inspect": "inspect",
-        "port": 9229
+        "port": 9229,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
       }
     },
     "test": {

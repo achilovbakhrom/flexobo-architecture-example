@@ -2,12 +2,12 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { enableGracefulShutdown } from '@flexobo/core';
 import { GatewayModule } from './gateway/gateway.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(GatewayModule);
 
-  // Get ConfigService instance
   const configService = app.get(ConfigService);
 
   const port = configService.get<number>('gateway.port', 3001);
@@ -82,6 +82,11 @@ async function bootstrap() {
   Logger.log(`🚪 API Gateway: http://localhost:${port}`);
   Logger.log(`📊 Health: http://localhost:${port}/api/health`);
   Logger.log(`📖 Swagger: http://localhost:${port}/api/docs`);
+
+  enableGracefulShutdown(app, {
+    serviceName: 'API Gateway',
+    timeout: 5000,
+  });
 }
 
 bootstrap();

@@ -5,6 +5,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { enableGracefulShutdown } from '@flexobo/core';
 import { AdminPanelModule } from './admin-panel.module';
 
 async function bootstrap() {
@@ -57,6 +58,12 @@ async function bootstrap() {
   Logger.log(`🚀 Admin Panel Service is running on: http://localhost:${port}`);
   Logger.log(`🔐 All endpoints require ADMIN role`);
   Logger.log(`📖 Swagger UI: http://localhost:${port}/api/docs`);
+
+  // Enable graceful shutdown for HMR and proper cleanup
+  enableGracefulShutdown(app, {
+    serviceName: 'Admin Panel',
+    timeout: 5000,
+  });
 }
 
 bootstrap();

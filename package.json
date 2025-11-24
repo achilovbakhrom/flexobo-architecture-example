@@ -6,6 +6,7 @@
     "postinstall": "mkdir -p node_modules/@flexobo && ln -sf \"$(pwd)/dist/libs/core\" node_modules/@flexobo/core && ln -sf \"$(pwd)/dist/libs/shared-kernel\" node_modules/@flexobo/shared-kernel",
     "dev": "npx nx run-many --target=serve --projects=order-service,api-gateway,admin-panel --parallel=3",
     "dev:clean": "pkill -f 'nx serve' 2>/dev/null || true && pkill -f 'node dist' 2>/dev/null || true && lsof -ti:3000,3001,3002,9229,9230,9231 | xargs kill -9 2>/dev/null || true",
+    "dev:kill": "bash scripts/kill-dev-servers.sh",
     "dev:restart": "npm run dev:clean && sleep 2 && npm run dev",
     "dev:order": "npx nx serve order-service",
     "dev:gateway": "npx nx serve api-gateway",

@@ -31,7 +31,9 @@
         "buildTarget": "api-gateway:build",
         "watch": true,
         "inspect": "inspect",
-        "port": 9231
+        "port": 9231,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
       }
     },
     "test": {

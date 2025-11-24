@@ -10,6 +10,7 @@ config({ path: 'apps/order-service/.env' });
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { enableGracefulShutdown } from '@flexobo/core';
 import { OrderModule } from './order.module';
 
 async function bootstrap() {
@@ -37,7 +38,6 @@ async function bootstrap() {
 
   app.setGlobalPrefix(globalPrefix);
 
-  // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Order Service API')
     .setDescription('Order management with event sourcing and CQRS pattern.')
@@ -59,6 +59,12 @@ async function bootstrap() {
     `📊 Health check: http://localhost:${port}/${globalPrefix}/health`
   );
   Logger.log(`📖 Swagger UI: http://localhost:${port}/${globalPrefix}/docs`);
+
+  // Enable graceful shutdown for HMR and proper cleanup
+  enableGracefulShutdown(app, {
+    serviceName: 'Order Service',
+    timeout: 5000,
+  });
 }
 
 bootstrap();
