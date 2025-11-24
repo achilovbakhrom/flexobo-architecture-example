@@ -1,14 +1,32 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { ConfigService } from '@nestjs/config';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { GatewayModule } from './gateway/gateway.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(GatewayModule);
-  const port = process.env.API_GATEWAY_PORT || 3001;
+
+  // Get ConfigService instance
+  const configService = app.get(ConfigService);
+
+  const port = configService.get<number>('gateway.port', 3001);
+  const corsOrigin = configService.get<string>('gateway.corsOrigin', '*');
+  const orderServiceUrl = configService.get<string>(
+    'gateway.orderServiceUrl',
+    'http://localhost:3000'
+  );
+  const adminPanelUrl = configService.get<string>(
+    'gateway.adminPanelUrl',
+    'http://localhost:3002'
+  );
+  const gatewayUrl = configService.get<string>(
+    'gateway.gatewayUrl',
+    `http://localhost:${port}`
+  );
 
   app.enableCors({
-    origin: process.env['CORS_ORIGIN'] || '*',
+    origin: corsOrigin,
     credentials: true,
   });
 
@@ -18,13 +36,6 @@ async function bootstrap() {
       whitelist: true,
     })
   );
-
-  const orderServiceUrl =
-    process.env.ORDER_SERVICE_URL || 'http://localhost:3000';
-  const adminPanelUrl = process.env.ADMIN_PANEL_URL || 'http://localhost:3002';
-
-  const gatewayUrl =
-    process.env.GATEWAY_SERVICE_URL || `http://localhost:${port}`;
 
   const config = new DocumentBuilder()
     .setTitle('Flexobo API Gateway')

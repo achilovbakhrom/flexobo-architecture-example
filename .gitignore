@@ -44,3 +44,8 @@ Thumbs.db
 .github/instructions/nx.instructions.md
 
 /generated/prisma
+
+# Docker
+docker-compose.override.yml
+.env
+.env.docker
