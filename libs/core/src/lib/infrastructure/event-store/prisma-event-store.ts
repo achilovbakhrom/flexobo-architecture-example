@@ -50,9 +50,9 @@ export class PrismaEventStore implements IEventStore {
         for (const event of events) {
           await tx.$executeRawUnsafe(
             `INSERT INTO events (
-              id, aggregate_id, aggregate_type, event_type, 
+              id, aggregate_id, aggregate_type, event_type,
               event_data, version, occurred_at, metadata
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            ) VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7, $8::jsonb)`,
             this.generateId(),
             event.aggregateId,
             event.aggregateType,
