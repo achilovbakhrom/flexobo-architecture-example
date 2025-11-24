@@ -47,5 +47,13 @@ Thumbs.db
 
 # Docker
 docker-compose.override.yml
+
+# Environment files (ignore actual .env but track .env.example)
 .env
+.env.local
+.env.*.local
 .env.docker
+apps/*/.env
+!apps/*/.env.example
+libs/*/.env
+!libs/*/.env.example

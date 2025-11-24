@@ -53,12 +53,10 @@ async function bootstrap() {
 
   await app.listen(port);
   Logger.log(
-    `🚀 Order Service is running on: http://localhost:${port}/${globalPrefix}`
+    `Order Service is running on: http://localhost:${port}/${globalPrefix}`
   );
-  Logger.log(
-    `📊 Health check: http://localhost:${port}/${globalPrefix}/health`
-  );
-  Logger.log(`📖 Swagger UI: http://localhost:${port}/${globalPrefix}/docs`);
+  Logger.log(`Health check: http://localhost:${port}/${globalPrefix}/health`);
+  Logger.log(`Swagger UI: http://localhost:${port}/${globalPrefix}/docs`);
 
   // Enable graceful shutdown for HMR and proper cleanup
   enableGracefulShutdown(app, {
