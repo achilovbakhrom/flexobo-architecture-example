@@ -29,7 +29,7 @@ export class CqrsModule {
             commandHandlers.forEach((handler) => commandBus.register(handler));
             return commandHandlers;
           },
-          inject: [CommandBus],
+          inject: [CommandBus, ...commandHandlers],
         },
         {
           provide: 'QUERY_HANDLERS',
@@ -37,7 +37,7 @@ export class CqrsModule {
             queryHandlers.forEach((handler) => queryBus.register(handler));
             return queryHandlers;
           },
-          inject: [QueryBus],
+          inject: [QueryBus, ...queryHandlers],
         },
       ],
       exports: [CommandBus, QueryBus],
