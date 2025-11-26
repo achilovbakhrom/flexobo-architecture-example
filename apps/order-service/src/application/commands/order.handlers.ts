@@ -1,5 +1,16 @@
 /**
  * Order command handlers
+ *
+ * These handlers use the IOrderEventRepository to persist and load order events.
+ * The application layer is responsible for:
+ * - Reconstructing domain aggregates from events
+ * - Executing business logic on aggregates
+ * - Converting uncommitted events to storable format
+ *
+ * This maintains proper hexagonal architecture separation:
+ * - Infrastructure (adapter) works only with DTOs/events
+ * - Application layer knows about domain entities
+ * - Domain layer remains pure
  */
 
 import {
@@ -7,10 +18,14 @@ import {
   ICommandHandler,
   Result,
   Success,
+  DomainEvent,
 } from '@flexobo/core';
 import { Order } from '../../domain/order.aggregate';
-import { IEventStore } from '@flexobo/core';
-import { DomainEvent } from '@flexobo/core';
+import {
+  IOrderEventRepository,
+  ORDER_EVENT_REPOSITORY,
+} from '../../ports/order.repository.port';
+import { StoredEventDto } from '../dto/order.dto';
 import {
   CreateOrderCommand,
   AddOrderItemCommand,
@@ -20,17 +35,10 @@ import {
 } from './order.commands';
 import { Inject } from '@nestjs/common';
 
-// Helper function to convert StoredEvent[] to DomainEvent[]
-function toDomainEvents(
-  stored: {
-    eventData: Record<string, unknown>;
-    eventType: string;
-    version: number;
-    occurredAt: Date;
-    aggregateId: string;
-    aggregateType: string;
-  }[]
-): DomainEvent[] {
+/**
+ * Converts stored events to domain events for aggregate reconstruction
+ */
+function toDomainEvents(stored: StoredEventDto[]): DomainEvent[] {
   return stored.map((s) => ({
     type: s.eventType,
     aggregateId: s.aggregateId,
@@ -41,32 +49,81 @@ function toDomainEvents(
   }));
 }
 
+/**
+ * Loads an Order aggregate from stored events
+ */
+async function loadOrder(
+  repository: IOrderEventRepository,
+  orderId: string
+): Promise<Order | null> {
+  const storedEvents = await repository.getEvents(orderId);
+
+  if (storedEvents.length === 0) {
+    return null;
+  }
+
+  const events = toDomainEvents(storedEvents);
+  return Order.fromEvents(events);
+}
+
+/**
+ * Saves uncommitted events from an Order aggregate
+ */
+async function saveOrder(
+  repository: IOrderEventRepository,
+  order: Order
+): Promise<void> {
+  const uncommittedEvents = order.getUncommittedEvents();
+
+  if (uncommittedEvents.length === 0) {
+    return;
+  }
+
+  // Calculate expected version for optimistic concurrency
+  const expectedVersion = order.version - uncommittedEvents.length;
+
+  // Convert domain events to storable format
+  const events = uncommittedEvents.map((event) => ({
+    type: event.type,
+    data: event.data,
+    aggregateType: event.aggregateType,
+  }));
+
+  await repository.appendEvents(order.id, events, expectedVersion);
+
+  order.markEventsAsCommitted();
+}
+
 @CommandHandler(CreateOrderCommand)
 export class CreateOrderHandler
   implements ICommandHandler<CreateOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository
   ) {}
 
   async execute(command: CreateOrderCommand): Promise<Result<void, Error>> {
     try {
+      // Check if order already exists
+      const exists = await this.eventRepository.exists(command.orderId);
+      if (exists) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} already exists`),
+        };
+      }
+
+      // Create new order (domain logic)
       const order = Order.create(command.orderId, command.userId);
-      console.log(JSON.stringify(order, null, 2));
 
-      // Save events
-      console.log('Saving events to event store...');
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        0
-      );
+      // Save events through repository
+      await saveOrder(this.eventRepository, order);
 
-      order.markEventsAsCommitted();
-      console.log('Order created and saved to event store successfully');
       return new Success(undefined);
     } catch (error) {
-      console.error('ERROR saving order to event store:', error);
+      console.error('ERROR creating order:', error);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -77,17 +134,24 @@ export class AddOrderItemHandler
   implements ICommandHandler<AddOrderItemCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository
   ) {}
 
   async execute(command: AddOrderItemCommand): Promise<Result<void, Error>> {
     try {
-      // Load order from event store
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      // Load order from events
+      const order = await loadOrder(this.eventRepository, command.orderId);
 
-      // Execute business logic
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      // Execute business logic (domain)
       order.addItem(
         command.productId,
         command.productName,
@@ -96,14 +160,9 @@ export class AddOrderItemHandler
         command.priceCurrency
       );
 
-      // Save new events
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      // Save events
+      await saveOrder(this.eventRepository, order);
 
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -116,24 +175,26 @@ export class ConfirmOrderHandler
   implements ICommandHandler<ConfirmOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository
   ) {}
 
   async execute(command: ConfirmOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await loadOrder(this.eventRepository, command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.confirm();
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      await saveOrder(this.eventRepository, order);
 
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -146,24 +207,26 @@ export class CancelOrderHandler
   implements ICommandHandler<CancelOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository
   ) {}
 
   async execute(command: CancelOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await loadOrder(this.eventRepository, command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.cancel(command.reason);
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      await saveOrder(this.eventRepository, order);
 
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -176,24 +239,26 @@ export class ShipOrderHandler
   implements ICommandHandler<ShipOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository
   ) {}
 
   async execute(command: ShipOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await loadOrder(this.eventRepository, command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.ship(command.trackingNumber);
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      await saveOrder(this.eventRepository, order);
 
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };

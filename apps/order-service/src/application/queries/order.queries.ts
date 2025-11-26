@@ -14,9 +14,14 @@ export class GetOrderByIdQuery implements IQuery {
 
 export class GetOrdersByUserQuery implements IQuery {
   public readonly userId: string;
+  public readonly limit?: number;
+  public readonly offset?: number;
 
   constructor(...args: unknown[]) {
     this.userId = args[0] as string;
+    const options = args[1] as { limit?: number; offset?: number } | undefined;
+    this.limit = options?.limit;
+    this.offset = options?.offset;
   }
 }
 

@@ -1,12 +1,22 @@
 /**
  * Order Service Module
+ *
+ * Hexagonal Architecture:
+ * - Domain Layer: Pure business logic (aggregates)
+ * - Application Layer: Use cases, commands, queries, DTOs
+ * - Ports: Interfaces defining boundaries
+ * - Adapters (by technology):
+ *   - http/v1: REST controllers (API v1)
+ *   - persistence: Repositories
+ *   - queue: Event consumers (projections/read model updates)
+ *   - cache: Redis cache (future)
  */
 
 import { Module } from '@nestjs/common';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CqrsModule } from '@flexobo/core';
 import { EventStoreModule } from '@flexobo/core';
 import { OutboxModule } from '@flexobo/core';
-import { PrismaClient } from '@prisma/client';
 import {
   VersioningModule,
   VersioningStrategy,
@@ -16,9 +26,51 @@ import { HealthModule } from '@flexobo/core';
 import { ObservabilityModule } from '@flexobo/core';
 import { PostgreSQLHealthIndicator } from '@flexobo/core';
 
-import { OrderController } from './presentation/order.controller';
+// ============================================================
+// HTTP Adapters (Controllers) - API v1
+// ============================================================
+import { OrderController } from './adapters/http/v1/order.controller';
+import { ProductController } from './adapters/http/v1/product.controller';
+import { PaymentController } from './adapters/http/v1/payment.controller';
+import { OrderHistoryController } from './adapters/http/v1/order-history.controller';
 
-// Command handlers
+// ============================================================
+// Ports
+// ============================================================
+import { ORDER_EVENT_REPOSITORY } from './ports/order.repository.port';
+import { ORDER_READ_MODEL_REPOSITORY } from './ports/order-read-model.port';
+import {
+  PRODUCT_EVENT_REPOSITORY,
+  PRODUCT_READ_MODEL_REPOSITORY,
+} from './ports/product.repository.port';
+import {
+  PAYMENT_EVENT_REPOSITORY,
+  PAYMENT_READ_MODEL_REPOSITORY,
+} from './ports/payment.repository.port';
+import { ORDER_HISTORY_REPOSITORY } from './ports/order-history.repository.port';
+
+// ============================================================
+// Persistence Adapters (Repositories)
+// ============================================================
+import { EventSourcedOrderRepository } from './adapters/persistence/event-sourced-order.repository';
+import { PrismaOrderReadModelRepository } from './adapters/persistence/prisma-order-read-model.repository';
+import { EventSourcedProductRepository } from './adapters/persistence/event-sourced-product.repository';
+import { PrismaProductReadModelRepository } from './adapters/persistence/prisma-product-read-model.repository';
+import { EventSourcedPaymentRepository } from './adapters/persistence/event-sourced-payment.repository';
+import { PrismaPaymentReadModelRepository } from './adapters/persistence/prisma-payment-read-model.repository';
+import { PrismaOrderHistoryRepository } from './adapters/persistence/prisma-order-history.repository';
+
+// ============================================================
+// Queue Adapters (Event Consumers)
+// ============================================================
+import { OrderEventConsumer } from './adapters/queue/order-event.consumer';
+import { PaymentEventConsumer } from './adapters/queue/payment-event.consumer';
+import { OrderHistoryEventConsumer } from './adapters/queue/order-history-event.consumer';
+import { ProductEventConsumer } from './adapters/queue/product-event.consumer';
+
+// ============================================================
+// Order Command Handlers
+// ============================================================
 import {
   CreateOrderHandler,
   AddOrderItemHandler,
@@ -27,15 +79,70 @@ import {
   ShipOrderHandler,
 } from './application/commands/order.handlers';
 
-// Query handlers
+// ============================================================
+// Product Command Handlers
+// ============================================================
+import {
+  CreateProductHandler,
+  UpdateProductHandler,
+  DeleteProductHandler,
+  UpdateProductStockHandler,
+} from './application/commands/product.handlers';
+
+// ============================================================
+// Payment Command Handlers
+// ============================================================
+import {
+  CreatePaymentHandler,
+  ProcessPaymentHandler,
+  CompletePaymentHandler,
+  FailPaymentHandler,
+  RefundPaymentHandler,
+} from './application/commands/payment.handlers';
+
+// ============================================================
+// Order Query Handlers
+// ============================================================
 import {
   GetOrderByIdHandler,
   GetOrdersByUserHandler,
   GetRecentOrdersHandler,
 } from './application/queries/order.handlers';
 
+// ============================================================
+// Product Query Handlers
+// ============================================================
+import {
+  GetProductByIdHandler,
+  GetProductBySkuHandler,
+  GetProductsByCategoryHandler,
+  GetActiveProductsHandler,
+  SearchProductsHandler,
+} from './application/queries/product.handlers';
+
+// ============================================================
+// Payment Query Handlers
+// ============================================================
+import {
+  GetPaymentByIdHandler,
+  GetPaymentsByOrderHandler,
+  GetPaymentsByStatusHandler,
+  GetPaymentByTransactionIdHandler,
+} from './application/queries/payment.handlers';
+
+// ============================================================
+// Use Cases
+// ============================================================
+import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
+
 @Module({
   imports: [
+    // Event Emitter for projections
+    EventEmitterModule.forRoot({
+      wildcard: true,
+      delimiter: '.',
+    }),
+
     // Event Store for event sourcing (MUST be before CqrsModule)
     EventStoreModule.forRoot({
       enableUpcasting: false,
@@ -44,22 +151,45 @@ import {
     // Core CQRS infrastructure
     CqrsModule.forRoot({
       commandHandlers: [
+        // Order commands
         CreateOrderHandler,
         AddOrderItemHandler,
         ConfirmOrderHandler,
         CancelOrderHandler,
         ShipOrderHandler,
+        // Product commands
+        CreateProductHandler,
+        UpdateProductHandler,
+        DeleteProductHandler,
+        UpdateProductStockHandler,
+        // Payment commands
+        CreatePaymentHandler,
+        ProcessPaymentHandler,
+        CompletePaymentHandler,
+        FailPaymentHandler,
+        RefundPaymentHandler,
       ],
       queryHandlers: [
+        // Order queries
         GetOrderByIdHandler,
         GetOrdersByUserHandler,
         GetRecentOrdersHandler,
+        // Product queries
+        GetProductByIdHandler,
+        GetProductBySkuHandler,
+        GetProductsByCategoryHandler,
+        GetActiveProductsHandler,
+        SearchProductsHandler,
+        // Payment queries
+        GetPaymentByIdHandler,
+        GetPaymentsByOrderHandler,
+        GetPaymentsByStatusHandler,
+        GetPaymentByTransactionIdHandler,
       ],
     }),
 
     // Outbox pattern for reliable messaging
     OutboxModule.forRoot({
-      // PrismaClient will be created automatically
       workerConfig: {
         pollingIntervalMs: 5000,
         batchSize: 100,
@@ -87,7 +217,6 @@ import {
       indicators: [],
       dependencies: [
         new PostgreSQLHealthIndicator(async (query: string) => {
-          // Mock implementation - replace with actual Prisma client
           console.log('Health check query:', query);
           return [{ result: 1 }];
         }),
@@ -109,7 +238,69 @@ import {
       global: true,
     }),
   ],
-  controllers: [OrderController],
-  providers: [],
+  controllers: [
+    OrderController,
+    ProductController,
+    PaymentController,
+    OrderHistoryController,
+  ],
+  providers: [
+    // ============================================================
+    // Order Repositories
+    // ============================================================
+    {
+      provide: ORDER_EVENT_REPOSITORY,
+      useClass: EventSourcedOrderRepository,
+    },
+    {
+      provide: ORDER_READ_MODEL_REPOSITORY,
+      useClass: PrismaOrderReadModelRepository,
+    },
+
+    // ============================================================
+    // Product Repositories (Event-sourced + Read Model)
+    // ============================================================
+    {
+      provide: PRODUCT_EVENT_REPOSITORY,
+      useClass: EventSourcedProductRepository,
+    },
+    {
+      provide: PRODUCT_READ_MODEL_REPOSITORY,
+      useClass: PrismaProductReadModelRepository,
+    },
+
+    // ============================================================
+    // Payment Repositories (Event-sourced + Read Model)
+    // ============================================================
+    {
+      provide: PAYMENT_EVENT_REPOSITORY,
+      useClass: EventSourcedPaymentRepository,
+    },
+    {
+      provide: PAYMENT_READ_MODEL_REPOSITORY,
+      useClass: PrismaPaymentReadModelRepository,
+    },
+
+    // ============================================================
+    // Order History Repository (Audit Log)
+    // ============================================================
+    {
+      provide: ORDER_HISTORY_REPOSITORY,
+      useClass: PrismaOrderHistoryRepository,
+    },
+
+    // ============================================================
+    // Queue Event Consumers - update read models from events
+    // ============================================================
+    OrderEventConsumer,
+    ProductEventConsumer,
+    PaymentEventConsumer,
+    OrderHistoryEventConsumer,
+
+    // ============================================================
+    // Use Cases - orchestrate complex workflows
+    // ============================================================
+    CheckoutUseCase,
+  ],
 })
 export class OrderModule {}

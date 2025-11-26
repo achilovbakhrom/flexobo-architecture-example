@@ -1,0 +1,233 @@
+/**
+ * Development Runner Script
+ *
+ * Usage:
+ *   npx tsx scripts/dev.ts order    # Run order-service
+ *   npx tsx scripts/dev.ts gateway  # Run api-gateway
+ *   npx tsx scripts/dev.ts admin    # Run admin-panel
+ *   npx tsx scripts/dev.ts all      # Run all services
+ *   npx tsx scripts/dev.ts stop     # Stop all services and containers
+ */
+
+import { execSync, spawn, ChildProcess } from 'child_process';
+
+type ServiceName = 'order' | 'gateway' | 'admin';
+
+interface ServiceConfig {
+  name: string;
+  nxProject: string;
+  dockerCompose: string;
+  color: string;
+}
+
+const SERVICES: Record<ServiceName, ServiceConfig> = {
+  order: {
+    name: 'order-service',
+    nxProject: 'order-service',
+    dockerCompose: 'apps/order-service/docker-compose.yml',
+    color: '\x1b[36m', // cyan
+  },
+  gateway: {
+    name: 'api-gateway',
+    nxProject: 'api-gateway',
+    dockerCompose: 'apps/api-gateway/docker-compose.yml',
+    color: '\x1b[33m', // yellow
+  },
+  admin: {
+    name: 'admin-panel',
+    nxProject: 'admin-panel',
+    dockerCompose: 'apps/admin-panel/docker-compose.yml',
+    color: '\x1b[35m', // magenta
+  },
+};
+
+const INFRA_COMPOSE = 'infrastructure/docker-compose.yml';
+const RESET = '\x1b[0m';
+const GREEN = '\x1b[32m';
+const RED = '\x1b[31m';
+const YELLOW = '\x1b[33m';
+
+function log(message: string, color = RESET) {
+  console.log(`${color}[dev]${RESET} ${message}`);
+}
+
+function exec(cmd: string, silent = false): string {
+  try {
+    return execSync(cmd, {
+      encoding: 'utf-8',
+      stdio: silent ? 'pipe' : 'inherit',
+    });
+  } catch {
+    return '';
+  }
+}
+
+function isDockerRunning(): boolean {
+  try {
+    execSync('docker info', { stdio: 'pipe' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isComposeUp(composeFile: string): boolean {
+  try {
+    const result = execSync(
+      `docker-compose -f ${composeFile} ps --services --filter "status=running"`,
+      { encoding: 'utf-8', stdio: 'pipe' }
+    );
+    return result.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+function startCompose(composeFile: string, name: string): void {
+  if (isComposeUp(composeFile)) {
+    log(`${name} containers already running`, GREEN);
+  } else {
+    log(`Starting ${name} containers...`);
+    exec(`docker-compose -f ${composeFile} up -d`);
+    log(`${name} containers started`, GREEN);
+  }
+}
+
+function stopCompose(composeFile: string, name: string): void {
+  if (isComposeUp(composeFile)) {
+    log(`Stopping ${name} containers...`, YELLOW);
+    exec(`docker-compose -f ${composeFile} down`);
+    log(`${name} containers stopped`, GREEN);
+  }
+}
+
+function runService(service: ServiceConfig): ChildProcess {
+  log(`Starting ${service.name}...`, service.color);
+
+  const child = spawn('npx', ['nx', 'serve', service.nxProject], {
+    stdio: 'inherit',
+    shell: true,
+  });
+
+  return child;
+}
+
+function runMultipleServices(services: ServiceConfig[]): void {
+  const names = services.map((s) => s.nxProject).join(',');
+  log(`Starting services: ${names}`, GREEN);
+
+  spawn(
+    'npx',
+    [
+      'nx',
+      'run-many',
+      '--target=serve',
+      `--projects=${names}`,
+      `--parallel=${services.length}`,
+    ],
+    {
+      stdio: 'inherit',
+      shell: true,
+    }
+  );
+}
+
+function killProcesses(): void {
+  log('Killing dev processes...', YELLOW);
+
+  // Kill nx serve processes
+  exec("pkill -f 'nx serve' 2>/dev/null || true", true);
+
+  // Kill node dist processes
+  exec("pkill -f 'node dist' 2>/dev/null || true", true);
+
+  // Kill processes on dev ports
+  exec(
+    'lsof -ti:3000,3001,3002,9229,9230,9231 | xargs kill -9 2>/dev/null || true',
+    true
+  );
+
+  log('Dev processes killed', GREEN);
+}
+
+function stopAll(): void {
+  log('Stopping all services...', YELLOW);
+
+  // Kill running processes
+  killProcesses();
+
+  // Stop all service containers
+  for (const key of Object.keys(SERVICES) as ServiceName[]) {
+    const service = SERVICES[key];
+    stopCompose(service.dockerCompose, service.name);
+  }
+
+  // Stop infrastructure
+  stopCompose(INFRA_COMPOSE, 'Infrastructure');
+
+  log('All services stopped', GREEN);
+}
+
+async function main() {
+  const arg = process.argv[2];
+
+  if (!arg || !['order', 'gateway', 'admin', 'all', 'stop'].includes(arg)) {
+    console.log(`
+Usage: npx tsx scripts/dev.ts <command>
+
+Commands:
+  order    - Run order-service (port 3001)
+  gateway  - Run api-gateway (port 3000)
+  admin    - Run admin-panel (port 3002)
+  all      - Run all services
+  stop     - Stop all services and containers
+`);
+    process.exit(1);
+  }
+
+  // Handle stop command
+  if (arg === 'stop') {
+    stopAll();
+    return;
+  }
+
+  // Check Docker for start commands
+  if (!isDockerRunning()) {
+    log('Docker is not running. Please start Docker first.', RED);
+    process.exit(1);
+  }
+
+  // Start shared infrastructure (RabbitMQ)
+  log('Checking shared infrastructure...');
+  startCompose(INFRA_COMPOSE, 'Infrastructure (RabbitMQ)');
+
+  if (arg === 'all') {
+    // Start all service containers
+    for (const key of Object.keys(SERVICES) as ServiceName[]) {
+      const service = SERVICES[key];
+      startCompose(service.dockerCompose, service.name);
+    }
+
+    // Run all services
+    runMultipleServices(Object.values(SERVICES));
+  } else {
+    const service = SERVICES[arg as ServiceName];
+
+    // Start service-specific containers
+    startCompose(service.dockerCompose, service.name);
+
+    // Run the service
+    runService(service);
+  }
+}
+
+// Handle Ctrl+C gracefully
+process.on('SIGINT', () => {
+  log('\nShutting down...', RED);
+  process.exit(0);
+});
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

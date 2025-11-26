@@ -1,13 +1,13 @@
 // Admin Panel Database Schema
 
 generator client {
-    provider = "prisma-client-js"
-    output   = "../../../node_modules/.prisma/admin-client"
+    provider   = "prisma-client-js"
+    output     = "../node_modules/.prisma/admin-client"
+    engineType = "client"
 }
 
 datasource db {
     provider = "postgresql"
-    url      = env("ADMIN_PANEL_DATABASE_URL")
 }
 
 // Admin users
