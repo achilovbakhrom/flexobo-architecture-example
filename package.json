@@ -11,13 +11,20 @@
     "stop": "npx tsx scripts/dev.ts stop",
     "db:migration:create:order": "npx prisma migrate dev --create-only --config apps/order-service/prisma.config.ts",
     "db:migration:create:admin": "npx prisma migrate dev --create-only --config apps/admin-panel/prisma.config.ts",
+    "db:migration:create:gateway": "npx prisma migrate dev --create-only --config apps/api-gateway/prisma.config.ts",
     "db:migration:apply:order": "npx prisma migrate deploy --config apps/order-service/prisma.config.ts",
     "db:migration:apply:admin": "npx prisma migrate deploy --config apps/admin-panel/prisma.config.ts",
+    "db:migration:apply:gateway": "npx prisma migrate deploy --config apps/api-gateway/prisma.config.ts",
     "db:studio:order": "npx prisma studio --config apps/order-service/prisma.config.ts --port 5555",
     "db:studio:admin": "npx prisma studio --config apps/admin-panel/prisma.config.ts --port 5557",
+    "db:studio:gateway": "npx prisma studio --config apps/api-gateway/prisma.config.ts --port 5556",
     "test": "npx nx run-many --target=test --all",
     "lint": "npx nx run-many --target=lint --all",
-    "build": "npx nx run-many --target=build --all"
+    "build": "npx nx run-many --target=build --all",
+    "docker:build:order": "docker build -f apps/order-service/Dockerfile -t flexobo/order-service:latest .",
+    "docker:build:gateway": "docker build -f apps/api-gateway/Dockerfile -t flexobo/api-gateway:latest .",
+    "docker:build:admin": "docker build -f apps/admin-panel/Dockerfile -t flexobo/admin-panel:latest .",
+    "docker:build:all": "npm run docker:build:order && npm run docker:build:gateway && npm run docker:build:admin"
   },
   "private": true,
   "dependencies": {

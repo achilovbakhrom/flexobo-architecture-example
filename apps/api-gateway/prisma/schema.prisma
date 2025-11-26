@@ -1,13 +1,13 @@
 // API Gateway Database Schema
 
 generator client {
-    provider = "prisma-client-js"
-    output   = "../../../node_modules/.prisma/gateway-client"
+    provider   = "prisma-client-js"
+    output     = "../node_modules/.prisma/gateway-client"
+    engineType = "client"
 }
 
 datasource db {
     provider = "postgresql"
-    url      = env("API_GATEWAY_DATABASE_URL")
 }
 
 // Rate limiting tracking
