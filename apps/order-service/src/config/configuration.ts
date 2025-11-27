@@ -1,8 +1,3 @@
-/**
- * Order Service Configuration
- * Typed configuration with validation
- */
-
 import { registerAs } from '@nestjs/config';
 
 export interface OrderServiceConfig {

@@ -1,25 +1,13 @@
-/**
- * Order command handlers
- *
- * These handlers use the IOrderEventRepository to persist and load order events.
- * The application layer is responsible for:
- * - Reconstructing domain aggregates from events
- * - Executing business logic on aggregates
- * - Converting uncommitted events to storable format
- *
- * This maintains proper hexagonal architecture separation:
- * - Infrastructure (adapter) works only with DTOs/events
- * - Application layer knows about domain entities
- * - Domain layer remains pure
- */
-
 import {
   CommandHandler,
   ICommandHandler,
   Result,
   Success,
   DomainEvent,
+  OutboxService,
 } from '@flexobo/core';
+import { Inject } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Order } from '../../domain/order.aggregate';
 import {
   IOrderEventRepository,
@@ -32,12 +20,10 @@ import {
   ConfirmOrderCommand,
   CancelOrderCommand,
   ShipOrderCommand,
+  MarkInventoryReservedCommand,
+  MarkInventoryFailedCommand,
 } from './order.commands';
-import { Inject } from '@nestjs/common';
 
-/**
- * Converts stored events to domain events for aggregate reconstruction
- */
 function toDomainEvents(stored: StoredEventDto[]): DomainEvent[] {
   return stored.map((s) => ({
     type: s.eventType,
@@ -49,9 +35,6 @@ function toDomainEvents(stored: StoredEventDto[]): DomainEvent[] {
   }));
 }
 
-/**
- * Loads an Order aggregate from stored events
- */
 async function loadOrder(
   repository: IOrderEventRepository,
   orderId: string
@@ -66,23 +49,20 @@ async function loadOrder(
   return Order.fromEvents(events);
 }
 
-/**
- * Saves uncommitted events from an Order aggregate
- */
 async function saveOrder(
   repository: IOrderEventRepository,
-  order: Order
-): Promise<void> {
+  order: Order,
+  outboxService: OutboxService,
+  eventEmitter: EventEmitter2
+): Promise<DomainEvent[]> {
   const uncommittedEvents = order.getUncommittedEvents();
 
   if (uncommittedEvents.length === 0) {
-    return;
+    return [];
   }
 
-  // Calculate expected version for optimistic concurrency
   const expectedVersion = order.version - uncommittedEvents.length;
 
-  // Convert domain events to storable format
   const events = uncommittedEvents.map((event) => ({
     type: event.type,
     data: event.data,
@@ -91,7 +71,21 @@ async function saveOrder(
 
   await repository.appendEvents(order.id, events, expectedVersion);
 
+  await outboxService.saveEvents(uncommittedEvents, order.id, 'Order');
+
+  for (const event of uncommittedEvents) {
+    const eventName = `order.${event.type.toLowerCase().replace('order', '')}`;
+    eventEmitter.emit(eventName, {
+      aggregateId: event.aggregateId,
+      eventType: event.type,
+      data: event.data,
+      version: event.version,
+    });
+  }
+
   order.markEventsAsCommitted();
+
+  return uncommittedEvents;
 }
 
 @CommandHandler(CreateOrderCommand)
@@ -100,12 +94,13 @@ export class CreateOrderHandler
 {
   constructor(
     @Inject(ORDER_EVENT_REPOSITORY)
-    private readonly eventRepository: IOrderEventRepository
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async execute(command: CreateOrderCommand): Promise<Result<void, Error>> {
     try {
-      // Check if order already exists
       const exists = await this.eventRepository.exists(command.orderId);
       if (exists) {
         return {
@@ -115,11 +110,14 @@ export class CreateOrderHandler
         };
       }
 
-      // Create new order (domain logic)
       const order = Order.create(command.orderId, command.userId);
 
-      // Save events through repository
-      await saveOrder(this.eventRepository, order);
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
 
       return new Success(undefined);
     } catch (error) {
@@ -135,12 +133,13 @@ export class AddOrderItemHandler
 {
   constructor(
     @Inject(ORDER_EVENT_REPOSITORY)
-    private readonly eventRepository: IOrderEventRepository
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async execute(command: AddOrderItemCommand): Promise<Result<void, Error>> {
     try {
-      // Load order from events
       const order = await loadOrder(this.eventRepository, command.orderId);
 
       if (!order) {
@@ -151,7 +150,6 @@ export class AddOrderItemHandler
         };
       }
 
-      // Execute business logic (domain)
       order.addItem(
         command.productId,
         command.productName,
@@ -160,8 +158,12 @@ export class AddOrderItemHandler
         command.priceCurrency
       );
 
-      // Save events
-      await saveOrder(this.eventRepository, order);
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
 
       return new Success(undefined);
     } catch (error) {
@@ -176,7 +178,9 @@ export class ConfirmOrderHandler
 {
   constructor(
     @Inject(ORDER_EVENT_REPOSITORY)
-    private readonly eventRepository: IOrderEventRepository
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async execute(command: ConfirmOrderCommand): Promise<Result<void, Error>> {
@@ -193,7 +197,12 @@ export class ConfirmOrderHandler
 
       order.confirm();
 
-      await saveOrder(this.eventRepository, order);
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
 
       return new Success(undefined);
     } catch (error) {
@@ -208,7 +217,9 @@ export class CancelOrderHandler
 {
   constructor(
     @Inject(ORDER_EVENT_REPOSITORY)
-    private readonly eventRepository: IOrderEventRepository
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async execute(command: CancelOrderCommand): Promise<Result<void, Error>> {
@@ -225,7 +236,12 @@ export class CancelOrderHandler
 
       order.cancel(command.reason);
 
-      await saveOrder(this.eventRepository, order);
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
 
       return new Success(undefined);
     } catch (error) {
@@ -240,7 +256,9 @@ export class ShipOrderHandler
 {
   constructor(
     @Inject(ORDER_EVENT_REPOSITORY)
-    private readonly eventRepository: IOrderEventRepository
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
   async execute(command: ShipOrderCommand): Promise<Result<void, Error>> {
@@ -257,7 +275,94 @@ export class ShipOrderHandler
 
       order.ship(command.trackingNumber);
 
-      await saveOrder(this.eventRepository, order);
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(MarkInventoryReservedCommand)
+export class MarkInventoryReservedHandler
+  implements ICommandHandler<MarkInventoryReservedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
+  ) {}
+
+  async execute(
+    command: MarkInventoryReservedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await loadOrder(this.eventRepository, command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      order.markInventoryReserved(command.reservations);
+
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(MarkInventoryFailedCommand)
+export class MarkInventoryFailedHandler
+  implements ICommandHandler<MarkInventoryFailedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_EVENT_REPOSITORY)
+    private readonly eventRepository: IOrderEventRepository,
+    private readonly outboxService: OutboxService,
+    private readonly eventEmitter: EventEmitter2
+  ) {}
+
+  async execute(
+    command: MarkInventoryFailedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await loadOrder(this.eventRepository, command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      order.markInventoryFailed(command.failedProductIds, command.reason);
+
+      await saveOrder(
+        this.eventRepository,
+        order,
+        this.outboxService,
+        this.eventEmitter
+      );
 
       return new Success(undefined);
     } catch (error) {

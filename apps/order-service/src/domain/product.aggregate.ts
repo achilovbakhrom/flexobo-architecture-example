@@ -1,24 +1,9 @@
-/**
- * Product Aggregate (Event-Sourced)
- *
- * Represents a product in the catalog. Follows event sourcing pattern
- * where all state changes are captured as domain events.
- */
-
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-
-// ============================================================
-// Value Objects
-// ============================================================
 
 export interface ProductPrice {
   amount: number;
   currency: string;
 }
-
-// ============================================================
-// Product Aggregate
-// ============================================================
 
 export class Product extends AggregateRoot {
   private sku!: string;
@@ -31,9 +16,6 @@ export class Product extends AggregateRoot {
   private imageUrl?: string;
   private metadata?: Record<string, unknown>;
 
-  /**
-   * Create a new product
-   */
   static create(
     productId: string,
     sku: string,
@@ -68,18 +50,12 @@ export class Product extends AggregateRoot {
     return product;
   }
 
-  /**
-   * Reconstruct product from events
-   */
   static fromEvents(events: DomainEvent[]): Product {
     const product = new Product(events[0].aggregateId);
     product.loadFromHistory(events);
     return product;
   }
 
-  /**
-   * Update product details
-   */
   update(data: {
     name?: string;
     description?: string;
@@ -103,9 +79,6 @@ export class Product extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Update stock level
-   */
   updateStock(quantity: number, reason?: string): void {
     if (quantity < 0) {
       throw new Error('Stock level cannot be negative');
@@ -123,9 +96,6 @@ export class Product extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Activate the product
-   */
   activate(): void {
     if (this.isActive) {
       return; // Already active
@@ -136,9 +106,6 @@ export class Product extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Deactivate the product
-   */
   deactivate(): void {
     if (!this.isActive) {
       return; // Already inactive
@@ -149,18 +116,12 @@ export class Product extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Delete the product (soft delete via deactivation)
-   */
   delete(): void {
     const event = this.createEvent('ProductDeleted', {});
     this.addEvent(event);
     this.apply(event);
   }
 
-  /**
-   * Get product details
-   */
   getDetails() {
     return {
       id: this.id,
@@ -177,7 +138,6 @@ export class Product extends AggregateRoot {
     };
   }
 
-  // Getters
   getSku(): string {
     return this.sku;
   }
@@ -193,10 +153,6 @@ export class Product extends AggregateRoot {
   getIsActive(): boolean {
     return this.isActive;
   }
-
-  // ============================================================
-  // Event Application Logic
-  // ============================================================
 
   protected apply(event: DomainEvent): void {
     switch (event.type) {
@@ -232,8 +188,7 @@ export class Product extends AggregateRoot {
           event.data['currency'] !== undefined
         ) {
           this.price = {
-            amount:
-              (event.data['priceAmount'] as number) ?? this.price.amount,
+            amount: (event.data['priceAmount'] as number) ?? this.price.amount,
             currency: (event.data['currency'] as string) ?? this.price.currency,
           };
         }
@@ -262,7 +217,6 @@ export class Product extends AggregateRoot {
         break;
 
       default:
-        // Ignore unknown events
         break;
     }
   }

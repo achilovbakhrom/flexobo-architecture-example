@@ -1,15 +1,4 @@
-/**
- * Payment Aggregate (Event-Sourced)
- *
- * Represents a payment for an order. Follows event sourcing pattern
- * where all state changes are captured as domain events.
- */
-
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-
-// ============================================================
-// Value Objects
-// ============================================================
 
 export enum PaymentStatus {
   PENDING = 'PENDING',
@@ -31,10 +20,6 @@ export interface PaymentAmount {
   currency: string;
 }
 
-// ============================================================
-// Payment Aggregate
-// ============================================================
-
 export class Payment extends AggregateRoot {
   private orderId!: string;
   private amount!: PaymentAmount;
@@ -45,9 +30,6 @@ export class Payment extends AggregateRoot {
   private refundedAmount?: PaymentAmount;
   private processedAt?: Date;
 
-  /**
-   * Create a new payment
-   */
   static create(
     paymentId: string,
     orderId: string,
@@ -70,18 +52,12 @@ export class Payment extends AggregateRoot {
     return payment;
   }
 
-  /**
-   * Reconstruct payment from events
-   */
   static fromEvents(events: DomainEvent[]): Payment {
     const payment = new Payment(events[0].aggregateId);
     payment.loadFromHistory(events);
     return payment;
   }
 
-  /**
-   * Start processing the payment
-   */
   process(): void {
     if (this.status !== PaymentStatus.PENDING) {
       throw new Error('Can only process pending payments');
@@ -92,9 +68,6 @@ export class Payment extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Complete the payment
-   */
   complete(transactionId: string): void {
     if (this.status !== PaymentStatus.PROCESSING) {
       throw new Error('Can only complete processing payments');
@@ -108,9 +81,6 @@ export class Payment extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Mark payment as failed
-   */
   fail(reason: string): void {
     if (
       this.status !== PaymentStatus.PENDING &&
@@ -127,9 +97,6 @@ export class Payment extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Refund the payment (full or partial)
-   */
   refund(amount: number, reason: string): void {
     if (this.status !== PaymentStatus.COMPLETED) {
       throw new Error('Can only refund completed payments');
@@ -148,9 +115,6 @@ export class Payment extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Get payment details
-   */
   getDetails() {
     return {
       id: this.id,
@@ -166,7 +130,6 @@ export class Payment extends AggregateRoot {
     };
   }
 
-  // Getters for read operations
   getOrderId(): string {
     return this.orderId;
   }
@@ -174,10 +137,6 @@ export class Payment extends AggregateRoot {
   getStatus(): PaymentStatus {
     return this.status;
   }
-
-  // ============================================================
-  // Event Application Logic
-  // ============================================================
 
   protected apply(event: DomainEvent): void {
     switch (event.type) {
@@ -216,7 +175,6 @@ export class Payment extends AggregateRoot {
         break;
 
       default:
-        // Ignore unknown events
         break;
     }
   }

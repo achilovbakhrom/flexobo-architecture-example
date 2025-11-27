@@ -81,11 +81,13 @@ model ProjectionPosition {
 model OrderReadModel {
     id             String   @id
     userId         String   @map("user_id")
-    status         String   // DRAFT, CONFIRMED, PAID, SHIPPED, DELIVERED, CANCELLED
+    status         String   // DRAFT, CONFIRMED, AWAITING_INVENTORY, INVENTORY_RESERVED, INVENTORY_FAILED, PAID, SHIPPED, DELIVERED, CANCELLED
     totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
     currency       String   @default("USD")
     itemCount      Int      @default(0) @map("item_count")
     trackingNumber String?  @map("tracking_number")
+    version        Int      @default(0) // Projection version for idempotency
+    lastEventId    String?  @map("last_event_id") // Last processed event ID
     createdAt      DateTime @default(now()) @map("created_at")
     updatedAt      DateTime @updatedAt @map("updated_at")
 

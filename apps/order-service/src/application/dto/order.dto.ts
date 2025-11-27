@@ -1,10 +1,3 @@
-/**
- * Order DTOs (Data Transfer Objects)
- *
- * These DTOs are used for communication between layers.
- * They decouple the domain model from infrastructure concerns.
- */
-
 export interface OrderItemDto {
   productId: string;
   productName: string;
@@ -24,9 +17,6 @@ export interface OrderDto {
   version: number;
 }
 
-/**
- * Stored event format from the event store
- */
 export interface StoredEventDto {
   id: string;
   aggregateId: string;
@@ -38,9 +28,6 @@ export interface StoredEventDto {
   metadata?: Record<string, unknown> | null;
 }
 
-/**
- * Read model for order list queries
- */
 export interface OrderReadModelDto {
   id: string;
   userId: string;
@@ -53,9 +40,6 @@ export interface OrderReadModelDto {
   updatedAt: Date;
 }
 
-/**
- * Read model for order items
- */
 export interface OrderItemReadModelDto {
   id: string;
   orderId: string;
@@ -66,9 +50,6 @@ export interface OrderItemReadModelDto {
   priceCurrency: string;
 }
 
-/**
- * Full order read model with items
- */
 export interface OrderWithItemsReadModelDto extends OrderReadModelDto {
   items: OrderItemReadModelDto[];
 }

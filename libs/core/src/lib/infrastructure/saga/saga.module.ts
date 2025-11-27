@@ -1,46 +1,38 @@
 import { DynamicModule, Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { PrismaClient } from '@prisma/client';
-import { PrismaSagaRepository } from './prisma-saga.repository';
+import {
+  PrismaSagaRepository,
+  SAGA_PRISMA_CLIENT,
+} from './prisma-saga.repository';
 
 export const SAGA_REPOSITORY = 'SAGA_REPOSITORY';
-export const PRISMA_CLIENT = 'PRISMA_CLIENT';
 
-/**
- * Saga module for orchestration pattern
- */
 @Module({})
 export class SagaModule {
-  /**
-   * Register module with Prisma client
-   */
-  static forRoot(options?: { prismaClient?: PrismaClient }): DynamicModule {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  static forRoot(options?: { prismaClient?: any }): DynamicModule {
     const prismaProvider = {
-      provide: PRISMA_CLIENT,
-      useValue: options?.prismaClient ?? new PrismaClient(),
+      provide: SAGA_PRISMA_CLIENT,
+      useValue: options?.prismaClient,
     };
 
     const repositoryProvider = {
       provide: SAGA_REPOSITORY,
-      useFactory: (prisma: PrismaClient) => new PrismaSagaRepository(prisma),
-      inject: [PRISMA_CLIENT],
+      useClass: PrismaSagaRepository,
     };
 
     return {
       module: SagaModule,
       imports: [EventEmitterModule.forRoot()],
       providers: [prismaProvider, repositoryProvider],
-      exports: [SAGA_REPOSITORY, PRISMA_CLIENT],
+      exports: [SAGA_REPOSITORY, SAGA_PRISMA_CLIENT],
       global: true,
     };
   }
 
-  /**
-   * Register module with async configuration
-   */
   static forRootAsync(options: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    useFactory: (...args: any[]) => Promise<{ prismaClient?: PrismaClient }> | { prismaClient?: PrismaClient };
+    useFactory: (...args: any[]) => Promise<{ prismaClient?: any }> | { prismaClient?: any };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     inject?: any[];
   }): DynamicModule {
@@ -51,23 +43,22 @@ export class SagaModule {
     };
 
     const prismaProvider = {
-      provide: PRISMA_CLIENT,
-      useFactory: (config: { prismaClient?: PrismaClient }) =>
-        config.prismaClient ?? new PrismaClient(),
+      provide: SAGA_PRISMA_CLIENT,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      useFactory: (config: { prismaClient?: any }) => config.prismaClient,
       inject: ['SAGA_MODULE_OPTIONS'],
     };
 
     const repositoryProvider = {
       provide: SAGA_REPOSITORY,
-      useFactory: (prisma: PrismaClient) => new PrismaSagaRepository(prisma),
-      inject: [PRISMA_CLIENT],
+      useClass: PrismaSagaRepository,
     };
 
     return {
       module: SagaModule,
       imports: [EventEmitterModule.forRoot()],
       providers: [optionsProvider, prismaProvider, repositoryProvider],
-      exports: [SAGA_REPOSITORY, PRISMA_CLIENT],
+      exports: [SAGA_REPOSITORY, SAGA_PRISMA_CLIENT],
       global: true,
     };
   }

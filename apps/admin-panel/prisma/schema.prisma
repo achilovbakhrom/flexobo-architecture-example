@@ -71,3 +71,104 @@ model FeatureFlag {
 
     @@map("feature_flags")
 }
+
+// ============================================================
+// Event Sourcing Infrastructure
+// ============================================================
+
+// Event store for inventory aggregate
+model Event {
+    id            String   @id @default(uuid())
+    aggregateId   String   @map("aggregate_id")
+    aggregateType String   @map("aggregate_type")
+    eventType     String   @map("event_type")
+    eventData     Json     @map("event_data")
+    version       Int
+    occurredAt    DateTime @default(now()) @map("occurred_at")
+    metadata      Json?
+
+    @@unique([aggregateId, version])
+    @@index([aggregateId])
+    @@index([aggregateType, occurredAt])
+    @@index([eventType])
+    @@map("events")
+}
+
+// Outbox for reliable messaging
+model OutboxMessage {
+    id            String   @id @default(uuid())
+    aggregateId   String   @map("aggregate_id")
+    aggregateType String   @map("aggregate_type")
+    eventType     String   @map("event_type")
+    payload       Json
+    status        String   @default("PENDING") // PENDING, PROCESSING, PUBLISHED, FAILED
+    retryCount    Int      @default(0) @map("retry_count")
+    maxRetries    Int      @default(5) @map("max_retries")
+    error         String?
+    companyId     String?  @map("company_id")
+    metadata      Json?
+    createdAt     DateTime @default(now()) @map("created_at")
+    processedAt   DateTime? @map("processed_at")
+    publishedAt   DateTime? @map("published_at")
+
+    @@index([status, createdAt])
+    @@index([aggregateId])
+    @@map("outbox_messages")
+}
+
+// ============================================================
+// Inventory Read Models
+// ============================================================
+
+// Inventory read model (denormalized for queries)
+model InventoryReadModel {
+    id             String   @id
+    productId      String   @unique @map("product_id")
+    sku            String   @unique
+    productName    String   @map("product_name")
+    totalStock     Int      @default(0) @map("total_stock")
+    reservedStock  Int      @default(0) @map("reserved_stock")
+    availableStock Int      @default(0) @map("available_stock")
+    version        Int      @default(0)
+    lastEventId    String?  @map("last_event_id")
+    createdAt      DateTime @default(now()) @map("created_at")
+    updatedAt      DateTime @updatedAt @map("updated_at")
+
+    reservations StockReservationReadModel[]
+
+    @@index([sku])
+    @@index([productId])
+    @@map("inventory_read_model")
+}
+
+// Stock reservations read model
+model StockReservationReadModel {
+    id          String   @id @default(uuid())
+    inventoryId String   @map("inventory_id")
+    orderId     String   @map("order_id")
+    quantity    Int
+    status      String   // PENDING, CONFIRMED, RELEASED, EXPIRED
+    reservedAt  DateTime @map("reserved_at")
+    expiresAt   DateTime @map("expires_at")
+    releasedAt  DateTime? @map("released_at")
+    confirmedAt DateTime? @map("confirmed_at")
+
+    inventory InventoryReadModel @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+    @@unique([inventoryId, orderId])
+    @@index([orderId])
+    @@index([status])
+    @@index([expiresAt])
+    @@map("stock_reservations")
+}
+
+// Projection checkpoint for idempotent event processing
+model ProjectionCheckpoint {
+    id               String   @id @default(uuid())
+    projectionName   String   @unique @map("projection_name")
+    lastEventId      String   @map("last_event_id")
+    lastEventVersion Int      @map("last_event_version")
+    processedAt      DateTime @default(now()) @map("processed_at")
+
+    @@map("projection_checkpoints")
+}

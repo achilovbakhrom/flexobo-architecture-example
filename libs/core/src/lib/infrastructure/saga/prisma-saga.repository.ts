@@ -1,24 +1,78 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   ISagaRepository,
   SagaExecution,
   SagaStatus,
   SagaStepStatus,
+  SagaStepExecution,
 } from './saga.interface';
 
-/**
- * Prisma-based saga repository implementation
- */
+interface SagaRecord {
+  id: string;
+  sagaType: string;
+  status: string;
+  context: unknown;
+  steps: unknown[];
+  startedAt: Date;
+  completedAt: Date | null;
+  error: string | null;
+  metadata: unknown;
+}
+
+interface SagaPrismaClient {
+  saga: {
+    create: (args: {
+      data: {
+        id: string;
+        sagaType: string;
+        status: string;
+        context: object;
+        steps: object[];
+        startedAt: Date;
+        completedAt?: Date;
+        error?: string;
+        metadata: object;
+      };
+    }) => Promise<SagaRecord>;
+    findUnique: (args: {
+      where: { id: string };
+    }) => Promise<SagaRecord | null>;
+    findMany: (args: {
+      where: { status: string };
+      take: number;
+      orderBy: { startedAt: 'asc' | 'desc' };
+    }) => Promise<SagaRecord[]>;
+    update: (args: {
+      where: { id: string };
+      data: {
+        status?: string;
+        completedAt?: Date;
+        steps?: object[];
+      };
+    }) => Promise<SagaRecord>;
+    delete: (args: { where: { id: string } }) => Promise<SagaRecord>;
+    deleteMany: (args: {
+      where: {
+        AND: Array<{
+          OR?: Array<{ status: string }>;
+          completedAt?: { lt: Date };
+        }>;
+      };
+    }) => Promise<{ count: number }>;
+  };
+}
+
+export const SAGA_PRISMA_CLIENT = Symbol('SAGA_PRISMA_CLIENT');
+
 @Injectable()
 export class PrismaSagaRepository implements ISagaRepository {
   private readonly logger = new Logger(PrismaSagaRepository.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(SAGA_PRISMA_CLIENT)
+    private readonly prisma: SagaPrismaClient
+  ) {}
 
-  /**
-   * Save saga execution state
-   */
   async save(execution: SagaExecution): Promise<void> {
     try {
       await this.prisma.saga.create({
@@ -40,9 +94,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Find saga execution by ID
-   */
   async findById(sagaId: string): Promise<SagaExecution | null> {
     try {
       const saga = await this.prisma.saga.findUnique({
@@ -59,7 +110,7 @@ export class PrismaSagaRepository implements ISagaRepository {
         status: saga.status as SagaStatus,
         context: saga.context,
         steps:
-          saga.steps as unknown as import('./saga.interface').SagaStepExecution[],
+          saga.steps as unknown as SagaStepExecution[],
         startedAt: saga.startedAt,
         completedAt: saga.completedAt ?? undefined,
         error: saga.error ?? undefined,
@@ -71,9 +122,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Find saga executions by status
-   */
   async findByStatus(
     status: SagaStatus,
     limit = 100
@@ -92,7 +140,7 @@ export class PrismaSagaRepository implements ISagaRepository {
         status: saga.status as SagaStatus,
         context: saga.context,
         steps:
-          saga.steps as unknown as import('./saga.interface').SagaStepExecution[],
+          saga.steps as unknown as SagaStepExecution[],
         startedAt: saga.startedAt,
         completedAt: saga.completedAt ?? undefined,
         error: saga.error ?? undefined,
@@ -104,9 +152,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Update saga execution status
-   */
   async updateStatus(sagaId: string, status: SagaStatus): Promise<void> {
     try {
       await this.prisma.saga.update({
@@ -129,9 +174,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Update saga step status
-   */
   async updateStepStatus(
     sagaId: string,
     stepName: string,
@@ -154,7 +196,6 @@ export class PrismaSagaRepository implements ISagaRepository {
       const stepIndex = steps.findIndex((s: any) => s.stepName === stepName);
 
       if (stepIndex === -1) {
-        // Step not found, add it
         steps.push({
           stepName,
           status,
@@ -170,7 +211,6 @@ export class PrismaSagaRepository implements ISagaRepository {
           attempt: 1,
         });
       } else {
-        // Update existing step
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const existingStep = steps[stepIndex] as any;
         steps[stepIndex] = {
@@ -199,9 +239,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Delete saga execution
-   */
   async delete(sagaId: string): Promise<void> {
     try {
       await this.prisma.saga.delete({
@@ -213,9 +250,6 @@ export class PrismaSagaRepository implements ISagaRepository {
     }
   }
 
-  /**
-   * Clean up completed/compensated sagas older than specified days
-   */
   async cleanup(olderThanDays = 30): Promise<number> {
     try {
       const cutoffDate = new Date();

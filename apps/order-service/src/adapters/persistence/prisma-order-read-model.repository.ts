@@ -4,16 +4,27 @@
  * Implements IOrderReadModelRepository for querying order read models.
  */
 
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   IOrderReadModelRepository,
   ORDER_READ_MODEL_REPOSITORY,
+  VersionedUpsertOptions,
 } from '../../ports/order-read-model.port';
 import {
   OrderReadModelDto,
   OrderWithItemsReadModelDto,
   OrderItemReadModelDto,
 } from '../../application/dto/order.dto';
+
+interface OrderReadModelUpdate {
+  status?: string;
+  totalAmount?: unknown;
+  currency?: string;
+  itemCount?: number;
+  trackingNumber?: string | null;
+  version?: number | { increment: number };
+  lastEventId?: string | null;
+}
 
 interface OrderPrismaClient {
   orderReadModel: {
@@ -30,7 +41,7 @@ interface OrderPrismaClient {
     upsert: (args: {
       where: { id: string };
       create: Omit<OrderRecord, 'items' | 'createdAt' | 'updatedAt'>;
-      update: Partial<Omit<OrderRecord, 'id' | 'items' | 'createdAt' | 'updatedAt'>>;
+      update: OrderReadModelUpdate;
     }) => Promise<OrderRecord>;
     delete: (args: { where: { id: string } }) => Promise<OrderRecord>;
   };
@@ -51,6 +62,8 @@ interface OrderRecord {
   currency: string;
   itemCount: number;
   trackingNumber: string | null;
+  version: number;
+  lastEventId: string | null;
   createdAt: Date;
   updatedAt: Date;
   items?: OrderItemRecord[];
@@ -68,6 +81,8 @@ interface OrderItemRecord {
 
 @Injectable()
 export class PrismaOrderReadModelRepository implements IOrderReadModelRepository {
+  private readonly logger = new Logger(PrismaOrderReadModelRepository.name);
+
   constructor(
     @Inject('PrismaClient') private readonly prisma: OrderPrismaClient
   ) {}
@@ -120,7 +135,32 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
     return orders.map((order) => this.mapToReadModelDto(order));
   }
 
-  async upsert(order: Omit<OrderReadModelDto, 'createdAt'>): Promise<void> {
+  async upsert(
+    order: Omit<OrderReadModelDto, 'createdAt'>,
+    options?: VersionedUpsertOptions
+  ): Promise<boolean> {
+    // Check for idempotency - skip if event already processed
+    if (options?.eventId) {
+      const alreadyProcessed = await this.isEventProcessed(order.id, options.eventId);
+      if (alreadyProcessed) {
+        this.logger.debug(
+          `Event ${options.eventId} already processed for order ${order.id}, skipping`
+        );
+        return false;
+      }
+    }
+
+    // Check expected version for optimistic concurrency
+    if (options?.expectedVersion !== undefined) {
+      const currentVersion = await this.getVersion(order.id);
+      if (currentVersion !== options.expectedVersion) {
+        this.logger.warn(
+          `Version mismatch for order ${order.id}: expected ${options.expectedVersion}, got ${currentVersion}`
+        );
+        return false;
+      }
+    }
+
     await this.prisma.orderReadModel.upsert({
       where: { id: order.id },
       create: {
@@ -131,6 +171,8 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
         currency: order.currency,
         itemCount: order.itemCount,
         trackingNumber: order.trackingNumber ?? null,
+        version: 1,
+        lastEventId: options?.eventId ?? null,
       },
       update: {
         status: order.status,
@@ -138,8 +180,26 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
         currency: order.currency,
         itemCount: order.itemCount,
         trackingNumber: order.trackingNumber ?? null,
+        version: { increment: 1 },
+        lastEventId: options?.eventId ?? undefined,
       },
     });
+
+    return true;
+  }
+
+  async getVersion(orderId: string): Promise<number> {
+    const order = await this.prisma.orderReadModel.findUnique({
+      where: { id: orderId },
+    });
+    return order?.version ?? 0;
+  }
+
+  async isEventProcessed(orderId: string, eventId: string): Promise<boolean> {
+    const order = await this.prisma.orderReadModel.findUnique({
+      where: { id: orderId },
+    });
+    return order?.lastEventId === eventId;
   }
 
   async saveItem(item: OrderItemReadModelDto): Promise<void> {

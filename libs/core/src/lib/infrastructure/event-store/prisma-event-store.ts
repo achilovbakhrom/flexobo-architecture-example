@@ -1,19 +1,29 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Inject } from '@nestjs/common';
 import { IEventStore, StoredEvent } from './event-store.interface';
 import { DomainEvent, ConcurrencyException } from '../../domain';
 
-/**
- * Prisma-based implementation of event store
- * Stores events in PostgreSQL with partitioning support
- */
+interface EventStorePrismaClient {
+  $transaction: <T>(
+    fn: (tx: {
+      $queryRawUnsafe: <R>(query: string, ...values: unknown[]) => Promise<R>;
+      $executeRawUnsafe: (
+        query: string,
+        ...values: unknown[]
+      ) => Promise<number>;
+    }) => Promise<T>
+  ) => Promise<T>;
+  $queryRawUnsafe: <R>(query: string, ...values: unknown[]) => Promise<R>;
+}
+
+export const EVENT_STORE_PRISMA_CLIENT = Symbol('EVENT_STORE_PRISMA_CLIENT');
+
 @Injectable()
 export class PrismaEventStore implements IEventStore {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(EVENT_STORE_PRISMA_CLIENT)
+    private readonly prisma: EventStorePrismaClient
+  ) {}
 
-  /**
-   * Appends events to the event store with optimistic concurrency control
-   */
   async append(
     aggregateId: string,
     events: DomainEvent[],
@@ -24,10 +34,8 @@ export class PrismaEventStore implements IEventStore {
     }
 
     try {
-      // Use transaction for atomicity
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await this.prisma.$transaction(async (tx: any) => {
-        // Check current version for optimistic concurrency
         const latestEvent = await tx.$queryRawUnsafe(
           `SELECT version FROM events 
            WHERE aggregate_id = $1 
@@ -46,7 +54,6 @@ export class PrismaEventStore implements IEventStore {
           );
         }
 
-        // Insert events
         for (const event of events) {
           await tx.$executeRawUnsafe(
             `INSERT INTO events (
@@ -69,7 +76,6 @@ export class PrismaEventStore implements IEventStore {
         throw error;
       }
 
-      // Check for unique constraint violation (duplicate version)
       if ((error as { code?: string }).code === '23505') {
         throw new ConcurrencyException(
           aggregateId,
@@ -82,9 +88,6 @@ export class PrismaEventStore implements IEventStore {
     }
   }
 
-  /**
-   * Gets all events for an aggregate in order
-   */
   async getEvents(aggregateId: string): Promise<StoredEvent[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events = (await (this.prisma.$queryRawUnsafe as any)(
@@ -101,9 +104,6 @@ export class PrismaEventStore implements IEventStore {
     return events.map(this.mapStoredEvent);
   }
 
-  /**
-   * Gets events by event type
-   */
   async getEventsByType(
     eventType: string,
     limit = 100,
@@ -127,9 +127,6 @@ export class PrismaEventStore implements IEventStore {
     return events.map(this.mapStoredEvent);
   }
 
-  /**
-   * Gets events by aggregate type
-   */
   async getEventsByAggregateType(
     aggregateType: string,
     limit = 100,
@@ -153,9 +150,6 @@ export class PrismaEventStore implements IEventStore {
     return events.map(this.mapStoredEvent);
   }
 
-  /**
-   * Gets events within a date range
-   */
   async getEventsByDateRange(
     from: Date,
     to: Date,
@@ -191,9 +185,6 @@ export class PrismaEventStore implements IEventStore {
     return events.map(this.mapStoredEvent);
   }
 
-  /**
-   * Maps database record to StoredEvent
-   */
   private mapStoredEvent(record: {
     id: string;
     aggregateId: string;
@@ -222,9 +213,6 @@ export class PrismaEventStore implements IEventStore {
     };
   }
 
-  /**
-   * Generates a unique ID for events
-   */
   private generateId(): string {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }

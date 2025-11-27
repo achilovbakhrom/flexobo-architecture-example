@@ -1,9 +1,3 @@
-/**
- * Payment commands
- *
- * Payment is event-sourced.
- */
-
 import { ICommand } from '@flexobo/core';
 
 export class CreatePaymentCommand implements ICommand {

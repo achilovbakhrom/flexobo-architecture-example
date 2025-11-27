@@ -1,25 +1,80 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   IOutboxRepository,
   OutboxMessage,
   OutboxMessageStatus,
 } from './outbox-message.interface';
 
-// Infer the OutboxMessage type from Prisma's return type
-type PrismaOutboxMessage = Awaited<
-  ReturnType<PrismaClient['outboxMessage']['findUnique']>
->;
+interface OutboxMessageRecord {
+  id: string;
+  aggregateId: string;
+  aggregateType: string;
+  eventType: string;
+  payload: unknown;
+  status: string;
+  retryCount: number;
+  maxRetries: number;
+  createdAt: Date;
+  processedAt: Date | null;
+  publishedAt: Date | null;
+  error: string | null;
+  companyId: string | null;
+  metadata: unknown | null;
+}
 
-/**
- * Prisma-based implementation of the outbox repository
- * with support for distributed locking (FOR UPDATE SKIP LOCKED)
- */
+interface OutboxPrismaClient {
+  outboxMessage: {
+    create: (args: {
+      data: {
+        aggregateId: string;
+        aggregateType: string;
+        eventType: string;
+        payload: Record<string, never>;
+        status: string;
+        retryCount: number;
+        maxRetries: number;
+        companyId?: string;
+        metadata?: Record<string, never>;
+      };
+    }) => Promise<OutboxMessageRecord>;
+    update: (args: {
+      where: { id: string };
+      data: {
+        status?: string;
+        processedAt?: Date;
+        publishedAt?: Date;
+        error?: string;
+        retryCount?: { increment: number };
+      };
+    }) => Promise<OutboxMessageRecord>;
+    findMany: (args: {
+      where: { status: string };
+      orderBy: { createdAt: 'asc' | 'desc' };
+      take: number;
+    }) => Promise<OutboxMessageRecord[]>;
+    deleteMany: (args: {
+      where: {
+        status: string;
+        publishedAt?: { lt: Date };
+      };
+    }) => Promise<{ count: number }>;
+  };
+  $queryRaw: <T>(
+    query: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<T>;
+}
+
+export const OUTBOX_PRISMA_CLIENT = Symbol('OUTBOX_PRISMA_CLIENT');
+
 @Injectable()
 export class PrismaOutboxRepository implements IOutboxRepository {
   private readonly logger = new Logger(PrismaOutboxRepository.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(OUTBOX_PRISMA_CLIENT)
+    private readonly prisma: OutboxPrismaClient
+  ) {}
 
   async save(
     message: Omit<
@@ -45,8 +100,6 @@ export class PrismaOutboxRepository implements IOutboxRepository {
   }
 
   async findPendingMessages(batchSize: number): Promise<OutboxMessage[]> {
-    // Use raw SQL for FOR UPDATE SKIP LOCKED
-    // This ensures only one worker processes each message
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages = await this.prisma.$queryRaw<any[]>`
       SELECT * FROM outbox_messages
@@ -58,7 +111,7 @@ export class PrismaOutboxRepository implements IOutboxRepository {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return messages.map((m: any) =>
-      this.toDomain(m as NonNullable<PrismaOutboxMessage>)
+      this.toDomain(m as OutboxMessageRecord)
     );
   }
 
@@ -130,8 +183,6 @@ export class PrismaOutboxRepository implements IOutboxRepository {
   }
 
   async findRetryableMessages(batchSize: number): Promise<OutboxMessage[]> {
-    // Find failed messages that haven't exceeded max retries
-    // Use exponential backoff: wait 2^retryCount minutes before retry
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const messages = await this.prisma.$queryRaw<any[]>`
       SELECT * FROM outbox_messages
@@ -145,16 +196,11 @@ export class PrismaOutboxRepository implements IOutboxRepository {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return messages.map((m: any) =>
-      this.toDomain(m as NonNullable<PrismaOutboxMessage>)
+      this.toDomain(m as OutboxMessageRecord)
     );
   }
 
-  /**
-   * Convert Prisma entity to domain model
-   */
-  private toDomain(
-    prismaMessage: NonNullable<PrismaOutboxMessage>
-  ): OutboxMessage {
+  private toDomain(prismaMessage: OutboxMessageRecord): OutboxMessage {
     return {
       id: prismaMessage.id,
       aggregateId: prismaMessage.aggregateId,

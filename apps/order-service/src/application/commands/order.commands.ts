@@ -1,7 +1,3 @@
-/**
- * Order commands
- */
-
 import { ICommand } from '@flexobo/core';
 
 export class CreateOrderCommand implements ICommand {
@@ -57,5 +53,27 @@ export class ShipOrderCommand implements ICommand {
   constructor(...args: unknown[]) {
     this.orderId = args[0] as string;
     this.trackingNumber = args[1] as string;
+  }
+}
+
+export class MarkInventoryReservedCommand implements ICommand {
+  public readonly orderId: string;
+  public readonly reservations: Array<{ productId: string; quantity: number }>;
+
+  constructor(...args: unknown[]) {
+    this.orderId = args[0] as string;
+    this.reservations = args[1] as Array<{ productId: string; quantity: number }>;
+  }
+}
+
+export class MarkInventoryFailedCommand implements ICommand {
+  public readonly orderId: string;
+  public readonly failedProductIds: string[];
+  public readonly reason: string;
+
+  constructor(...args: unknown[]) {
+    this.orderId = args[0] as string;
+    this.failedProductIds = args[1] as string[];
+    this.reason = args[2] as string;
   }
 }

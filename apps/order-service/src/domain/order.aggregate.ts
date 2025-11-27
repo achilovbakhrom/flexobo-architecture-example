@@ -1,12 +1,4 @@
-/**
- * Order domain model using core library
- */
-
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-
-// ============================================================
-// Value Objects
-// ============================================================
 
 export interface OrderItem {
   productId: string;
@@ -19,15 +11,14 @@ export interface OrderItem {
 export enum OrderStatus {
   DRAFT = 'DRAFT',
   CONFIRMED = 'CONFIRMED',
+  AWAITING_INVENTORY = 'AWAITING_INVENTORY',
+  INVENTORY_RESERVED = 'INVENTORY_RESERVED',
+  INVENTORY_FAILED = 'INVENTORY_FAILED',
   PAID = 'PAID',
   SHIPPED = 'SHIPPED',
   DELIVERED = 'DELIVERED',
   CANCELLED = 'CANCELLED',
 }
-
-// ============================================================
-// Order Aggregate
-// ============================================================
 
 export class Order extends AggregateRoot {
   private userId!: string;
@@ -37,9 +28,6 @@ export class Order extends AggregateRoot {
   private currency = 'USD';
   private trackingNumber?: string;
 
-  /**
-   * Create new order
-   */
   static create(orderId: string, userId: string): Order {
     const order = new Order(orderId);
 
@@ -56,18 +44,12 @@ export class Order extends AggregateRoot {
     return order;
   }
 
-  /**
-   * Reconstruct order from events
-   */
   static fromEvents(events: DomainEvent[]): Order {
     const order = new Order(events[0].aggregateId);
     order.loadFromHistory(events);
     return order;
   }
 
-  /**
-   * Add item to order
-   */
   addItem(
     productId: string,
     productName: string,
@@ -96,9 +78,6 @@ export class Order extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Confirm order
-   */
   confirm(): void {
     if (this.status !== OrderStatus.DRAFT) {
       throw new Error('Can only confirm draft orders');
@@ -108,14 +87,45 @@ export class Order extends AggregateRoot {
       throw new Error('Cannot confirm order with no items');
     }
 
-    const event = this.createEvent('OrderConfirmed', {});
+    const event = this.createEvent('OrderConfirmed', {
+      items: this.items,
+      userId: this.userId,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
-  /**
-   * Cancel order
-   */
+  markInventoryReserved(
+    reservations: Array<{ productId: string; quantity: number }>
+  ): void {
+    if (this.status !== OrderStatus.AWAITING_INVENTORY) {
+      throw new Error(
+        'Can only reserve inventory for orders awaiting inventory'
+      );
+    }
+
+    const event = this.createEvent('OrderInventoryReserved', {
+      reservations,
+      reservedAt: new Date().toISOString(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  markInventoryFailed(failedProductIds: string[], reason: string): void {
+    if (this.status !== OrderStatus.AWAITING_INVENTORY) {
+      throw new Error('Can only fail inventory for orders awaiting inventory');
+    }
+
+    const event = this.createEvent('OrderInventoryFailed', {
+      failedProductIds,
+      reason,
+      failedAt: new Date().toISOString(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
   cancel(reason: string): void {
     if (this.status === OrderStatus.CANCELLED) {
       throw new Error('Order is already cancelled');
@@ -133,9 +143,6 @@ export class Order extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Ship order
-   */
   ship(trackingNumber: string): void {
     if (this.status !== OrderStatus.PAID) {
       throw new Error('Can only ship paid orders');
@@ -146,9 +153,6 @@ export class Order extends AggregateRoot {
     this.apply(event);
   }
 
-  /**
-   * Get order details
-   */
   getDetails() {
     return {
       id: this.id,
@@ -161,10 +165,6 @@ export class Order extends AggregateRoot {
       version: this.version,
     };
   }
-
-  // ============================================================
-  // Event Application Logic
-  // ============================================================
 
   protected apply(event: DomainEvent): void {
     switch (event.type) {
@@ -181,7 +181,6 @@ export class Order extends AggregateRoot {
           const item = event.data['item'] as OrderItem;
           this.items.push(item);
 
-          // Recalculate total
           this.totalAmount = this.items.reduce(
             (sum, i) => sum + i.priceAmount * i.quantity,
             0
@@ -190,7 +189,15 @@ export class Order extends AggregateRoot {
         break;
 
       case 'OrderConfirmed':
-        this.status = OrderStatus.CONFIRMED;
+        this.status = OrderStatus.AWAITING_INVENTORY;
+        break;
+
+      case 'OrderInventoryReserved':
+        this.status = OrderStatus.INVENTORY_RESERVED;
+        break;
+
+      case 'OrderInventoryFailed':
+        this.status = OrderStatus.INVENTORY_FAILED;
         break;
 
       case 'OrderCancelled':
@@ -203,7 +210,6 @@ export class Order extends AggregateRoot {
         break;
 
       default:
-        // Ignore unknown events
         break;
     }
   }

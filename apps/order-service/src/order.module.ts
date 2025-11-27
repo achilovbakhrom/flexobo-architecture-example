@@ -18,6 +18,10 @@ import { CqrsModule } from '@flexobo/core';
 import { EventStoreModule } from '@flexobo/core';
 import { OutboxModule } from '@flexobo/core';
 import {
+  MessagingModule,
+  MESSAGE_PUBLISHER,
+} from '@flexobo/core';
+import {
   VersioningModule,
   VersioningStrategy,
   VersionStatus,
@@ -69,6 +73,11 @@ import { OrderHistoryEventConsumer } from './adapters/queue/order-history-event.
 import { ProductEventConsumer } from './adapters/queue/product-event.consumer';
 
 // ============================================================
+// Messaging Adapters (RabbitMQ Event Handlers)
+// ============================================================
+import { InventoryEventHandler } from './adapters/messaging/inventory-event.handler';
+
+// ============================================================
 // Order Command Handlers
 // ============================================================
 import {
@@ -77,6 +86,8 @@ import {
   ConfirmOrderHandler,
   CancelOrderHandler,
   ShipOrderHandler,
+  MarkInventoryReservedHandler,
+  MarkInventoryFailedHandler,
 } from './application/commands/order.handlers';
 
 // ============================================================
@@ -135,6 +146,11 @@ import {
 // ============================================================
 import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
 
+// ============================================================
+// Sagas
+// ============================================================
+import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga';
+
 @Module({
   imports: [
     // Event Emitter for projections
@@ -148,6 +164,28 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
       enableUpcasting: false,
     }),
 
+    // RabbitMQ Messaging for cross-service communication
+    MessagingModule.forRoot({
+      config: {
+        url: process.env['RABBITMQ_URL'] || 'amqp://guest:guest@localhost:5672',
+        exchanges: [
+          { name: 'flexobo.events', type: 'topic', durable: true },
+          { name: 'flexobo.dlx', type: 'topic', durable: true },
+        ],
+        deadLetter: {
+          exchange: 'flexobo.dlx',
+          queue: 'flexobo.dead-letter',
+          ttl: 86400000 * 7, // 7 days
+        },
+        logging: {
+          enabled: true,
+          level: 'info',
+        },
+      },
+      enablePublisher: true,
+      enableConsumer: true,
+    }),
+
     // Core CQRS infrastructure
     CqrsModule.forRoot({
       commandHandlers: [
@@ -157,6 +195,8 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
         ConfirmOrderHandler,
         CancelOrderHandler,
         ShipOrderHandler,
+        MarkInventoryReservedHandler,
+        MarkInventoryFailedHandler,
         // Product commands
         CreateProductHandler,
         UpdateProductHandler,
@@ -188,11 +228,16 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
       ],
     }),
 
-    // Outbox pattern for reliable messaging
+    // Outbox pattern for reliable messaging (wired to RabbitMQ)
     OutboxModule.forRoot({
       workerConfig: {
         pollingIntervalMs: 5000,
         batchSize: 100,
+        enabled: true,
+      },
+      messagePublisher: {
+        provide: 'IMessagePublisher',
+        useExisting: MESSAGE_PUBLISHER,
       },
     }),
 
@@ -298,9 +343,19 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
     OrderHistoryEventConsumer,
 
     // ============================================================
+    // Messaging Event Handlers - RabbitMQ cross-service handlers
+    // ============================================================
+    InventoryEventHandler,
+
+    // ============================================================
     // Use Cases - orchestrate complex workflows
     // ============================================================
     CheckoutUseCase,
+
+    // ============================================================
+    // Sagas - coordinate long-running processes
+    // ============================================================
+    OrderFulfillmentSaga,
   ],
 })
 export class OrderModule {}

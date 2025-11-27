@@ -13,6 +13,7 @@ import {
   ORDER_READ_MODEL_REPOSITORY,
 } from '../../ports/order-read-model.port';
 import { OrderItemDto } from '../../application/dto/order.dto';
+import { ORDER_EVENTS } from '../../domain/events/event.constants';
 import { v4 as uuidv4 } from 'uuid';
 
 interface OrderEventData {
@@ -35,7 +36,7 @@ export class OrderEventConsumer implements OnModuleInit {
     this.logger.log('Order event consumer initialized');
   }
 
-  @OnEvent('order.created')
+  @OnEvent(ORDER_EVENTS.CREATED)
   async handleOrderCreated(event: OrderEventData): Promise<void> {
     this.logger.debug(`Consuming OrderCreated: ${event.aggregateId}`);
 
@@ -51,7 +52,7 @@ export class OrderEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('order.item_added')
+  @OnEvent(ORDER_EVENTS.ITEM_ADDED)
   async handleOrderItemAdded(event: OrderEventData): Promise<void> {
     this.logger.debug(`Consuming OrderItemAdded: ${event.aggregateId}`);
 
@@ -87,7 +88,7 @@ export class OrderEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('order.confirmed')
+  @OnEvent(ORDER_EVENTS.CONFIRMED)
   async handleOrderConfirmed(event: OrderEventData): Promise<void> {
     this.logger.debug(`Consuming OrderConfirmed: ${event.aggregateId}`);
 
@@ -96,7 +97,7 @@ export class OrderEventConsumer implements OnModuleInit {
       await this.readModelRepository.upsert({
         id: order.id,
         userId: order.userId,
-        status: 'CONFIRMED',
+        status: 'AWAITING_INVENTORY',
         totalAmount: order.totalAmount,
         currency: order.currency,
         itemCount: order.itemCount,
@@ -106,7 +107,7 @@ export class OrderEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('order.cancelled')
+  @OnEvent(ORDER_EVENTS.CANCELLED)
   async handleOrderCancelled(event: OrderEventData): Promise<void> {
     this.logger.debug(`Consuming OrderCancelled: ${event.aggregateId}`);
 
@@ -125,7 +126,7 @@ export class OrderEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('order.shipped')
+  @OnEvent(ORDER_EVENTS.SHIPPED)
   async handleOrderShipped(event: OrderEventData): Promise<void> {
     this.logger.debug(`Consuming OrderShipped: ${event.aggregateId}`);
 
@@ -139,6 +140,44 @@ export class OrderEventConsumer implements OnModuleInit {
         currency: order.currency,
         itemCount: order.itemCount,
         trackingNumber: event.data['trackingNumber'] as string,
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  @OnEvent(ORDER_EVENTS.INVENTORY_RESERVED)
+  async handleOrderInventoryReserved(event: OrderEventData): Promise<void> {
+    this.logger.debug(`Consuming OrderInventoryReserved: ${event.aggregateId}`);
+
+    const order = await this.readModelRepository.findById(event.aggregateId);
+    if (order) {
+      await this.readModelRepository.upsert({
+        id: order.id,
+        userId: order.userId,
+        status: 'INVENTORY_RESERVED',
+        totalAmount: order.totalAmount,
+        currency: order.currency,
+        itemCount: order.itemCount,
+        trackingNumber: order.trackingNumber,
+        updatedAt: new Date(),
+      });
+    }
+  }
+
+  @OnEvent(ORDER_EVENTS.INVENTORY_FAILED)
+  async handleOrderInventoryFailed(event: OrderEventData): Promise<void> {
+    this.logger.debug(`Consuming OrderInventoryFailed: ${event.aggregateId}`);
+
+    const order = await this.readModelRepository.findById(event.aggregateId);
+    if (order) {
+      await this.readModelRepository.upsert({
+        id: order.id,
+        userId: order.userId,
+        status: 'INVENTORY_FAILED',
+        totalAmount: order.totalAmount,
+        currency: order.currency,
+        itemCount: order.itemCount,
+        trackingNumber: order.trackingNumber,
         updatedAt: new Date(),
       });
     }

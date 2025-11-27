@@ -12,6 +12,7 @@ import {
   IOrderHistoryRepository,
   ORDER_HISTORY_REPOSITORY,
 } from '../../ports/order-history.repository.port';
+import { ORDER_EVENTS } from '../../domain/events/event.constants';
 
 interface OrderEventData {
   aggregateId: string;
@@ -34,7 +35,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     this.logger.log('Order history event consumer initialized');
   }
 
-  @OnEvent('order.created')
+  @OnEvent(ORDER_EVENTS.CREATED)
   async handleOrderCreated(event: OrderEventData): Promise<void> {
     this.logger.debug(`Recording OrderCreated: ${event.aggregateId}`);
 
@@ -49,7 +50,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('order.item_added')
+  @OnEvent(ORDER_EVENTS.ITEM_ADDED)
   async handleOrderItemAdded(event: OrderEventData): Promise<void> {
     this.logger.debug(`Recording OrderItemAdded: ${event.aggregateId}`);
 
@@ -65,7 +66,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('order.confirmed')
+  @OnEvent(ORDER_EVENTS.CONFIRMED)
   async handleOrderConfirmed(event: OrderEventData): Promise<void> {
     this.logger.debug(`Recording OrderConfirmed: ${event.aggregateId}`);
 
@@ -81,7 +82,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('order.cancelled')
+  @OnEvent(ORDER_EVENTS.CANCELLED)
   async handleOrderCancelled(event: OrderEventData): Promise<void> {
     this.logger.debug(`Recording OrderCancelled: ${event.aggregateId}`);
 
@@ -101,7 +102,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('order.shipped')
+  @OnEvent(ORDER_EVENTS.SHIPPED)
   async handleOrderShipped(event: OrderEventData): Promise<void> {
     this.logger.debug(`Recording OrderShipped: ${event.aggregateId}`);
 

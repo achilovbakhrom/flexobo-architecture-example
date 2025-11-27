@@ -12,6 +12,7 @@ import {
   IPaymentReadModelRepository,
   PAYMENT_READ_MODEL_REPOSITORY,
 } from '../../ports/payment.repository.port';
+import { PAYMENT_EVENTS } from '../../domain/events/event.constants';
 
 interface PaymentEventData {
   aggregateId: string;
@@ -33,7 +34,7 @@ export class PaymentEventConsumer implements OnModuleInit {
     this.logger.log('Payment event consumer initialized');
   }
 
-  @OnEvent('payment.created')
+  @OnEvent(PAYMENT_EVENTS.CREATED)
   async handlePaymentCreated(event: PaymentEventData): Promise<void> {
     this.logger.debug(`Consuming PaymentCreated: ${event.aggregateId}`);
 
@@ -52,7 +53,7 @@ export class PaymentEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('payment.processing')
+  @OnEvent(PAYMENT_EVENTS.PROCESSING)
   async handlePaymentProcessing(event: PaymentEventData): Promise<void> {
     this.logger.debug(`Consuming PaymentProcessing: ${event.aggregateId}`);
 
@@ -74,7 +75,7 @@ export class PaymentEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('payment.completed')
+  @OnEvent(PAYMENT_EVENTS.COMPLETED)
   async handlePaymentCompleted(event: PaymentEventData): Promise<void> {
     this.logger.debug(`Consuming PaymentCompleted: ${event.aggregateId}`);
 
@@ -96,7 +97,7 @@ export class PaymentEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('payment.failed')
+  @OnEvent(PAYMENT_EVENTS.FAILED)
   async handlePaymentFailed(event: PaymentEventData): Promise<void> {
     this.logger.debug(`Consuming PaymentFailed: ${event.aggregateId}`);
 
@@ -118,7 +119,7 @@ export class PaymentEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('payment.refunded')
+  @OnEvent(PAYMENT_EVENTS.REFUNDED)
   async handlePaymentRefunded(event: PaymentEventData): Promise<void> {
     this.logger.debug(`Consuming PaymentRefunded: ${event.aggregateId}`);
 

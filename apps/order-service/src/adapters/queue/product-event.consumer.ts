@@ -12,6 +12,7 @@ import {
   IProductReadModelRepository,
   PRODUCT_READ_MODEL_REPOSITORY,
 } from '../../ports/product.repository.port';
+import { PRODUCT_EVENTS } from '../../domain/events/event.constants';
 
 interface ProductEventData {
   aggregateId: string;
@@ -33,7 +34,7 @@ export class ProductEventConsumer implements OnModuleInit {
     this.logger.log('Product event consumer initialized');
   }
 
-  @OnEvent('product.created')
+  @OnEvent(PRODUCT_EVENTS.CREATED)
   async handleProductCreated(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductCreated: ${event.aggregateId}`);
 
@@ -53,7 +54,7 @@ export class ProductEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent('product.updated')
+  @OnEvent(PRODUCT_EVENTS.UPDATED)
   async handleProductUpdated(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductUpdated: ${event.aggregateId}`);
 
@@ -89,7 +90,7 @@ export class ProductEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('product.stock_updated')
+  @OnEvent(PRODUCT_EVENTS.STOCK_UPDATED)
   async handleProductStockUpdated(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductStockUpdated: ${event.aggregateId}`);
 
@@ -112,7 +113,7 @@ export class ProductEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('product.activated')
+  @OnEvent(PRODUCT_EVENTS.ACTIVATED)
   async handleProductActivated(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductActivated: ${event.aggregateId}`);
 
@@ -135,7 +136,7 @@ export class ProductEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('product.deactivated')
+  @OnEvent(PRODUCT_EVENTS.DEACTIVATED)
   async handleProductDeactivated(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductDeactivated: ${event.aggregateId}`);
 
@@ -158,7 +159,7 @@ export class ProductEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent('product.deleted')
+  @OnEvent(PRODUCT_EVENTS.DELETED)
   async handleProductDeleted(event: ProductEventData): Promise<void> {
     this.logger.debug(`Consuming ProductDeleted: ${event.aggregateId}`);
 
