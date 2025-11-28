@@ -2,76 +2,78 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Debug: Order Service",
       "type": "node",
-      "request": "launch",
-      "name": "Debug flexobo-microservice-example with Nx",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "flexobo-microservice-example"],
-      "env": {
-        "NODE_OPTIONS": "--inspect=9229"
-      },
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"],
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceFolder}/apps/flexobo-microservice-example/dist/**/*.(m|c|)js",
-        "!**/node_modules/**"
-      ]
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/order-service/**/*.js"],
+      "preLaunchTask": "start:order"
     },
     {
+      "name": "Debug: Admin Panel",
       "type": "node",
-      "request": "launch",
-      "name": "Debug order-service with Nx",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "order-service"],
-      "env": {
-        "NODE_OPTIONS": "--inspect=9230"
-      },
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"],
+      "request": "attach",
+      "port": 9230,
+      "restart": true,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceFolder}/apps/order-service/dist/**/*.(m|c|)js",
-        "!**/node_modules/**"
-      ]
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/admin-panel/**/*.js"],
+      "preLaunchTask": "start:admin"
     },
     {
+      "name": "Debug: API Gateway",
       "type": "node",
-      "request": "launch",
-      "name": "Debug api-gateway with Nx",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "api-gateway"],
-      "env": {
-        "NODE_OPTIONS": "--inspect=9231"
-      },
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"],
+      "request": "attach",
+      "port": 9231,
+      "restart": true,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceFolder}/apps/api-gateway/dist/**/*.(m|c|)js",
-        "!**/node_modules/**"
-      ]
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"],
+      "preLaunchTask": "start:gateway"
     },
     {
+      "name": "Attach: Order Service (9229)",
       "type": "node",
-      "request": "launch",
-      "name": "Debug admin-panel with Nx",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["nx", "serve", "admin-panel"],
-      "env": {
-        "NODE_OPTIONS": "--inspect=9232"
-      },
-      "console": "integratedTerminal",
-      "internalConsoleOptions": "neverOpen",
-      "skipFiles": ["<node_internals>/**"],
+      "request": "attach",
+      "port": 9229,
+      "restart": true,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceFolder}/apps/admin-panel/dist/**/*.(m|c|)js",
-        "!**/node_modules/**"
-      ]
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/order-service/**/*.js"]
+    },
+    {
+      "name": "Attach: Admin Panel (9230)",
+      "type": "node",
+      "request": "attach",
+      "port": 9230,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/admin-panel/**/*.js"]
+    },
+    {
+      "name": "Attach: API Gateway (9231)",
+      "type": "node",
+      "request": "attach",
+      "port": 9231,
+      "restart": true,
+      "sourceMaps": true,
+      "skipFiles": ["<node_internals>/**"],
+      "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Debug: All Services",
+      "configurations": [
+        "Debug: Order Service",
+        "Debug: Admin Panel",
+        "Debug: API Gateway"
+      ],
+      "stopAll": true
     }
   ]
 }
