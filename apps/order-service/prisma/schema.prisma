@@ -1,9 +1,8 @@
 // Order Service Database Schema
 
 generator client {
-    provider   = "prisma-client-js"
-    output     = "../node_modules/.prisma/order-client"
-    engineType = "client"
+    provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/order-client"
 }
 
 datasource db {
@@ -81,7 +80,7 @@ model ProjectionPosition {
 model OrderReadModel {
     id             String   @id
     userId         String   @map("user_id")
-    status         String   // DRAFT, CONFIRMED, AWAITING_INVENTORY, INVENTORY_RESERVED, INVENTORY_FAILED, PAID, SHIPPED, DELIVERED, CANCELLED
+    status         String // DRAFT, CONFIRMED, AWAITING_INVENTORY, INVENTORY_RESERVED, INVENTORY_FAILED, PAID, SHIPPED, DELIVERED, CANCELLED
     totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
     currency       String   @default("USD")
     itemCount      Int      @default(0) @map("item_count")
@@ -107,7 +106,7 @@ model OrderItemReadModel {
     productName   String  @map("product_name")
     quantity      Int
     priceAmount   Decimal @map("price_amount") @db.Decimal(10, 2)
-    priceCurrency String  @map("price_currency") @default("USD")
+    priceCurrency String  @default("USD") @map("price_currency")
 
     order OrderReadModel @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -148,18 +147,18 @@ model ProductReadModel {
 
 // Payment Read Model - denormalized view of payments
 model PaymentReadModel {
-    id              String    @id
-    orderId         String    @map("order_id")
-    amount          Decimal   @db.Decimal(10, 2)
-    currency        String    @default("USD")
-    status          String    // PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
-    paymentMethod   String    @map("payment_method") // CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER
-    transactionId   String?   @map("transaction_id")
-    failureReason   String?   @map("failure_reason")
-    refundedAmount  Decimal?  @map("refunded_amount") @db.Decimal(10, 2)
-    processedAt     DateTime? @map("processed_at")
-    createdAt       DateTime  @default(now()) @map("created_at")
-    updatedAt       DateTime  @updatedAt @map("updated_at")
+    id             String    @id
+    orderId        String    @map("order_id")
+    amount         Decimal   @db.Decimal(10, 2)
+    currency       String    @default("USD")
+    status         String // PENDING, PROCESSING, COMPLETED, FAILED, REFUNDED
+    paymentMethod  String    @map("payment_method") // CREDIT_CARD, DEBIT_CARD, PAYPAL, BANK_TRANSFER
+    transactionId  String?   @map("transaction_id")
+    failureReason  String?   @map("failure_reason")
+    refundedAmount Decimal?  @map("refunded_amount") @db.Decimal(10, 2)
+    processedAt    DateTime? @map("processed_at")
+    createdAt      DateTime  @default(now()) @map("created_at")
+    updatedAt      DateTime  @updatedAt @map("updated_at")
 
     @@index([orderId])
     @@index([status])
@@ -173,19 +172,21 @@ model PaymentReadModel {
 
 // Order History - audit trail of all order changes
 model OrderHistoryReadModel {
-    id          String   @id @default(uuid())
-    orderId     String   @map("order_id")
-    eventType   String   @map("event_type") // OrderCreated, ItemAdded, OrderConfirmed, etc.
-    eventData   Json     @map("event_data")
-    previousState String? @map("previous_state") // Status before change
-    newState    String?  @map("new_state") // Status after change
-    changedBy   String?  @map("changed_by") // User/system that made the change
-    ipAddress   String?  @map("ip_address")
-    userAgent   String?  @map("user_agent")
-    occurredAt  DateTime @default(now()) @map("occurred_at")
+    id            String   @id @default(uuid())
+    orderId       String   @map("order_id")
+    eventType     String   @map("event_type") // OrderCreated, ItemAdded, OrderConfirmed, etc.
+    eventData     Json     @map("event_data")
+    version       Int      @default(0) // Event/aggregate version for synchronization
+    previousState String?  @map("previous_state") // Status before change
+    newState      String?  @map("new_state") // Status after change
+    changedBy     String?  @map("changed_by") // User/system that made the change
+    ipAddress     String?  @map("ip_address")
+    userAgent     String?  @map("user_agent")
+    occurredAt    DateTime @default(now()) @map("occurred_at")
 
     @@index([orderId])
     @@index([eventType])
     @@index([occurredAt])
+    @@index([orderId, version])
     @@map("order_history")
 }

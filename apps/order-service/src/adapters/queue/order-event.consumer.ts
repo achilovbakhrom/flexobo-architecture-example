@@ -14,7 +14,7 @@ import {
 } from '../../ports/order-read-model.port';
 import { OrderItemDto } from '../../application/dto/order.dto';
 import { ORDER_EVENTS } from '../../domain/events/event.constants';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 interface OrderEventData {
   aggregateId: string;
@@ -38,28 +38,31 @@ export class OrderEventConsumer implements OnModuleInit {
 
   @OnEvent(ORDER_EVENTS.CREATED)
   async handleOrderCreated(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderCreated: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderCreated: ${event.aggregateId} (version: ${event.version})`);
 
-    await this.readModelRepository.upsert({
-      id: event.aggregateId,
-      userId: event.data['userId'] as string,
-      status: 'DRAFT',
-      totalAmount: 0,
-      currency: (event.data['currency'] as string) || 'USD',
-      itemCount: 0,
-      trackingNumber: null,
-      updatedAt: new Date(),
-    });
+    await this.readModelRepository.upsert(
+      {
+        id: event.aggregateId,
+        userId: event.data['userId'] as string,
+        status: 'DRAFT',
+        totalAmount: 0,
+        currency: (event.data['currency'] as string) || 'USD',
+        itemCount: 0,
+        trackingNumber: null,
+        updatedAt: new Date(),
+      },
+      { version: event.version }
+    );
   }
 
   @OnEvent(ORDER_EVENTS.ITEM_ADDED)
   async handleOrderItemAdded(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderItemAdded: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderItemAdded: ${event.aggregateId} (version: ${event.version})`);
 
     const item = event.data['item'] as OrderItemDto;
 
     await this.readModelRepository.saveItem({
-      id: uuidv4(),
+      id: randomUUID(),
       orderId: event.aggregateId,
       productId: item.productId,
       productName: item.productName,
@@ -75,111 +78,129 @@ export class OrderEventConsumer implements OnModuleInit {
         0
       );
 
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: order.status,
-        totalAmount,
-        currency: order.currency,
-        itemCount: order.items.length,
-        trackingNumber: order.trackingNumber,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: order.status,
+          totalAmount,
+          currency: order.currency,
+          itemCount: order.items.length,
+          trackingNumber: order.trackingNumber,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 
   @OnEvent(ORDER_EVENTS.CONFIRMED)
   async handleOrderConfirmed(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderConfirmed: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderConfirmed: ${event.aggregateId} (version: ${event.version})`);
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: 'AWAITING_INVENTORY',
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        itemCount: order.itemCount,
-        trackingNumber: order.trackingNumber,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: 'AWAITING_INVENTORY',
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          itemCount: order.itemCount,
+          trackingNumber: order.trackingNumber,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 
   @OnEvent(ORDER_EVENTS.CANCELLED)
   async handleOrderCancelled(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderCancelled: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderCancelled: ${event.aggregateId} (version: ${event.version})`);
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: 'CANCELLED',
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        itemCount: order.itemCount,
-        trackingNumber: order.trackingNumber,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: 'CANCELLED',
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          itemCount: order.itemCount,
+          trackingNumber: order.trackingNumber,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 
   @OnEvent(ORDER_EVENTS.SHIPPED)
   async handleOrderShipped(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderShipped: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderShipped: ${event.aggregateId} (version: ${event.version})`);
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: 'SHIPPED',
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        itemCount: order.itemCount,
-        trackingNumber: event.data['trackingNumber'] as string,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: 'SHIPPED',
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          itemCount: order.itemCount,
+          trackingNumber: event.data['trackingNumber'] as string,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 
   @OnEvent(ORDER_EVENTS.INVENTORY_RESERVED)
   async handleOrderInventoryReserved(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderInventoryReserved: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderInventoryReserved: ${event.aggregateId} (version: ${event.version})`);
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: 'INVENTORY_RESERVED',
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        itemCount: order.itemCount,
-        trackingNumber: order.trackingNumber,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: 'INVENTORY_RESERVED',
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          itemCount: order.itemCount,
+          trackingNumber: order.trackingNumber,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 
   @OnEvent(ORDER_EVENTS.INVENTORY_FAILED)
   async handleOrderInventoryFailed(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Consuming OrderInventoryFailed: ${event.aggregateId}`);
+    this.logger.debug(`Consuming OrderInventoryFailed: ${event.aggregateId} (version: ${event.version})`);
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      await this.readModelRepository.upsert({
-        id: order.id,
-        userId: order.userId,
-        status: 'INVENTORY_FAILED',
-        totalAmount: order.totalAmount,
-        currency: order.currency,
-        itemCount: order.itemCount,
-        trackingNumber: order.trackingNumber,
-        updatedAt: new Date(),
-      });
+      await this.readModelRepository.upsert(
+        {
+          id: order.id,
+          userId: order.userId,
+          status: 'INVENTORY_FAILED',
+          totalAmount: order.totalAmount,
+          currency: order.currency,
+          itemCount: order.itemCount,
+          trackingNumber: order.trackingNumber,
+          updatedAt: new Date(),
+        },
+        { version: event.version }
+      );
     }
   }
 }

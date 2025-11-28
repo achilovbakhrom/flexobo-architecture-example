@@ -29,6 +29,7 @@ class EventUpcasterRegistrar implements OnModuleInit {
 export interface EventStoreModuleOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prismaClient?: any;
+  prismaClientToken?: string | symbol;
   enableUpcasting?: boolean;
   upcasters?: Provider[];
 }
@@ -36,19 +37,37 @@ export interface EventStoreModuleOptions {
 @Module({})
 export class EventStoreModule {
   static forRoot(options: EventStoreModuleOptions = {}): DynamicModule {
-    const { prismaClient, enableUpcasting = true, upcasters = [] } = options;
+    const {
+      prismaClient,
+      prismaClientToken,
+      enableUpcasting = true,
+      upcasters = [],
+    } = options;
 
-    const providers: Provider[] = [
-      {
+    const providers: Provider[] = [];
+
+    // If prismaClient is provided directly, use it
+    // Otherwise, if prismaClientToken is provided, use useExisting
+    // Otherwise, use 'PrismaClient' as the default token
+    if (prismaClient) {
+      providers.push({
         provide: EVENT_STORE_PRISMA_CLIENT,
         useValue: prismaClient,
-      },
+      });
+    } else {
+      providers.push({
+        provide: EVENT_STORE_PRISMA_CLIENT,
+        useExisting: prismaClientToken || 'PrismaClient',
+      });
+    }
+
+    providers.push(
       {
         provide: 'IEventStore',
         useClass: PrismaEventStore,
       },
-      EventUpcasterRegistry,
-    ];
+      EventUpcasterRegistry
+    );
 
     if (enableUpcasting && upcasters.length > 0) {
       providers.push(

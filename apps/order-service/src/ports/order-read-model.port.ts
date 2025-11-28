@@ -7,10 +7,16 @@ import {
 export interface VersionedUpsertOptions {
   eventId?: string;
   expectedVersion?: number;
+  version?: number; // The event version to set (synchronized with event store)
 }
 
 export interface IOrderReadModelRepository {
   findById(orderId: string): Promise<OrderWithItemsReadModelDto | null>;
+
+  findAll(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<OrderReadModelDto[]>;
 
   findByUserId(
     userId: string,

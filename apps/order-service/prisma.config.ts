@@ -2,7 +2,6 @@ import path from 'path';
 import { defineConfig } from 'prisma/config';
 import dotenv from 'dotenv';
 
-// Load service-specific .env file
 dotenv.config({ path: path.join(__dirname, '.env') });
 
 export default defineConfig({

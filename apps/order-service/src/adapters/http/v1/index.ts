@@ -5,7 +5,7 @@ export * from './payment.controller';
 export * from './order-history.controller';
 
 // DTOs
-export * from './order.dto';
-export * from './product.dto';
-export * from './payment.dto';
-export * from './order-history.dto';
+export * from './dto/order.dto';
+export * from './dto/product.dto';
+export * from './dto/payment.dto';
+export * from './dto/order-history.dto';

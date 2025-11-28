@@ -17,6 +17,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CqrsModule } from '@flexobo/core';
 import { EventStoreModule } from '@flexobo/core';
 import { OutboxModule } from '@flexobo/core';
+import { PrismaModule } from './prisma.module';
 import {
   MessagingModule,
   MESSAGE_PUBLISHER,
@@ -118,6 +119,7 @@ import {
   GetOrderByIdHandler,
   GetOrdersByUserHandler,
   GetRecentOrdersHandler,
+  GetAllOrdersHandler,
 } from './application/queries/order.handlers';
 
 // ============================================================
@@ -153,6 +155,9 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
 
 @Module({
   imports: [
+    // Prisma ORM
+    PrismaModule,
+
     // Event Emitter for projections
     EventEmitterModule.forRoot({
       wildcard: true,
@@ -189,7 +194,6 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     // Core CQRS infrastructure
     CqrsModule.forRoot({
       commandHandlers: [
-        // Order commands
         CreateOrderHandler,
         AddOrderItemHandler,
         ConfirmOrderHandler,
@@ -197,12 +201,10 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
         ShipOrderHandler,
         MarkInventoryReservedHandler,
         MarkInventoryFailedHandler,
-        // Product commands
         CreateProductHandler,
         UpdateProductHandler,
         DeleteProductHandler,
         UpdateProductStockHandler,
-        // Payment commands
         CreatePaymentHandler,
         ProcessPaymentHandler,
         CompletePaymentHandler,
@@ -210,17 +212,15 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
         RefundPaymentHandler,
       ],
       queryHandlers: [
-        // Order queries
         GetOrderByIdHandler,
         GetOrdersByUserHandler,
         GetRecentOrdersHandler,
-        // Product queries
+        GetAllOrdersHandler,
         GetProductByIdHandler,
         GetProductBySkuHandler,
         GetProductsByCategoryHandler,
         GetActiveProductsHandler,
         SearchProductsHandler,
-        // Payment queries
         GetPaymentByIdHandler,
         GetPaymentsByOrderHandler,
         GetPaymentsByStatusHandler,
@@ -356,6 +356,43 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     // Sagas - coordinate long-running processes
     // ============================================================
     OrderFulfillmentSaga,
+
+    // ============================================================
+    // Command Handlers
+    // ============================================================
+    CreateOrderHandler,
+    AddOrderItemHandler,
+    ConfirmOrderHandler,
+    CancelOrderHandler,
+    ShipOrderHandler,
+    MarkInventoryReservedHandler,
+    MarkInventoryFailedHandler,
+    CreateProductHandler,
+    UpdateProductHandler,
+    DeleteProductHandler,
+    UpdateProductStockHandler,
+    CreatePaymentHandler,
+    ProcessPaymentHandler,
+    CompletePaymentHandler,
+    FailPaymentHandler,
+    RefundPaymentHandler,
+
+    // ============================================================
+    // Query Handlers
+    // ============================================================
+    GetOrderByIdHandler,
+    GetOrdersByUserHandler,
+    GetRecentOrdersHandler,
+    GetAllOrdersHandler,
+    GetProductByIdHandler,
+    GetProductBySkuHandler,
+    GetProductsByCategoryHandler,
+    GetActiveProductsHandler,
+    SearchProductsHandler,
+    GetPaymentByIdHandler,
+    GetPaymentsByOrderHandler,
+    GetPaymentsByStatusHandler,
+    GetPaymentByTransactionIdHandler,
   ],
 })
 export class OrderModule {}

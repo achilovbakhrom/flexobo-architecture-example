@@ -10,6 +10,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   UseInterceptors,
   HttpCode,
   HttpStatus,
@@ -20,6 +21,7 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@flexobo/core';
 import { VersionInterceptor, ApiVersion } from '@flexobo/core';
@@ -34,6 +36,7 @@ import {
 import {
   GetOrderByIdQuery,
   GetOrdersByUserQuery,
+  GetAllOrdersQuery,
 } from '../../../application/queries/order.queries';
 import { CheckoutUseCase } from '../../../application/use-cases/checkout.use-case';
 import {
@@ -45,7 +48,7 @@ import {
   ShipOrderDto,
   CheckoutDto,
   CheckoutResponseDto,
-} from './order.dto';
+} from './dto/order.dto';
 
 @ApiTags('Orders')
 @ApiVersion('1.0.0')
@@ -82,6 +85,38 @@ export class OrderController {
     await this.commandBus.execute(new CreateOrderCommand(orderId, dto.userId));
 
     return { orderId };
+  }
+
+  @Get()
+  @ApiOperation({
+    summary: 'Get all orders',
+    description: 'Retrieves all orders with pagination support',
+    operationId: 'getAllOrders',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Maximum number of orders to return (default: 50)',
+  })
+  @ApiQuery({
+    name: 'offset',
+    required: false,
+    type: Number,
+    description: 'Number of orders to skip (default: 0)',
+  })
+  @ApiResponse({ status: 200, description: 'Orders retrieved successfully' })
+  @Traced('OrderController.getAllOrders')
+  async getAllOrders(
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string
+  ) {
+    return await this.queryBus.execute(
+      new GetAllOrdersQuery({
+        limit: limit ? parseInt(limit, 10) : undefined,
+        offset: offset ? parseInt(offset, 10) : undefined,
+      })
+    );
   }
 
   @Get(':orderId')

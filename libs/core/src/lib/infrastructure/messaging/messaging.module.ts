@@ -46,7 +46,7 @@ export class MessagingModule {
       },
     ];
 
-    const exports: string[] = [RABBITMQ_CONFIG];
+    const moduleExports: string[] = [RABBITMQ_CONFIG];
 
     if (enablePublisher) {
       providers.push({
@@ -58,7 +58,7 @@ export class MessagingModule {
         },
         inject: [RABBITMQ_CONFIG],
       });
-      exports.push(MESSAGE_PUBLISHER);
+      moduleExports.push(MESSAGE_PUBLISHER);
     }
 
     if (enableConsumer) {
@@ -71,13 +71,13 @@ export class MessagingModule {
         },
         inject: [RABBITMQ_CONFIG],
       });
-      exports.push(MESSAGE_CONSUMER);
+      moduleExports.push(MESSAGE_CONSUMER);
     }
 
     return {
       module: MessagingModule,
       providers,
-      exports,
+      exports: moduleExports,
       global: true,
     };
   }

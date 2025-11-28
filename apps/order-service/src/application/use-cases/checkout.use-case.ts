@@ -16,7 +16,7 @@
 
 import { Injectable, Logger } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@flexobo/core';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 
 // Commands
 import { ConfirmOrderCommand } from '../commands/order.commands';
@@ -96,7 +96,7 @@ export class CheckoutUseCase {
       }
 
       // Step 2: Create a payment
-      const paymentId = uuidv4();
+      const paymentId = randomUUID();
       const createPaymentResult = await this.commandBus.execute(
         new CreatePaymentCommand({
           paymentId,

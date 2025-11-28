@@ -11,6 +11,7 @@ import { IMessagePublisher } from '../messaging/message-publisher.interface';
 export interface OutboxModuleOptions {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   prismaClient?: any;
+  prismaClientToken?: string | symbol;
   serviceConfig?: OutboxServiceConfig;
   workerConfig?: OutboxWorkerConfig;
   messagePublisher?: Provider;
@@ -19,14 +20,32 @@ export interface OutboxModuleOptions {
 @Module({})
 export class OutboxModule {
   static forRoot(options: OutboxModuleOptions = {}): DynamicModule {
-    const { prismaClient, serviceConfig, workerConfig, messagePublisher } =
-      options;
+    const {
+      prismaClient,
+      prismaClientToken,
+      serviceConfig,
+      workerConfig,
+      messagePublisher,
+    } = options;
 
-    const providers: Provider[] = [
-      {
+    const providers: Provider[] = [];
+
+    // If prismaClient is provided directly, use it
+    // Otherwise, if prismaClientToken is provided, use useExisting
+    // Otherwise, use 'PrismaClient' as the default token
+    if (prismaClient) {
+      providers.push({
         provide: OUTBOX_PRISMA_CLIENT,
         useValue: prismaClient,
-      },
+      });
+    } else {
+      providers.push({
+        provide: OUTBOX_PRISMA_CLIENT,
+        useExisting: prismaClientToken || 'PrismaClient',
+      });
+    }
+
+    providers.push(
       {
         provide: 'IOutboxRepository',
         useClass: PrismaOutboxRepository,
@@ -37,8 +56,8 @@ export class OutboxModule {
           return new OutboxService(repository, serviceConfig);
         },
         inject: ['IOutboxRepository'],
-      },
-    ];
+      }
+    );
 
     if (messagePublisher) {
       providers.push(messagePublisher, {

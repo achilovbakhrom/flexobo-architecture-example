@@ -32,3 +32,14 @@ export class GetRecentOrdersQuery implements IQuery {
     this.limit = args[0] as number | undefined;
   }
 }
+
+export class GetAllOrdersQuery implements IQuery {
+  public readonly limit?: number;
+  public readonly offset?: number;
+
+  constructor(...args: unknown[]) {
+    const options = args[0] as { limit?: number; offset?: number } | undefined;
+    this.limit = options?.limit;
+    this.offset = options?.offset;
+  }
+}

@@ -29,7 +29,7 @@ import {
 import {
   OrderHistoryResponseDto,
   OrderHistoryQueryParamsDto,
-} from './order-history.dto';
+} from './dto/order-history.dto';
 
 @ApiTags('Order History')
 @ApiVersion('1.0.0')
@@ -73,7 +73,13 @@ export class OrderHistoryController {
   @ApiParam({
     name: 'eventType',
     description: 'Event type',
-    enum: ['OrderCreated', 'OrderItemAdded', 'OrderConfirmed', 'OrderCancelled', 'OrderShipped'],
+    enum: [
+      'OrderCreated',
+      'OrderItemAdded',
+      'OrderConfirmed',
+      'OrderCancelled',
+      'OrderShipped',
+    ],
   })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })

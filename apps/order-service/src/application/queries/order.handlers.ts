@@ -18,6 +18,7 @@ import {
   GetOrderByIdQuery,
   GetOrdersByUserQuery,
   GetRecentOrdersQuery,
+  GetAllOrdersQuery,
 } from './order.queries';
 import { Inject } from '@nestjs/common';
 import {
@@ -83,6 +84,30 @@ export class GetRecentOrdersHandler
     return {
       limit,
       orders,
+    };
+  }
+}
+
+@QueryHandler(GetAllOrdersQuery)
+export class GetAllOrdersHandler implements IQueryHandler<GetAllOrdersQuery> {
+  constructor(
+    @Inject(ORDER_READ_MODEL_REPOSITORY)
+    private readonly readModelRepository: IOrderReadModelRepository
+  ) {}
+
+  async execute(query: GetAllOrdersQuery): Promise<{
+    orders: OrderReadModelDto[];
+    limit: number;
+    offset: number;
+  }> {
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
+    const orders = await this.readModelRepository.findAll({ limit, offset });
+
+    return {
+      orders,
+      limit,
+      offset,
     };
   }
 }

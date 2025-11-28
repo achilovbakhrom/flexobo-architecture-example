@@ -1,4 +1,4 @@
-import { Module, Global, DynamicModule, Type } from '@nestjs/common';
+import { Module, Global, DynamicModule, Type, OnModuleInit, Inject, Optional } from '@nestjs/common';
 import { CommandBus } from './commands/command.bus';
 import { QueryBus } from './queries/query.bus';
 import { ICommandHandler, ICommand } from './commands/command.interface';
@@ -9,9 +9,24 @@ export interface CqrsModuleOptions {
   queryHandlers?: Type<IQueryHandler<IQuery, unknown>>[];
 }
 
+export const CQRS_COMMAND_HANDLERS = 'CQRS_COMMAND_HANDLERS';
+export const CQRS_QUERY_HANDLERS = 'CQRS_QUERY_HANDLERS';
+
 @Global()
 @Module({})
-export class CqrsModule {
+export class CqrsModule implements OnModuleInit {
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+    @Optional() @Inject(CQRS_COMMAND_HANDLERS) private readonly commandHandlers: Type<ICommandHandler<ICommand, unknown>>[] = [],
+    @Optional() @Inject(CQRS_QUERY_HANDLERS) private readonly queryHandlers: Type<IQueryHandler<IQuery, unknown>>[] = [],
+  ) {}
+
+  onModuleInit() {
+    this.commandHandlers.forEach((handler) => this.commandBus.register(handler));
+    this.queryHandlers.forEach((handler) => this.queryBus.register(handler));
+  }
+
   static forRoot(options: CqrsModuleOptions = {}): DynamicModule {
     const commandHandlers = options.commandHandlers || [];
     const queryHandlers = options.queryHandlers || [];
@@ -21,26 +36,16 @@ export class CqrsModule {
       providers: [
         CommandBus,
         QueryBus,
-        ...commandHandlers,
-        ...queryHandlers,
         {
-          provide: 'COMMAND_HANDLERS',
-          useFactory: (commandBus: CommandBus) => {
-            commandHandlers.forEach((handler) => commandBus.register(handler));
-            return commandHandlers;
-          },
-          inject: [CommandBus, ...commandHandlers],
+          provide: CQRS_COMMAND_HANDLERS,
+          useValue: commandHandlers,
         },
         {
-          provide: 'QUERY_HANDLERS',
-          useFactory: (queryBus: QueryBus) => {
-            queryHandlers.forEach((handler) => queryBus.register(handler));
-            return queryHandlers;
-          },
-          inject: [QueryBus, ...queryHandlers],
+          provide: CQRS_QUERY_HANDLERS,
+          useValue: queryHandlers,
         },
       ],
-      exports: [CommandBus, QueryBus],
+      exports: [CommandBus, QueryBus, CQRS_COMMAND_HANDLERS, CQRS_QUERY_HANDLERS],
     };
   }
 }

@@ -98,6 +98,19 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
     return this.mapToDto({ ...order, items: order.items ?? [] });
   }
 
+  async findAll(options?: {
+    limit?: number;
+    offset?: number;
+  }): Promise<OrderReadModelDto[]> {
+    const orders = await this.prisma.orderReadModel.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: options?.limit ?? 50,
+      skip: options?.offset ?? 0,
+    });
+
+    return orders.map((order) => this.mapToReadModelDto(order));
+  }
+
   async findByUserId(
     userId: string,
     options?: { limit?: number; offset?: number }
@@ -161,6 +174,13 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
       }
     }
 
+    // Use provided version (synchronized with event store) or default to 1 for create
+    const createVersion = options?.version ?? 1;
+    // For update: use provided version or increment by 1
+    const updateVersion = options?.version !== undefined
+      ? options.version
+      : { increment: 1 };
+
     await this.prisma.orderReadModel.upsert({
       where: { id: order.id },
       create: {
@@ -171,7 +191,7 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
         currency: order.currency,
         itemCount: order.itemCount,
         trackingNumber: order.trackingNumber ?? null,
-        version: 1,
+        version: createVersion,
         lastEventId: options?.eventId ?? null,
       },
       update: {
@@ -180,7 +200,7 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
         currency: order.currency,
         itemCount: order.itemCount,
         trackingNumber: order.trackingNumber ?? null,
-        version: { increment: 1 },
+        version: updateVersion,
         lastEventId: options?.eventId ?? undefined,
       },
     });

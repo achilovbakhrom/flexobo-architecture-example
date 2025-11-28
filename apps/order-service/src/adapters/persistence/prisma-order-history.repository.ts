@@ -42,6 +42,7 @@ interface OrderHistoryRecord {
   orderId: string;
   eventType: string;
   eventData: unknown;
+  version: number;
   previousState: string | null;
   newState: string | null;
   changedBy: string | null;
@@ -54,6 +55,7 @@ interface CreateOrderHistoryRecord {
   orderId: string;
   eventType: string;
   eventData: unknown;
+  version: number;
   previousState?: string | null;
   newState?: string | null;
   changedBy?: string | null;
@@ -119,6 +121,7 @@ export class PrismaOrderHistoryRepository implements IOrderHistoryRepository {
         orderId: entry.orderId,
         eventType: entry.eventType,
         eventData: entry.eventData,
+        version: entry.version,
         previousState: entry.previousState ?? null,
         newState: entry.newState ?? null,
         changedBy: entry.changedBy ?? null,
@@ -147,6 +150,7 @@ export class PrismaOrderHistoryRepository implements IOrderHistoryRepository {
       orderId: entry.orderId,
       eventType: entry.eventType,
       eventData: entry.eventData as Record<string, unknown>,
+      version: entry.version,
       previousState: entry.previousState,
       newState: entry.newState,
       changedBy: entry.changedBy,

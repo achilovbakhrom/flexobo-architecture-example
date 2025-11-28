@@ -74,7 +74,14 @@ async function saveOrder(
   await outboxService.saveEvents(uncommittedEvents, order.id, 'Order');
 
   for (const event of uncommittedEvents) {
-    const eventName = `order.${event.type.toLowerCase().replace('order', '')}`;
+    // Convert PascalCase event type to snake_case event name
+    // e.g., OrderItemAdded -> order.item_added
+    const eventTypeName = event.type
+      .replace(/^Order/, '') // Remove 'Order' prefix
+      .replace(/([A-Z])/g, '_$1') // Add underscore before capitals
+      .toLowerCase()
+      .replace(/^_/, ''); // Remove leading underscore
+    const eventName = `order.${eventTypeName}`;
     eventEmitter.emit(eventName, {
       aggregateId: event.aggregateId,
       eventType: event.type,

@@ -10,6 +10,7 @@ export interface OrderHistoryDto {
   orderId: string;
   eventType: string;
   eventData: Record<string, unknown>;
+  version: number;
   previousState?: string | null;
   newState?: string | null;
   changedBy?: string | null;
@@ -22,6 +23,7 @@ export interface CreateOrderHistoryEntryDto {
   orderId: string;
   eventType: string;
   eventData: Record<string, unknown>;
+  version: number;
   previousState?: string;
   newState?: string;
   changedBy?: string;

@@ -27,7 +27,7 @@ import {
 import { CommandBus, QueryBus } from '@flexobo/core';
 import { VersionInterceptor, ApiVersion } from '@flexobo/core';
 import { Traced } from '@flexobo/core';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   CreateProductCommand,
   UpdateProductCommand,
@@ -47,8 +47,8 @@ import {
   UpdateProductRequestDto,
   UpdateStockRequestDto,
   ProductResponseDto,
-} from './product.dto';
-import { SuccessResponseDto } from './order.dto';
+} from './dto/product.dto';
+import { SuccessResponseDto } from './dto/order.dto';
 import { ProductDto } from '../../../application/dto/product.dto';
 
 @ApiTags('Products')
@@ -79,7 +79,7 @@ export class ProductController {
   async createProduct(
     @Body() dto: CreateProductRequestDto
   ): Promise<CreateProductResponseDto> {
-    const productId = uuidv4();
+    const productId = randomUUID();
 
     const result = await this.commandBus.execute(
       new CreateProductCommand({
@@ -110,7 +110,11 @@ export class ProductController {
     operationId: 'getProductById',
   })
   @ApiParam({ name: 'productId', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'Product found', type: ProductResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Product found',
+    type: ProductResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @Traced('ProductController.getProductById')
   async getProductById(
@@ -134,7 +138,11 @@ export class ProductController {
     operationId: 'getProductBySku',
   })
   @ApiParam({ name: 'sku', description: 'Product SKU' })
-  @ApiResponse({ status: 200, description: 'Product found', type: ProductResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Product found',
+    type: ProductResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @Traced('ProductController.getProductBySku')
   async getProductBySku(@Param('sku') sku: string): Promise<ProductDto> {
@@ -158,7 +166,11 @@ export class ProductController {
   @ApiParam({ name: 'category', description: 'Product category' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Products retrieved', type: [ProductResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Products retrieved',
+    type: [ProductResponseDto],
+  })
   @Traced('ProductController.getProductsByCategory')
   async getProductsByCategory(
     @Param('category') category: string,
@@ -178,7 +190,11 @@ export class ProductController {
   })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Products retrieved', type: [ProductResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Products retrieved',
+    type: [ProductResponseDto],
+  })
   @Traced('ProductController.getActiveProducts')
   async getActiveProducts(
     @Query('limit') limit?: number,
@@ -198,7 +214,11 @@ export class ProductController {
   @ApiParam({ name: 'query', description: 'Search query' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Search results', type: [ProductResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Search results',
+    type: [ProductResponseDto],
+  })
   @Traced('ProductController.searchProducts')
   async searchProducts(
     @Param('query') query: string,
@@ -218,7 +238,11 @@ export class ProductController {
   })
   @ApiParam({ name: 'productId', description: 'Product ID' })
   @ApiBody({ type: UpdateProductRequestDto })
-  @ApiResponse({ status: 200, description: 'Product updated', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Product updated',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @Traced('ProductController.updateProduct')
   async updateProduct(
@@ -244,7 +268,11 @@ export class ProductController {
   })
   @ApiParam({ name: 'productId', description: 'Product ID' })
   @ApiBody({ type: UpdateStockRequestDto })
-  @ApiResponse({ status: 200, description: 'Stock updated', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Stock updated',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @Traced('ProductController.updateProductStock')
   async updateProductStock(
@@ -269,7 +297,11 @@ export class ProductController {
     operationId: 'deleteProduct',
   })
   @ApiParam({ name: 'productId', description: 'Product ID' })
-  @ApiResponse({ status: 200, description: 'Product deleted', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Product deleted',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @Traced('ProductController.deleteProduct')
   async deleteProduct(

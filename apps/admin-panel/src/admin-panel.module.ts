@@ -15,6 +15,7 @@ import {
   MessagingModule,
   MESSAGE_PUBLISHER,
 } from '@flexobo/core';
+import { PrismaModule } from './prisma.module';
 
 // ============================================================
 // Presentation Layer (Controllers)
@@ -26,6 +27,7 @@ import {
   MetricsController,
   CacheController,
 } from './presentation/metrics.controller';
+import { InventoryController } from './presentation/inventory.controller';
 
 // ============================================================
 // Application Services
@@ -70,8 +72,16 @@ import { PrismaInventoryReadModelRepository } from './adapters/persistence/prism
 // ============================================================
 import { OrderEventHandler } from './adapters/messaging/order-event.handler';
 
+// ============================================================
+// Projection Handlers (Local Event Handlers for Read Model)
+// ============================================================
+import { InventoryProjectionHandler } from './adapters/projection/inventory.projection';
+
 @Module({
   imports: [
+    // Prisma ORM
+    PrismaModule,
+
     // Event Emitter for local projections
     EventEmitterModule.forRoot({
       wildcard: true,
@@ -149,6 +159,7 @@ import { OrderEventHandler } from './adapters/messaging/order-event.handler';
     AuditLogController,
     MetricsController,
     CacheController,
+    InventoryController,
   ],
   providers: [
     // ============================================================
@@ -180,6 +191,22 @@ import { OrderEventHandler } from './adapters/messaging/order-event.handler';
     // Messaging Event Handlers - RabbitMQ cross-service handlers
     // ============================================================
     OrderEventHandler,
+
+    // ============================================================
+    // Projection Handlers - Local event handlers for read model
+    // ============================================================
+    InventoryProjectionHandler,
+
+    // ============================================================
+    // Command Handlers (must be providers for DI resolution)
+    // ============================================================
+    CreateInventoryHandler,
+    AddStockHandler,
+    ReserveStockHandler,
+    ReserveStockByProductHandler,
+    ConfirmReservationHandler,
+    ReleaseReservationHandler,
+    ReleaseReservationByOrderHandler,
   ],
 })
 export class AdminPanelModule {}

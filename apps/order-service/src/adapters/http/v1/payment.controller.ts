@@ -26,7 +26,7 @@ import {
 import { CommandBus, QueryBus } from '@flexobo/core';
 import { VersionInterceptor, ApiVersion } from '@flexobo/core';
 import { Traced } from '@flexobo/core';
-import { v4 as uuidv4 } from 'uuid';
+import { randomUUID } from 'crypto';
 import {
   CreatePaymentCommand,
   ProcessPaymentCommand,
@@ -47,8 +47,8 @@ import {
   FailPaymentRequestDto,
   RefundPaymentRequestDto,
   PaymentResponseDto,
-} from './payment.dto';
-import { SuccessResponseDto } from './order.dto';
+} from './dto/payment.dto';
+import { SuccessResponseDto } from './dto/order.dto';
 import { PaymentDto } from '../../../application/dto/payment.dto';
 
 @ApiTags('Payments')
@@ -79,7 +79,7 @@ export class PaymentController {
   async createPayment(
     @Body() dto: CreatePaymentRequestDto
   ): Promise<CreatePaymentResponseDto> {
-    const paymentId = uuidv4();
+    const paymentId = randomUUID();
 
     const result = await this.commandBus.execute(
       new CreatePaymentCommand({
@@ -105,7 +105,11 @@ export class PaymentController {
     operationId: 'getPaymentById',
   })
   @ApiParam({ name: 'paymentId', description: 'Payment ID' })
-  @ApiResponse({ status: 200, description: 'Payment found', type: PaymentResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment found',
+    type: PaymentResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.getPaymentById')
   async getPaymentById(
@@ -129,7 +133,11 @@ export class PaymentController {
     operationId: 'getPaymentsByOrder',
   })
   @ApiParam({ name: 'orderId', description: 'Order ID' })
-  @ApiResponse({ status: 200, description: 'Payments retrieved', type: [PaymentResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Payments retrieved',
+    type: [PaymentResponseDto],
+  })
   @Traced('PaymentController.getPaymentsByOrder')
   async getPaymentsByOrder(
     @Param('orderId') orderId: string
@@ -152,7 +160,11 @@ export class PaymentController {
   })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Payments retrieved', type: [PaymentResponseDto] })
+  @ApiResponse({
+    status: 200,
+    description: 'Payments retrieved',
+    type: [PaymentResponseDto],
+  })
   @Traced('PaymentController.getPaymentsByStatus')
   async getPaymentsByStatus(
     @Param('status') status: string,
@@ -171,7 +183,11 @@ export class PaymentController {
     operationId: 'getPaymentByTransactionId',
   })
   @ApiParam({ name: 'transactionId', description: 'External transaction ID' })
-  @ApiResponse({ status: 200, description: 'Payment found', type: PaymentResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment found',
+    type: PaymentResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.getPaymentByTransactionId')
   async getPaymentByTransactionId(
@@ -195,7 +211,11 @@ export class PaymentController {
     operationId: 'processPayment',
   })
   @ApiParam({ name: 'paymentId', description: 'Payment ID' })
-  @ApiResponse({ status: 200, description: 'Payment processing started', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment processing started',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.processPayment')
   async processPayment(
@@ -220,7 +240,11 @@ export class PaymentController {
   })
   @ApiParam({ name: 'paymentId', description: 'Payment ID' })
   @ApiBody({ type: CompletePaymentRequestDto })
-  @ApiResponse({ status: 200, description: 'Payment completed', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment completed',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.completePayment')
   async completePayment(
@@ -246,7 +270,11 @@ export class PaymentController {
   })
   @ApiParam({ name: 'paymentId', description: 'Payment ID' })
   @ApiBody({ type: FailPaymentRequestDto })
-  @ApiResponse({ status: 200, description: 'Payment marked as failed', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment marked as failed',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.failPayment')
   async failPayment(
@@ -272,7 +300,11 @@ export class PaymentController {
   })
   @ApiParam({ name: 'paymentId', description: 'Payment ID' })
   @ApiBody({ type: RefundPaymentRequestDto })
-  @ApiResponse({ status: 200, description: 'Payment refunded', type: SuccessResponseDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Payment refunded',
+    type: SuccessResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Payment not found' })
   @Traced('PaymentController.refundPayment')
   async refundPayment(
