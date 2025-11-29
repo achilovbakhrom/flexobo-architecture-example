@@ -192,10 +192,63 @@ yarn db:studio:admin        # Port 5557
 ### 1. Generate Service
 
 ```bash
-npx nx g @nx/nest:application inventory-service
+# Generate in apps/ directory, skip e2e tests
+npx nx g @nx/nest:application apps/inventory-service --name=inventory-service --e2eTestRunner=none
 ```
 
-### 2. Create Docker Compose
+### 2. Update project.json
+
+Replace `apps/inventory-service/project.json` with:
+
+```json
+{
+  "name": "inventory-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/inventory-service/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "cache": false,
+      "options": {
+        "outputPath": "dist/apps/inventory-service",
+        "main": "apps/inventory-service/src/main.ts",
+        "tsConfig": "apps/inventory-service/tsconfig.app.json",
+        "assets": ["apps/inventory-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "cache": false,
+      "options": {
+        "buildTarget": "inventory-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9230,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}
+```
+
+### 3. Create Docker Compose
 
 Create `apps/inventory-service/docker-compose.yml`:
 
@@ -247,7 +300,7 @@ networks:
     external: true
 ```
 
-### 3. Create Environment File
+### 4. Create Environment File
 
 Create `apps/inventory-service/.env`:
 
@@ -270,7 +323,7 @@ OTEL_TRACE_ENDPOINT=http://localhost:4318/v1/traces
 OTEL_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 ```
 
-### 4. Setup Prisma
+### 5. Setup Prisma
 
 Create `apps/inventory-service/prisma/schema.prisma`:
 
@@ -322,7 +375,7 @@ export default {
 };
 ```
 
-### 5. Add Package Scripts
+### 6. Add Package Scripts
 
 Update root `package.json`:
 
@@ -337,7 +390,7 @@ Update root `package.json`:
 }
 ```
 
-### 6. Create Service Structure
+### 7. Create Service Structure
 
 ```
 apps/inventory-service/src/
@@ -365,7 +418,7 @@ apps/inventory-service/src/
     └── inventory-store.port.ts
 ```
 
-### 7. Create Module
+### 8. Create Module
 
 Create `apps/inventory-service/src/inventory.module.ts`:
 
@@ -448,7 +501,7 @@ import { PrismaModule } from './prisma.module';
 export class InventoryModule {}
 ```
 
-### 8. Start Service
+### 9. Start Service
 
 ```bash
 # Start infrastructure
@@ -463,6 +516,50 @@ yarn db:migration:apply:inventory
 
 # Start service
 yarn start:inventory
+```
+
+---
+
+## Removing a Microservice
+
+### 1. Stop and Remove Containers
+
+```bash
+cd apps/inventory-service && docker-compose down -v && cd ../..
+```
+
+### 2. Remove Service Directory
+
+```bash
+rm -rf apps/inventory-service
+```
+
+### 3. Remove Package Scripts
+
+Remove these entries from root `package.json`:
+
+```json
+{
+  "scripts": {
+    "start:inventory": "...",
+    "db:migration:create:inventory": "...",
+    "db:migration:apply:inventory": "...",
+    "db:studio:inventory": "..."
+  }
+}
+```
+
+### 4. Clean Up Build Artifacts
+
+```bash
+rm -rf dist/apps/inventory-service
+rm -rf node_modules/.prisma/inventory-client
+```
+
+### 5. Reset Nx Cache
+
+```bash
+npx nx reset
 ```
 
 ---
