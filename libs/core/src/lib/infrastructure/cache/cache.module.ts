@@ -20,14 +20,20 @@ export const CACHE_WARMING_SERVICE = 'CACHE_WARMING_SERVICE';
  */
 export interface RedisConfig {
   /**
+   * Redis URL (e.g., redis://localhost:6379)
+   * If provided, host/port/password/db are ignored
+   */
+  url?: string;
+
+  /**
    * Redis host
    */
-  host: string;
+  host?: string;
 
   /**
    * Redis port
    */
-  port: number;
+  port?: number;
 
   /**
    * Redis password
@@ -85,11 +91,7 @@ export class CacheModule {
     const redisProvider: Provider = {
       provide: REDIS_CLIENT,
       useFactory: () => {
-        const client = new Redis({
-          host: options.redis.host,
-          port: options.redis.port,
-          password: options.redis.password,
-          db: options.redis.db ?? 0,
+        const redisOptions = {
           connectTimeout: options.redis.connectTimeout ?? 10000,
           keyPrefix: options.redis.keyPrefix,
           maxRetriesPerRequest: options.redis.maxRetriesPerRequest ?? 3,
@@ -99,7 +101,18 @@ export class CacheModule {
             const delay = Math.min(times * 50, 2000);
             return delay;
           },
-        });
+        };
+
+        // Support URL or host/port configuration
+        const client = options.redis.url
+          ? new Redis(options.redis.url, redisOptions)
+          : new Redis({
+              ...redisOptions,
+              host: options.redis.host ?? 'localhost',
+              port: options.redis.port ?? 6379,
+              password: options.redis.password,
+              db: options.redis.db ?? 0,
+            });
 
         return client;
       },
@@ -175,11 +188,7 @@ export class CacheModule {
     const redisProvider: Provider = {
       provide: REDIS_CLIENT,
       useFactory: (config: CacheModuleOptions) => {
-        const client = new Redis({
-          host: config.redis.host,
-          port: config.redis.port,
-          password: config.redis.password,
-          db: config.redis.db ?? 0,
+        const redisOptions = {
           connectTimeout: config.redis.connectTimeout ?? 10000,
           keyPrefix: config.redis.keyPrefix,
           maxRetriesPerRequest: config.redis.maxRetriesPerRequest ?? 3,
@@ -189,7 +198,18 @@ export class CacheModule {
             const delay = Math.min(times * 50, 2000);
             return delay;
           },
-        });
+        };
+
+        // Support URL or host/port configuration
+        const client = config.redis.url
+          ? new Redis(config.redis.url, redisOptions)
+          : new Redis({
+              ...redisOptions,
+              host: config.redis.host ?? 'localhost',
+              port: config.redis.port ?? 6379,
+              password: config.redis.password,
+              db: config.redis.db ?? 0,
+            });
 
         return client;
       },

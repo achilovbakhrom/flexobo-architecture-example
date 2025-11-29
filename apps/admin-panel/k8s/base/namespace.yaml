@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: admin-panel
+  labels:
+    app: admin-panel
+    part-of: flexobo

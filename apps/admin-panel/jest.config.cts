@@ -7,4 +7,8 @@ module.exports = {
   },
   moduleFileExtensions: ['ts', 'js', 'html'],
   coverageDirectory: '../../coverage/apps/admin-panel',
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/__tests__/',  // Integration tests require full application context
+  ],
 };

@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: flexobo-infra
+  labels:
+    app.kubernetes.io/name: flexobo-infrastructure
+    app.kubernetes.io/part-of: flexobo

@@ -13,6 +13,11 @@ RUN npm ci --legacy-peer-deps
 # Build stage
 FROM dependencies AS build
 COPY . .
+
+# Generate Prisma client for admin-panel
+RUN npx prisma generate --schema=apps/admin-panel/prisma/schema.prisma
+
+# Build the application with NX
 RUN npx nx build admin-panel --configuration=production
 
 # Production stage
@@ -27,6 +32,9 @@ RUN addgroup -g 1001 -S nodejs && \
 COPY --from=build --chown=nodejs:nodejs /app/dist/apps/admin-panel ./
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/package*.json ./
+
+# Copy Prisma client (custom output path)
+COPY --from=build --chown=nodejs:nodejs /app/apps/admin-panel/node_modules/.prisma ./node_modules/.prisma
 
 USER nodejs
 

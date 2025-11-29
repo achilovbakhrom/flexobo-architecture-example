@@ -1,58 +1,42 @@
 /**
  * Order query handlers
+ *
+ * These handlers use the IOrderReadModelRepository to query orders.
+ * The read model is optimized for queries (CQRS pattern).
+ *
+ * This maintains proper hexagonal architecture separation:
+ * - Queries use read model (projection)
+ * - Commands use event store
  */
 
+import { QueryHandler, IQueryHandler } from '@flexobo/core';
 import {
-  QueryHandler,
-  IQueryHandler,
-  IEventStore,
-  DomainEvent,
-} from '@flexobo/core';
-import { Order } from '../../domain/order.aggregate';
+  IOrderReadModelRepository,
+  ORDER_READ_MODEL_REPOSITORY,
+} from '../../ports/order-read-model.port';
 import {
   GetOrderByIdQuery,
   GetOrdersByUserQuery,
   GetRecentOrdersQuery,
+  GetAllOrdersQuery,
 } from './order.queries';
 import { Inject } from '@nestjs/common';
-
-// Helper function to convert StoredEvent[] to DomainEvent[]
-function toDomainEvents(
-  stored: {
-    eventData: Record<string, unknown>;
-    eventType: string;
-    version: number;
-    occurredAt: Date;
-    aggregateId: string;
-    aggregateType: string;
-  }[]
-): DomainEvent[] {
-  return stored.map((s) => ({
-    type: s.eventType,
-    aggregateId: s.aggregateId,
-    aggregateType: s.aggregateType,
-    version: s.version,
-    occurredAt: s.occurredAt,
-    data: s.eventData,
-  }));
-}
+import {
+  OrderReadModelDto,
+  OrderWithItemsReadModelDto,
+} from '../dto/order.dto';
 
 @QueryHandler(GetOrderByIdQuery)
 export class GetOrderByIdHandler implements IQueryHandler<GetOrderByIdQuery> {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_READ_MODEL_REPOSITORY)
+    private readonly readModelRepository: IOrderReadModelRepository
   ) {}
 
-  async execute(query: GetOrderByIdQuery): Promise<unknown> {
-    const storedEvents = await this.eventStore.getEvents(query.orderId);
-
-    if (storedEvents.length === 0) {
-      return null;
-    }
-
-    const events = toDomainEvents(storedEvents);
-    const order = Order.fromEvents(events);
-    return order.getDetails();
+  async execute(
+    query: GetOrderByIdQuery
+  ): Promise<OrderWithItemsReadModelDto | null> {
+    return this.readModelRepository.findById(query.orderId);
   }
 }
 
@@ -61,16 +45,22 @@ export class GetOrdersByUserHandler
   implements IQueryHandler<GetOrdersByUserQuery>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_READ_MODEL_REPOSITORY)
+    private readonly readModelRepository: IOrderReadModelRepository
   ) {}
 
-  async execute(query: GetOrdersByUserQuery): Promise<unknown> {
-    // In a real implementation, you'd have a read model/projection
-    // For this example, we'll return a placeholder
+  async execute(query: GetOrdersByUserQuery): Promise<{
+    userId: string;
+    orders: OrderReadModelDto[];
+  }> {
+    const orders = await this.readModelRepository.findByUserId(query.userId, {
+      limit: query.limit,
+      offset: query.offset,
+    });
+
     return {
       userId: query.userId,
-      orders: [],
-      message: 'Read model not implemented - use projections in production',
+      orders,
     };
   }
 }
@@ -80,15 +70,44 @@ export class GetRecentOrdersHandler
   implements IQueryHandler<GetRecentOrdersQuery>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_READ_MODEL_REPOSITORY)
+    private readonly readModelRepository: IOrderReadModelRepository
   ) {}
 
-  async execute(query: GetRecentOrdersQuery): Promise<unknown> {
-    // In a real implementation, you'd query a read model
+  async execute(query: GetRecentOrdersQuery): Promise<{
+    limit: number;
+    orders: OrderReadModelDto[];
+  }> {
+    const limit = query.limit ?? 10;
+    const orders = await this.readModelRepository.findRecent(limit);
+
     return {
-      limit: query.limit,
-      orders: [],
-      message: 'Read model not implemented - use projections in production',
+      limit,
+      orders,
+    };
+  }
+}
+
+@QueryHandler(GetAllOrdersQuery)
+export class GetAllOrdersHandler implements IQueryHandler<GetAllOrdersQuery> {
+  constructor(
+    @Inject(ORDER_READ_MODEL_REPOSITORY)
+    private readonly readModelRepository: IOrderReadModelRepository
+  ) {}
+
+  async execute(query: GetAllOrdersQuery): Promise<{
+    orders: OrderReadModelDto[];
+    limit: number;
+    offset: number;
+  }> {
+    const limit = query.limit ?? 50;
+    const offset = query.offset ?? 0;
+    const orders = await this.readModelRepository.findAll({ limit, offset });
+
+    return {
+      orders,
+      limit,
+      offset,
     };
   }
 }

@@ -1,408 +1,610 @@
-# Flexobo Microservice Architecture
+# Flexobo Microservices Architecture
 
-A production-ready microservices architecture built with **NestJS**, **Nx**, and implementing advanced patterns like **Event Sourcing**, **CQRS**, **Saga**, and **Circuit Breaker**.
+[![CI](https://github.com/achilovbakhrom/flexobo-architecture-example/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/achilovbakhrom/flexobo-architecture-example/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/achilovbakhrom/flexobo-architecture-example/branch/dev/graph/badge.svg)](https://codecov.io/gh/achilovbakhrom/flexobo-architecture-example)
 
-## 🎯 Project Overview
+Enterprise-grade microservices example with event sourcing, CQRS, and domain-driven design.
 
-This project demonstrates a complete microservices ecosystem with:
-- **3 Microservices:** Order Service, API Gateway, Admin Panel
-- **17 Advanced Patterns:** Event Sourcing, CQRS, Outbox, Saga, 2PC, Snapshots, Circuit Breaker, etc.
-- **Full Testing Suite:** Unit, Integration, and E2E tests
-- **Production Deployment:** Docker & Kubernetes configurations
-- **CLI Tools:** System management and monitoring
-
-## 🏗️ Architecture
-
-```
-┌─────────────────┐
-│   API Gateway   │ ← Entry point (Port 3001)
-│   (3 replicas)  │
-└────────┬────────┘
-         │
-    ┌────┴────┬──────────────┐
-    ↓         ↓              ↓
-┌────────┐ ┌──────────┐ ┌───────────┐
-│ Order  │ │  Admin   │ │   Cache   │
-│Service │ │  Panel   │ │  (Redis)  │
-│        │ │          │ │           │
-└───┬────┘ └────┬─────┘ └───────────┘
-    │           │
-    ↓           ↓
-┌────────────────────┐
-│    PostgreSQL      │ ← Event Store + Data
-│  (Event Sourcing)  │
-└────────────────────┘
-         ↑
-    ┌────┴────┐
-    │ RabbitMQ│ ← Message Bus
-    │  (AMQP) │
-    └─────────┘
-```
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 20+
-- Docker & Docker Compose
-- PostgreSQL 15
-- RabbitMQ 3.12
-- Redis 7
-
-### Installation
+## Quick Start
 
 ```bash
-# Clone repository
-git clone <repository-url>
-cd flexobo-microservice-example
-
 # Install dependencies
-npm install
+yarn install
 
-# Start infrastructure (PostgreSQL, RabbitMQ, Redis)
-docker-compose -f docker-compose.dev.yml up -d
+# Start infrastructure (shared RabbitMQ)
+cd infrastructure && docker-compose up -d && cd ..
 
-# Run database migrations
-npx prisma migrate dev
+# Start order-service infrastructure (PostgreSQL, Redis)
+cd apps/order-service && docker-compose up -d && cd ../..
+
+# Run migrations
+yarn db:migration:apply:order
+
+# Start service
+yarn start:order
 ```
+
+**Services:**
+| Service | Port | URL |
+|---------|------|-----|
+| Order Service | 3000 | http://localhost:3000/api |
+| API Gateway | 3001 | http://localhost:3001/api |
+| Admin Panel | 3002 | http://localhost:3002/api |
+| Swagger UI | 3001 | http://localhost:3001/api/docs |
+| RabbitMQ Management | 15672 | http://localhost:15672 |
+
+---
+
+## Architecture
+
+### Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Runtime | Node.js 22 |
+| Framework | NestJS |
+| Language | TypeScript (strict) |
+| Database | PostgreSQL + Prisma |
+| Cache | Redis |
+| Message Queue | RabbitMQ |
+| Monorepo | Nx |
+| Observability | OpenTelemetry |
+
+### Project Structure
+
+```text
+apps/
+├── order-service/
+│   ├── prisma/              # Database schema and migrations
+│   └── src/
+│       ├── domain/          # Aggregates, entities, events
+│       ├── application/     # Commands, queries, use-cases
+│       ├── adapters/        # Infrastructure implementations
+│       │   ├── http/        # REST controllers
+│       │   ├── persistence/ # Repositories
+│       │   ├── eventbus/    # Event handlers and projections
+│       │   └── messaging/   # External message handlers
+│       └── ports/           # Repository interfaces
+├── api-gateway/
+└── admin-panel/
+
+libs/
+├── core/                    # CQRS, event sourcing, messaging
+└── shared-kernel/           # Event contracts, value objects
+
+infrastructure/
+└── docker-compose.yml       # Shared RabbitMQ, Infisical
+```
+
+### Patterns
+
+- **Event Sourcing** - All state changes stored as events
+- **CQRS** - Separate command and query models
+- **Hexagonal Architecture** - Ports and adapters
+- **Outbox Pattern** - Reliable event publishing
+- **Projections** - Event handlers that update read models
+- **Shared Kernel** - Cross-service event contracts
+
+---
+
+## Shared Kernel
+
+The `@flexobo/shared-kernel` library contains contracts shared across microservices.
+
+### Event Contracts
+
+```typescript
+import { EVENT_TYPES, ROUTING_KEYS, EXCHANGES } from '@flexobo/shared-kernel';
+
+// Domain event types (for event sourcing)
+EVENT_TYPES.ORDER.CREATED    // 'OrderCreated'
+EVENT_TYPES.PAYMENT.COMPLETED // 'PaymentCompleted'
+
+// Routing keys (for RabbitMQ subscriptions)
+ROUTING_KEYS.ORDER.CREATED   // 'order.created'
+ROUTING_KEYS.ORDER.ALL       // 'order.*'
+
+// Exchange names
+EXCHANGES.EVENTS             // 'flexobo.events'
+```
+
+### When to Use
+
+- **Listening to events from another service** - Import `ROUTING_KEYS` and `EVENT_TYPES`
+- **Publishing events** - Events are published automatically via outbox, use `EVENT_TYPES` in aggregates
+
+### Service-Specific Queues
+
+Each service defines its own queue names locally (not shared):
+
+```typescript
+// apps/order-service/src/domain/events/event.constants.ts
+export const QUEUES = {
+  ORDER: {
+    PROJECTION: 'order-service.order-projection',
+    HANDLER: 'order-service.on-order-events',
+  },
+  // ...
+} as const;
+```
+
+---
+
+## Development
 
 ### Run Services
 
 ```bash
-# Order Service (Port 3000)
-npx nx serve order-service
-
-# API Gateway (Port 3001)
-npx nx serve api-gateway
-
-# Admin Panel (Port 3002)
-npx nx serve admin-panel
+yarn start              # All services
+yarn start:order        # Order service only
+yarn start:gateway      # Gateway only
+yarn start:admin        # Admin only
+yarn stop               # Stop all services
 ```
 
-### Run with Docker
+### Build & Test
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
+yarn build              # Build all
+yarn test               # Test all
+yarn lint               # Lint all
 ```
 
-## 📦 Services
-
-### Order Service (Port 3000)
-- **Purpose:** Order management with event sourcing
-- **Features:** CQRS, Event Store, Outbox Pattern, Saga orchestration
-- **Endpoints:** `/api/v1/orders`
-
-### API Gateway (Port 3001)
-- **Purpose:** Single entry point, routing, resilience
-- **Features:** Circuit Breaker, Rate Limiting, Request Aggregation
-- **Endpoints:** `/api/v1/*`
-
-### Admin Panel (Port 3002)
-- **Purpose:** System administration and monitoring
-- **Features:** User management, Metrics, Audit logs, Cache management
-- **Endpoints:** `/api/v1/admin/*`
-
-## 🏛️ Implemented Patterns
-
-### Core Patterns
-1. **Event Sourcing** - Store all state changes as events
-2. **CQRS** - Separate read and write models
-3. **Outbox Pattern** - Reliable message delivery
-4. **Saga Pattern** - Distributed transaction orchestration
-5. **Two-Phase Commit** - Coordinated transactions
-6. **Event Store Snapshots** - Performance optimization
-
-### Resilience Patterns
-7. **Circuit Breaker** - Prevent cascade failures
-8. **Retry Pattern** - Automatic retry with backoff
-9. **Bulkhead Pattern** - Resource isolation
-10. **Rate Limiting** - Protect from overload
-
-### Infrastructure Patterns
-11. **Distributed Caching** - Redis-based caching
-12. **Distributed Tracing** - OpenTelemetry integration
-13. **API Versioning** - Backward compatibility
-14. **Health Checks** - Liveness & readiness probes
-15. **Structured Logging** - JSON logging with correlation IDs
-16. **Idempotency** - Safe request retries
-17. **Message Bus** - RabbitMQ event-driven communication
-
-## 🧪 Testing
-
-### Run All Tests
+### Infrastructure
 
 ```bash
-# Unit tests
-npx nx test order-service
-npx nx test api-gateway
-npx nx test admin-panel
+# Shared infrastructure (RabbitMQ)
+cd infrastructure && docker-compose up -d
 
-# Integration tests
-npx nx test order-service --testMatch="**/*.integration-spec.ts"
-
-# E2E tests (requires running services)
-npx nx e2e e2e-tests
+# Service-specific (PostgreSQL, Redis)
+cd apps/order-service && docker-compose up -d
 ```
 
-### Test Coverage
+---
+
+## Database
+
+Each service has its own PostgreSQL database and Redis cache with isolated docker-compose.
+
+### Environment Variables
 
 ```bash
-# Generate coverage report
-npx nx test order-service --coverage
-
-# View coverage
-open coverage/apps/order-service/index.html
+# apps/order-service/.env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/order_service
+REDIS_URL=redis://localhost:6381
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
 ```
 
-## 📚 Documentation
-
-- **[Integration Testing Guide](docs/INTEGRATION_TESTING.md)** - Integration test patterns and examples
-- **[E2E Testing Guide](docs/E2E_TESTING.md)** - End-to-end testing strategies
-- **[Docker Guide](docs/DOCKER.md)** - Docker configuration and deployment
-- **[Kubernetes Guide](docs/KUBERNETES.md)** - Kubernetes deployment and scaling
-- **[Architecture Overview](docs/ARCHITECTURE.md)** - Detailed architecture documentation
-
-## 🛠️ CLI Tools
+### Commands
 
 ```bash
-# List all commands
-npm run cli -- --help
+# Create migration
+yarn db:migration:create:order
 
-# Event Store commands
-npm run cli event-store list
-npm run cli event-store replay <aggregate-id>
+# Apply migration
+yarn db:migration:apply:order
 
-# Cache commands
-npm run cli cache list
-npm run cli cache clear <key>
-
-# System commands
-npm run cli system health
-npm run cli system metrics
-
-# User management
-npm run cli users list
-npm run cli users create --email admin@example.com
+# Open Prisma Studio
+yarn db:studio:order        # Port 5555
+yarn db:studio:gateway      # Port 5556
+yarn db:studio:admin        # Port 5557
 ```
 
-## 🔧 Technology Stack
+---
 
-- **Framework:** NestJS 11.0.0
-- **Build Tool:** Nx 22.1.0
-- **Language:** TypeScript 5.7.2
-- **Database:** PostgreSQL 15 + Prisma 6.19.0
-- **Message Broker:** RabbitMQ 3.12
-- **Cache:** Redis 7
-- **Testing:** Jest 29.7.0 + Supertest
-- **Container:** Docker + Docker Compose
-- **Orchestration:** Kubernetes + Kustomize
-- **Observability:** OpenTelemetry
+## Adding a New Microservice
 
-## 📊 Project Structure
-
-```
-flexobo-microservice-example/
-├── apps/
-│   ├── order-service/        # Order management service
-│   ├── api-gateway/          # API Gateway & routing
-│   ├── admin-panel/          # Admin interface
-│   └── e2e-tests/            # End-to-end tests
-├── libs/
-│   ├── core/                 # Core patterns (Event Store, CQRS, etc.)
-│   └── shared-kernel/        # Shared domain logic
-├── k8s/                      # Kubernetes manifests
-│   ├── base/                 # Base configurations
-│   └── overlays/             # Environment-specific configs
-├── docs/                     # Documentation
-├── scripts/                  # Build and deployment scripts
-└── tools/
-    └── cli/                  # CLI tools
-```
-
-## 🚢 Deployment
-
-### Docker Deployment
+### 1. Generate Service
 
 ```bash
-# Build images
-./scripts/docker-build.sh
-
-# Start services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f
-
-# Scale services
-docker-compose up -d --scale order-service=3
+# Generate in apps/ directory, skip e2e tests
+npx nx g @nx/nest:application apps/inventory-service --name=inventory-service --e2eTestRunner=none
 ```
 
-### Kubernetes Deployment
+### 2. Update project.json
 
-```bash
-# Build and push images
-./scripts/docker-build.sh --push
+Replace `apps/inventory-service/project.json` with:
 
-# Deploy to development
-kubectl apply -k k8s/overlays/development
-
-# Deploy to production
-kubectl apply -k k8s/overlays/production
-
-# Check status
-kubectl get all -n flexobo
-
-# View logs
-kubectl logs -f -l app=order-service -n flexobo
+```json
+{
+  "name": "inventory-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/inventory-service/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "cache": false,
+      "options": {
+        "outputPath": "dist/apps/inventory-service",
+        "main": "apps/inventory-service/src/main.ts",
+        "tsConfig": "apps/inventory-service/tsconfig.app.json",
+        "assets": ["apps/inventory-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "cache": false,
+      "options": {
+        "buildTarget": "inventory-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9230,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}
 ```
 
-## 🔐 Security
+### 3. Create Docker Compose
 
-- **Authentication:** JWT-based authentication
-- **Authorization:** Role-based access control (RBAC)
-- **Password Hashing:** PBKDF2 with salt
-- **Secrets Management:** Kubernetes secrets / Docker secrets
-- **Network Security:** Service-to-service communication via private network
-- **Input Validation:** Class-validator with DTO validation
+Create `apps/inventory-service/docker-compose.yml`:
 
-## 📈 Monitoring & Observability
+```yaml
+services:
+  postgres-inventory:
+    image: postgres:15-alpine
+    container_name: inventory-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_inventory_data:/var/lib/postgresql/data
+    networks:
+      - inventory-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-- **Health Checks:** `/health` endpoint on all services
-- **Metrics:** System metrics via Admin Panel
-- **Distributed Tracing:** OpenTelemetry integration
-- **Structured Logging:** JSON logs with correlation IDs
-- **Audit Logs:** Complete audit trail of all operations
+  redis-inventory:
+    image: redis:7-alpine
+    container_name: inventory-service-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_inventory_data:/data
+    networks:
+      - inventory-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-## 🎯 Key Features
+volumes:
+  postgres_inventory_data:
+  redis_inventory_data:
 
-### Event Sourcing
-- Complete audit trail of all changes
-- Time-travel debugging
-- Event replay capability
-- Snapshot optimization for performance
-
-### CQRS
-- Optimized read and write models
-- Scalable query handling
-- Event-driven projections
-- Denormalized read models
-
-### Saga Orchestration
-- Distributed transaction coordination
-- Automatic compensation on failure
-- State machine implementation
-- Timeout handling
-
-### Circuit Breaker
-- Automatic failure detection
-- Graceful degradation
-- Fast failure without waiting
-- Automatic recovery
-
-### Distributed Caching
-- Redis-based caching layer
-- Cache invalidation patterns
-- TTL-based expiration
-- Cache-aside pattern
-
-## 🔄 Development Workflow
-
-### Add New Feature
-
-```bash
-# Generate new module
-npx nx g @nx/nest:module feature-name --project=order-service
-
-# Generate controller
-npx nx g @nx/nest:controller feature-name --project=order-service
-
-# Generate service
-npx nx g @nx/nest:service feature-name --project=order-service
-
-# Generate tests
-npx nx g @nx/nest:service feature-name --project=order-service --unitTestRunner=jest
+networks:
+  inventory-service-network:
+    driver: bridge
+  flexobo-shared-network:
+    external: true
 ```
 
-### Run Affected Tests
+### 4. Create Environment File
+
+Create `apps/inventory-service/.env`:
 
 ```bash
-# Test only affected projects
-npx nx affected:test
+# Server
+INVENTORY_SERVICE_PORT=3003
+NODE_ENV=development
 
-# Build affected projects
-npx nx affected:build
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5435/inventory_service
 
-# Visualize dependency graph
-npx nx graph
+# Redis
+REDIS_URL=redis://localhost:6382
+
+# RabbitMQ
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
+
+# OpenTelemetry
+OTEL_TRACE_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 ```
 
-## 🐛 Troubleshooting
+### 5. Setup Prisma
 
-### Services Won't Start
+Create `apps/inventory-service/prisma/schema.prisma`:
 
-```bash
-# Check Docker containers
-docker ps -a
+```prisma
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../../node_modules/.prisma/inventory-client"
+}
 
-# View logs
-docker-compose logs order-service
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
 
-# Restart services
-docker-compose restart
+model EventStore {
+  id            String   @id @default(uuid())
+  aggregateId   String   @map("aggregate_id")
+  aggregateType String   @map("aggregate_type")
+  eventType     String   @map("event_type")
+  eventData     Json     @map("event_data")
+  version       Int
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  metadata      Json?
+
+  @@index([aggregateId])
+  @@index([aggregateType])
+  @@map("event_store")
+}
+
+model OutboxMessage {
+  id          String    @id @default(uuid())
+  eventType   String    @map("event_type")
+  payload     Json
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([processedAt])
+  @@map("outbox_messages")
+}
 ```
 
-### Database Connection Issues
+Create `apps/inventory-service/prisma.config.ts`:
+
+```typescript
+import path from 'path';
+
+export default {
+  schema: path.join(__dirname, 'prisma/schema.prisma'),
+};
+```
+
+### 6. Add Package Scripts
+
+Update root `package.json`:
+
+```json
+{
+  "scripts": {
+    "start:inventory": "npx tsx scripts/dev.ts inventory",
+    "db:migration:create:inventory": "npx prisma migrate dev --create-only --config apps/inventory-service/prisma.config.ts",
+    "db:migration:apply:inventory": "npx prisma migrate deploy --config apps/inventory-service/prisma.config.ts",
+    "db:studio:inventory": "npx prisma studio --config apps/inventory-service/prisma.config.ts --port 5558"
+  }
+}
+```
+
+### 7. Create Service Structure
+
+```text
+apps/inventory-service/src/
+├── main.ts
+├── inventory.module.ts
+├── prisma.module.ts
+├── domain/
+│   ├── inventory.aggregate.ts
+│   └── events/
+│       └── inventory.events.ts
+├── application/
+│   ├── commands/
+│   │   └── inventory.handlers.ts
+│   └── queries/
+│       └── inventory.handlers.ts
+├── adapters/
+│   ├── http/v1/
+│   │   └── inventory.controller.ts
+│   ├── persistence/
+│   │   └── inventory-aggregate.store.ts
+│   └── eventbus/
+│       └── projection/
+│           └── inventory.projection.ts
+└── ports/
+    └── inventory-store.port.ts
+```
+
+### 8. Create Module
+
+Create `apps/inventory-service/src/inventory.module.ts`:
+
+```typescript
+import { Module } from '@nestjs/common';
+import {
+  CqrsModule,
+  EventStoreModule,
+  OutboxModule,
+  CacheModule,
+  MessagingModule,
+  MESSAGE_PUBLISHER,
+  VersioningModule,
+  VersioningStrategy,
+  VersionStatus,
+  HealthModule,
+  ObservabilityModule,
+} from '@flexobo/core';
+import { PrismaModule } from './prisma.module';
+
+@Module({
+  imports: [
+    PrismaModule,
+    EventStoreModule.forRoot({ enableUpcasting: false }),
+    MessagingModule.forRoot({
+      config: {
+        url: process.env['RABBITMQ_URL'],
+        exchanges: [
+          { name: 'flexobo.events', type: 'topic', durable: true },
+          { name: 'flexobo.dlx', type: 'topic', durable: true },
+        ],
+        deadLetter: {
+          exchange: 'flexobo.dlx',
+          queue: 'flexobo.dead-letter',
+          ttl: 86400000 * 7,
+        },
+        logging: { enabled: true, level: 'info' },
+      },
+      enablePublisher: true,
+      enableConsumer: true,
+    }),
+    CqrsModule.forRoot({
+      commandHandlers: [],
+      queryHandlers: [],
+    }),
+    OutboxModule.forRoot({
+      workerConfig: { pollingIntervalMs: 5000, batchSize: 100, enabled: true },
+      messagePublisher: { provide: 'IMessagePublisher', useExisting: MESSAGE_PUBLISHER },
+    }),
+    VersioningModule.forRoot({
+      strategy: VersioningStrategy.URI,
+      defaultVersion: '1.0.0',
+      versions: [{ version: { major: 1, minor: 0, patch: 0 }, status: VersionStatus.STABLE, description: 'Initial release' }],
+      global: true,
+    }),
+    HealthModule.forRoot({
+      version: '1.0.0',
+      enableEndpoints: true,
+      indicators: [],
+      dependencies: [],
+      global: true,
+    }),
+    ObservabilityModule.forRoot({
+      serviceName: 'inventory-service',
+      serviceVersion: '1.0.0',
+      environment: process.env['NODE_ENV'],
+      traceExporterUrl: process.env['OTEL_TRACE_ENDPOINT'],
+      metricsExporterUrl: process.env['OTEL_METRICS_ENDPOINT'],
+      autoInstrumentation: true,
+      global: true,
+    }),
+    CacheModule.forRoot({
+      redis: { url: process.env['REDIS_URL'] },
+      cache: { prefix: 'inventory-service:', defaultTtl: 86400 * 7 },
+    }),
+  ],
+  controllers: [],
+  providers: [],
+})
+export class InventoryModule {}
+```
+
+### 9. Start Service
 
 ```bash
-# Check PostgreSQL
-docker-compose exec postgres psql -U postgres -d flexobo
+# Start infrastructure
+cd infrastructure && docker-compose up -d && cd ..
+cd apps/inventory-service && docker-compose up -d && cd ../..
+
+# Generate Prisma client
+npx prisma generate --config apps/inventory-service/prisma.config.ts
 
 # Run migrations
-npx prisma migrate dev
+yarn db:migration:apply:inventory
 
-# Reset database
-npx prisma migrate reset
+# Start service
+yarn start:inventory
 ```
 
-### RabbitMQ Issues
+---
+
+## Removing a Microservice
+
+### 1. Stop and Remove Containers
 
 ```bash
-# Access RabbitMQ Management UI
-open http://localhost:15672
-# Credentials: guest/guest
-
-# Check queues
-docker-compose exec rabbitmq rabbitmqctl list_queues
+cd apps/inventory-service && docker-compose down -v && cd ../..
 ```
 
-## 🤝 Contributing
+### 2. Remove Service Directory
 
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open Pull Request
+```bash
+rm -rf apps/inventory-service
+```
 
-## 📄 License
+### 3. Remove Package Scripts
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Remove these entries from root `package.json`:
 
-## 🙏 Acknowledgments
+```json
+{
+  "scripts": {
+    "start:inventory": "...",
+    "db:migration:create:inventory": "...",
+    "db:migration:apply:inventory": "...",
+    "db:studio:inventory": "..."
+  }
+}
+```
 
-- Built with [NestJS](https://nestjs.com/)
-- Monorepo powered by [Nx](https://nx.dev/)
-- Inspired by Domain-Driven Design principles
-- Implements patterns from "Microservices Patterns" by Chris Richardson
+### 4. Clean Up Build Artifacts
 
-## 📞 Support
+```bash
+rm -rf dist/apps/inventory-service
+rm -rf node_modules/.prisma/inventory-client
+```
 
-- **Documentation:** See `/docs` directory
-- **Issues:** Open an issue on GitHub
-- **Discussions:** Use GitHub Discussions
+### 5. Reset Nx Cache
+
+```bash
+npx nx reset
+```
+
+---
+
+## Troubleshooting
+
+### Service Won't Start
+
+```bash
+lsof -i :3000           # Check port
+kill -9 <PID>           # Kill process
+```
+
+### Database Issues
+
+```bash
+# Reset database
+npx prisma migrate reset --config apps/order-service/prisma.config.ts
+
+# Regenerate client
+rm -rf node_modules/.prisma && npx prisma generate --config apps/order-service/prisma.config.ts
+```
+
+### Build Errors
+
+```bash
+rm -rf dist/
+yarn build
+```
+
+### Infrastructure Issues
+
+```bash
+# Restart containers
+docker-compose down && docker-compose up -d
+
+# View logs
+docker-compose logs -f
+```
+
+## License
+
+MIT

@@ -51,6 +51,12 @@ export class UserRepository {
         const aVal = a[params.sortBy as keyof User];
         const bVal = b[params.sortBy as keyof User];
         const order = params.sortOrder === 'desc' ? -1 : 1;
+
+        // Handle undefined values
+        if (aVal === undefined && bVal === undefined) return 0;
+        if (aVal === undefined) return 1;
+        if (bVal === undefined) return -1;
+
         return aVal > bVal ? order : aVal < bVal ? -order : 0;
       });
     }

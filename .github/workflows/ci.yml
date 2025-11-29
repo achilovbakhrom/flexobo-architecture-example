@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main, dev]
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build libraries
+        run: yarn build
+
+      - name: Derive SHAs for NX affected
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "NX_BASE=origin/${{ github.base_ref }}" >> $GITHUB_ENV
+          else
+            echo "NX_BASE=HEAD~1" >> $GITHUB_ENV
+          fi
+          echo "NX_HEAD=HEAD" >> $GITHUB_ENV
+
+      - name: Show affected projects
+        run: npx nx show projects --affected
+
+      - name: Lint affected
+        run: npx nx affected -t lint --parallel=3
+
+      - name: Test with coverage
+        run: npx nx run-many -t test --all --parallel=3 --coverage --coverageReporters=lcov
+
+      - name: List coverage files
+        run: find coverage -name "lcov.info" -type f 2>/dev/null || echo "No coverage files found"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          directory: ./coverage
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Build affected
+        run: npx nx affected -t build --parallel=3
+
+  security:
+    runs-on: ubuntu-latest
+    needs: main
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run yarn audit
+        run: yarn audit --level high
+        continue-on-error: true

@@ -1,5 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   ITwoPhaseRepository,
   TwoPhaseTransaction,
@@ -7,19 +6,81 @@ import {
   ParticipantVote,
 } from './two-phase-commit.interface';
 
-// Infer the TwoPhaseCommit type from Prisma's return type
-type PrismaTwoPhaseCommit = Awaited<
-  ReturnType<PrismaClient['twoPhaseCommit']['findUnique']>
->;
+interface TwoPhaseCommitRecord {
+  transactionId: string;
+  state: string;
+  context: unknown;
+  participants: unknown[];
+  coordinatorId: string;
+  startedAt: Date;
+  preparedAt: Date | null;
+  decidedAt: Date | null;
+  completedAt: Date | null;
+  timeout: number;
+  metadata: unknown | null;
+}
 
-/**
- * Prisma-based implementation of two-phase commit repository
- */
+interface TwoPhasePrismaClient {
+  twoPhaseCommit: {
+    create: (args: {
+      data: {
+        transactionId: string;
+        state: string;
+        context: never;
+        participants: never;
+        coordinatorId: string;
+        startedAt: Date;
+        preparedAt?: Date;
+        decidedAt?: Date;
+        completedAt?: Date;
+        timeout: number;
+        metadata: never;
+      };
+    }) => Promise<TwoPhaseCommitRecord>;
+    findUnique: (args: {
+      where: { transactionId: string };
+    }) => Promise<TwoPhaseCommitRecord | null>;
+    findMany: (args: {
+      where: { state: string };
+      orderBy: { startedAt: 'asc' | 'desc' };
+      take: number;
+    }) => Promise<TwoPhaseCommitRecord[]>;
+    update: (args: {
+      where: { transactionId: string };
+      data: {
+        state?: string;
+        preparedAt?: Date;
+        decidedAt?: Date;
+        completedAt?: Date;
+        participants?: never;
+      };
+    }) => Promise<TwoPhaseCommitRecord>;
+    delete: (args: {
+      where: { transactionId: string };
+    }) => Promise<TwoPhaseCommitRecord>;
+    deleteMany: (args: {
+      where: {
+        state: { in: string[] };
+        completedAt: { lt: Date };
+      };
+    }) => Promise<{ count: number }>;
+  };
+  $queryRaw: <T>(
+    query: TemplateStringsArray,
+    ...values: unknown[]
+  ) => Promise<T>;
+}
+
+export const TWO_PHASE_PRISMA_CLIENT = Symbol('TWO_PHASE_PRISMA_CLIENT');
+
 @Injectable()
 export class PrismaTwoPhaseRepository implements ITwoPhaseRepository {
   private readonly logger = new Logger(PrismaTwoPhaseRepository.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(TWO_PHASE_PRISMA_CLIENT)
+    private readonly prisma: TwoPhasePrismaClient
+  ) {}
 
   async save(transaction: TwoPhaseTransaction): Promise<void> {
     await this.prisma.twoPhaseCommit.create({
@@ -52,7 +113,6 @@ export class PrismaTwoPhaseRepository implements ITwoPhaseRepository {
       completedAt?: Date;
     } = { state };
 
-    // Set timestamps based on state
     if (state === TransactionState.PREPARED) {
       updateData.preparedAt = new Date();
     } else if (
@@ -97,7 +157,6 @@ export class PrismaTwoPhaseRepository implements ITwoPhaseRepository {
       );
     }
 
-    // Update participant vote
     participants[participantIndex] = {
       ...participants[participantIndex],
       vote,
@@ -148,7 +207,7 @@ export class PrismaTwoPhaseRepository implements ITwoPhaseRepository {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return transactions.map((t: any) =>
-      this.toDomain(t as NonNullable<PrismaTwoPhaseCommit>)
+      this.toDomain(t as TwoPhaseCommitRecord)
     );
   }
 
@@ -182,11 +241,8 @@ export class PrismaTwoPhaseRepository implements ITwoPhaseRepository {
     return result.count;
   }
 
-  /**
-   * Convert Prisma entity to domain model
-   */
   private toDomain(
-    prismaTransaction: NonNullable<PrismaTwoPhaseCommit>
+    prismaTransaction: TwoPhaseCommitRecord
   ): TwoPhaseTransaction {
     return {
       transactionId: prismaTransaction.transactionId,

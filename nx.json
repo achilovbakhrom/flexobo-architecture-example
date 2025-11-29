@@ -16,17 +16,6 @@
   },
   "plugins": [
     {
-      "plugin": "@nx/webpack/plugin",
-      "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "previewTargetName": "preview",
-        "buildDepsTargetName": "build-deps",
-        "watchDepsTargetName": "watch-deps",
-        "serveStaticTargetName": "serve-static"
-      }
-    },
-    {
       "plugin": "@nx/eslint/plugin",
       "options": {
         "targetName": "lint"
@@ -38,8 +27,8 @@
         "targetName": "test"
       },
       "exclude": [
-        "apps/flexobo-microservice-example-e2e/**/*",
-        "apps/admin-panel-e2e/**/*"
+        "e2e/flexobo-microservice-example-e2e/**/*",
+        "e2e/admin-panel-e2e/**/*"
       ]
     }
   ],
@@ -48,11 +37,6 @@
       "cache": true,
       "dependsOn": ["^build"],
       "inputs": ["production", "^production"]
-    }
-  },
-  "release": {
-    "version": {
-      "preVersionCommand": "npx nx run-many -t build"
     }
   }
 }

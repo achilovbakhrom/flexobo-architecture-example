@@ -1,0 +1,222 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - dev   # Auto-deploy to development only
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to (production only - development is automatic)'
+        required: true
+        type: choice
+        default: 'production'
+        options:
+          - production
+      service:
+        description: 'Service to deploy (leave empty for all affected)'
+        required: false
+        type: choice
+        options:
+          - ''
+          - order-service
+          - api-gateway
+          - admin-panel
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+jobs:
+  detect-affected:
+    runs-on: ubuntu-latest
+    outputs:
+      affected: ${{ steps.affected.outputs.affected }}
+      order-service: ${{ steps.check.outputs.order-service }}
+      api-gateway: ${{ steps.check.outputs.api-gateway }}
+      admin-panel: ${{ steps.check.outputs.admin-panel }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Derive SHAs for NX affected
+        run: |
+          echo "NX_BASE=HEAD~1" >> $GITHUB_ENV
+          echo "NX_HEAD=HEAD" >> $GITHUB_ENV
+
+      - name: Get affected projects
+        id: affected
+        run: |
+          AFFECTED=$(npx nx show projects --affected --type=app 2>/dev/null || echo "")
+          echo "affected=$AFFECTED" >> $GITHUB_OUTPUT
+          echo "Affected projects: $AFFECTED"
+
+      - name: Check which services are affected
+        id: check
+        run: |
+          AFFECTED="${{ steps.affected.outputs.affected }}"
+
+          if echo "$AFFECTED" | grep -q "order-service"; then
+            echo "order-service=true" >> $GITHUB_OUTPUT
+          else
+            echo "order-service=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$AFFECTED" | grep -q "api-gateway"; then
+            echo "api-gateway=true" >> $GITHUB_OUTPUT
+          else
+            echo "api-gateway=false" >> $GITHUB_OUTPUT
+          fi
+
+          if echo "$AFFECTED" | grep -q "admin-panel"; then
+            echo "admin-panel=true" >> $GITHUB_OUTPUT
+          else
+            echo "admin-panel=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-push:
+    needs: detect-affected
+    runs-on: ubuntu-latest
+    if: needs.detect-affected.outputs.affected != ''
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: order-service
+            affected: ${{ needs.detect-affected.outputs.order-service }}
+          - name: api-gateway
+            affected: ${{ needs.detect-affected.outputs.api-gateway }}
+          - name: admin-panel
+            affected: ${{ needs.detect-affected.outputs.admin-panel }}
+
+    steps:
+      - name: Checkout
+        if: matrix.affected == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: matrix.affected == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: matrix.affected == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        if: matrix.affected == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push to ECR
+        if: matrix.affected == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./apps/${{ matrix.name }}/Dockerfile
+          push: true
+          tags: |
+            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.sha }}
+            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.ref_name }}
+            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-development:
+    needs: [detect-affected, build-and-push]
+    runs-on: ubuntu-latest
+    # Development deploys automatically on push to dev branch only (no manual trigger)
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
+    environment: development
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_DEV }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy order-service
+        if: needs.detect-affected.outputs.order-service == 'true'
+        run: |
+          kubectl apply -k apps/order-service/k8s/overlays/development
+          kubectl set image deployment/order-service order-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/order-service:${{ github.sha }} -n order-service
+          kubectl rollout status deployment/order-service -n order-service --timeout=300s
+
+      - name: Deploy api-gateway
+        if: needs.detect-affected.outputs.api-gateway == 'true'
+        run: |
+          kubectl apply -k apps/api-gateway/k8s/overlays/development
+          kubectl set image deployment/api-gateway api-gateway=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/api-gateway:${{ github.sha }} -n api-gateway
+          kubectl rollout status deployment/api-gateway -n api-gateway --timeout=300s
+
+      - name: Deploy admin-panel
+        if: needs.detect-affected.outputs.admin-panel == 'true'
+        run: |
+          kubectl apply -k apps/admin-panel/k8s/overlays/development
+          kubectl set image deployment/admin-panel admin-panel=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/admin-panel:${{ github.sha }} -n admin-panel
+          kubectl rollout status deployment/admin-panel -n admin-panel --timeout=300s
+
+  deploy-production:
+    needs: [detect-affected, build-and-push]
+    runs-on: ubuntu-latest
+    # Production deploys ONLY via manual trigger (workflow_dispatch)
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig for EKS
+        run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_PROD }} --region ${{ env.AWS_REGION }}
+
+      - name: Deploy order-service
+        if: needs.detect-affected.outputs.order-service == 'true'
+        run: |
+          kubectl apply -k apps/order-service/k8s/overlays/production
+          kubectl set image deployment/order-service order-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/order-service:${{ github.sha }} -n order-service
+          kubectl rollout status deployment/order-service -n order-service --timeout=300s
+
+      - name: Deploy api-gateway
+        if: needs.detect-affected.outputs.api-gateway == 'true'
+        run: |
+          kubectl apply -k apps/api-gateway/k8s/overlays/production
+          kubectl set image deployment/api-gateway api-gateway=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/api-gateway:${{ github.sha }} -n api-gateway
+          kubectl rollout status deployment/api-gateway -n api-gateway --timeout=300s
+
+      - name: Deploy admin-panel
+        if: needs.detect-affected.outputs.admin-panel == 'true'
+        run: |
+          kubectl apply -k apps/admin-panel/k8s/overlays/production
+          kubectl set image deployment/admin-panel admin-panel=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/admin-panel:${{ github.sha }} -n admin-panel
+          kubectl rollout status deployment/admin-panel -n admin-panel --timeout=300s

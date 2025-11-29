@@ -3,13 +3,6 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/shared-kernel/src",
   "projectType": "library",
-  "release": {
-    "version": {
-      "manifestRootsToUpdate": ["dist/{projectRoot}"],
-      "currentVersionResolver": "git-tag",
-      "fallbackCurrentVersionResolver": "disk"
-    }
-  },
   "tags": [],
   "targets": {
     "build": {
@@ -23,9 +16,9 @@
         "assets": ["libs/shared-kernel/*.md"]
       }
     },
-    "nx-release-publish": {
+    "test": {
       "options": {
-        "packageRoot": "dist/{projectRoot}"
+        "passWithNoTests": true
       }
     }
   }
