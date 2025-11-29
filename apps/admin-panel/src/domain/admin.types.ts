@@ -3,6 +3,8 @@
  */
 
 import { UserRole } from '@flexobo/core';
+import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsEmail, IsArray, IsBoolean, IsOptional, MinLength, IsEnum } from 'class-validator';
 
 /**
  * User aggregate
@@ -21,28 +23,63 @@ export interface User {
 /**
  * Create user command
  */
-export interface CreateUserCommand {
-  email: string;
-  username: string;
-  password: string;
+export class CreateUserCommand {
+  @ApiProperty({ description: 'User email address', example: 'user@example.com' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ description: 'Username', example: 'johndoe' })
+  @IsString()
+  @MinLength(3)
+  username!: string;
+
+  @ApiProperty({ description: 'User password', example: 'SecurePass123!', minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+
+  @ApiProperty({ description: 'User roles', required: false, isArray: true, enum: UserRole })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(UserRole, { each: true })
   roles?: UserRole[];
 }
 
 /**
  * Update user command
  */
-export interface UpdateUserCommand {
+export class UpdateUserCommand {
+  @ApiProperty({ description: 'User email address', required: false, example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
   email?: string;
+
+  @ApiProperty({ description: 'Username', required: false, example: 'johndoe' })
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
   username?: string;
+
+  @ApiProperty({ description: 'User password', required: false, minLength: 8 })
+  @IsOptional()
+  @IsString()
+  @MinLength(8)
   password?: string;
+
+  @ApiProperty({ description: 'User active status', required: false, example: true })
+  @IsOptional()
+  @IsBoolean()
   isActive?: boolean;
 }
 
 /**
  * Update user roles command
  */
-export interface UpdateUserRolesCommand {
-  roles: UserRole[];
+export class UpdateUserRolesCommand {
+  @ApiProperty({ description: 'User roles', isArray: true, enum: UserRole })
+  @IsArray()
+  @IsEnum(UserRole, { each: true })
+  roles!: UserRole[];
 }
 
 /**

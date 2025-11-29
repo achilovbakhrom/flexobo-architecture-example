@@ -16,6 +16,15 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiBearerAuth,
+  ApiQuery
+} from '@nestjs/swagger';
+import {
   JwtAuthGuard,
   RolesGuard,
   Roles,
@@ -34,6 +43,8 @@ import {
   ListQueryParams,
 } from '../domain/admin.types';
 
+@ApiTags('Admin - User Management')
+@ApiBearerAuth()
 @Controller('api/v1/admin/users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(UserRole.ADMIN)
@@ -47,6 +58,12 @@ export class UserController {
    * List all users
    */
   @Get()
+  @ApiOperation({ summary: 'List all users', description: 'Retrieves a paginated list of all users in the system' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiResponse({ status: 200, description: 'Users retrieved successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing token' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async listUsers(
     @Query() query: ListQueryParams
   ): Promise<PaginatedResult<UserDto>> {
@@ -57,6 +74,12 @@ export class UserController {
    * Get user by ID
    */
   @Get(':id')
+  @ApiOperation({ summary: 'Get user by ID', description: 'Retrieves detailed information about a specific user' })
+  @ApiParam({ name: 'id', description: 'User ID', example: 'user-123' })
+  @ApiResponse({ status: 200, description: 'User found' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async getUserById(@Param('id') id: string): Promise<UserDto> {
     return this.userManagementService.getUserById(id);
   }
@@ -65,6 +88,13 @@ export class UserController {
    * Create new user
    */
   @Post()
+  @ApiOperation({ summary: 'Create new user', description: 'Creates a new user account with specified roles and permissions' })
+  @ApiBody({ type: CreateUserCommand })
+  @ApiResponse({ status: 201, description: 'User created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
+  @ApiResponse({ status: 409, description: 'User already exists' })
   async createUser(
     @Body() command: CreateUserCommand,
     @CurrentUser() currentUser: JwtPayload
@@ -88,6 +118,14 @@ export class UserController {
    * Update user
    */
   @Put(':id')
+  @ApiOperation({ summary: 'Update user', description: 'Updates user information such as email, username, or other profile details' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiBody({ type: UpdateUserCommand })
+  @ApiResponse({ status: 200, description: 'User updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input data' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async updateUser(
     @Param('id') id: string,
     @Body() command: UpdateUserCommand,
@@ -112,6 +150,14 @@ export class UserController {
    * Update user roles
    */
   @Put(':id/roles')
+  @ApiOperation({ summary: 'Update user roles', description: 'Updates the roles assigned to a user for access control' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiBody({ type: UpdateUserRolesCommand })
+  @ApiResponse({ status: 200, description: 'User roles updated successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid roles data' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async updateUserRoles(
     @Param('id') id: string,
     @Body() command: UpdateUserRolesCommand,
@@ -137,6 +183,12 @@ export class UserController {
    */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete user', description: 'Permanently deletes a user account from the system' })
+  @ApiParam({ name: 'id', description: 'User ID' })
+  @ApiResponse({ status: 204, description: 'User deleted successfully' })
+  @ApiResponse({ status: 404, description: 'User not found' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden - Admin role required' })
   async deleteUser(
     @Param('id') id: string,
     @CurrentUser() currentUser: JwtPayload

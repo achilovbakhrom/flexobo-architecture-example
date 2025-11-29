@@ -1,0 +1,89 @@
+# ===========================================
+# Admin Panel - Docker Compose
+# ===========================================
+# Prerequisites: Start shared infrastructure first
+#   cd infrastructure && docker-compose up -d
+#
+# Then run: docker-compose up -d
+
+services:
+  # ===========================================
+  # Admin Panel Application
+  # ===========================================
+  admin-panel:
+    build:
+      context: ../..
+      dockerfile: apps/admin-panel/Dockerfile
+    container_name: admin-panel
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres-admin:
+        condition: service_healthy
+      redis-admin:
+        condition: service_healthy
+    networks:
+      - admin-panel-network
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ===========================================
+  # PostgreSQL Database (service-specific)
+  # ===========================================
+  postgres-admin:
+    image: postgres:15-alpine
+    container_name: admin-panel-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: admin_panel
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_admin_data:/var/lib/postgresql/data
+    networks:
+      - admin-panel-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis Cache (service-specific)
+  # ===========================================
+  redis-admin:
+    image: redis:7-alpine
+    container_name: admin-panel-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_admin_data:/data
+    networks:
+      - admin-panel-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_admin_data:
+    driver: local
+  redis_admin_data:
+    driver: local
+
+networks:
+  admin-panel-network:
+    driver: bridge
+  flexobo-shared-network:
+    external: true

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: order-service
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - infisical-secret.yaml
+  - postgres.yaml
+  - redis.yaml
+  - deployment.yaml
+  - hpa.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: order-service
+  app.kubernetes.io/part-of: flexobo

@@ -1,0 +1,61 @@
+// API Gateway Database Schema
+
+generator client {
+    provider   = "prisma-client-js"
+    output     = "../node_modules/.prisma/gateway-client"
+    engineType = "client"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// Rate limiting tracking
+model RateLimit {
+    id          String   @id @default(uuid())
+    identifier  String // IP, userId, apiKey, etc.
+    endpoint    String
+    count       Int      @default(1)
+    windowStart DateTime @default(now()) @map("window_start")
+    expiresAt   DateTime @map("expires_at")
+
+    @@unique([identifier, endpoint, windowStart])
+    @@index([identifier, endpoint])
+    @@index([expiresAt])
+    @@map("rate_limits")
+}
+
+// Circuit breaker state
+model CircuitBreaker {
+    id            String    @id @default(uuid())
+    serviceName   String    @unique @map("service_name")
+    state         String // CLOSED, OPEN, HALF_OPEN
+    failureCount  Int       @default(0) @map("failure_count")
+    successCount  Int       @default(0) @map("success_count")
+    lastFailureAt DateTime? @map("last_failure_at")
+    lastSuccessAt DateTime? @map("last_success_at")
+    openedAt      DateTime? @map("opened_at")
+    halfOpenedAt  DateTime? @map("half_opened_at")
+    updatedAt     DateTime  @updatedAt @map("updated_at")
+
+    @@map("circuit_breakers")
+}
+
+// API request logs
+model RequestLog {
+    id           String   @id @default(uuid())
+    requestId    String   @unique @map("request_id")
+    method       String
+    path         String
+    statusCode   Int      @map("status_code")
+    responseTime Int      @map("response_time") // milliseconds
+    userId       String?  @map("user_id")
+    ipAddress    String?  @map("ip_address")
+    userAgent    String?  @map("user_agent")
+    timestamp    DateTime @default(now())
+
+    @@index([userId])
+    @@index([timestamp])
+    @@index([path, timestamp])
+    @@map("request_logs")
+}

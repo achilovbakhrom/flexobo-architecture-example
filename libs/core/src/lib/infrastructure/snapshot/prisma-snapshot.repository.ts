@@ -1,19 +1,59 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import {
   ISnapshotRepository,
   Snapshot,
   SnapshotStrategy,
 } from './snapshot.interface';
 
-/**
- * Prisma-based implementation of snapshot repository
- */
+interface SnapshotRecord {
+  id: string;
+  aggregateId: string;
+  aggregateType: string;
+  snapshotData: unknown;
+  version: number;
+  createdAt: Date;
+  expiresAt: Date | null;
+}
+
+interface SnapshotPrismaClient {
+  snapshot: {
+    create: (args: {
+      data: {
+        aggregateId: string;
+        aggregateType: string;
+        snapshotData: Record<string, never>;
+        version: number;
+        expiresAt: Date;
+      };
+    }) => Promise<SnapshotRecord>;
+    findUnique: (args: {
+      where: { aggregateId: string };
+    }) => Promise<SnapshotRecord | null>;
+    findMany: (args: {
+      where: { aggregateId: string };
+      orderBy: { version: 'asc' | 'desc' };
+      select?: { id: boolean };
+    }) => Promise<SnapshotRecord[] | { id: string }[]>;
+    deleteMany: (args: {
+      where: {
+        id?: { in: string[] };
+        expiresAt?: { lt: Date };
+        aggregateId?: string;
+      };
+    }) => Promise<{ count: number }>;
+  };
+}
+
+export const SNAPSHOT_PRISMA_CLIENT = Symbol('SNAPSHOT_PRISMA_CLIENT');
+
 @Injectable()
 export class PrismaSnapshotRepository implements ISnapshotRepository {
   private readonly logger = new Logger(PrismaSnapshotRepository.name);
 
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    @Inject(SNAPSHOT_PRISMA_CLIENT)
+    private readonly prisma: SnapshotPrismaClient
+  ) {}
 
   async save<T>(
     snapshot: Omit<Snapshot<T>, 'id' | 'createdAt'>
@@ -66,51 +106,37 @@ export class PrismaSnapshotRepository implements ISnapshotRepository {
   }
 
   async getAll<T>(aggregateId: string): Promise<Snapshot<T>[]> {
-    const snapshots = await this.prisma.snapshot.findMany({
+    const snapshots = (await this.prisma.snapshot.findMany({
       where: { aggregateId },
       orderBy: { version: 'desc' },
-    });
+    })) as SnapshotRecord[];
 
-    return snapshots.map(
-      (s: {
-        id: string;
-        aggregateId: string;
-        aggregateType: string;
-        snapshotData: unknown;
-        version: number;
-        createdAt: Date;
-        expiresAt: Date | null;
-      }): Snapshot<T> => ({
-        id: s.id,
-        aggregateId: s.aggregateId,
-        aggregateType: s.aggregateType,
-        data: s.snapshotData as T,
-        version: s.version,
-        createdAt: s.createdAt,
-        expiresAt: s.expiresAt || undefined,
-      })
-    );
+    return snapshots.map((s) => ({
+      id: s.id,
+      aggregateId: s.aggregateId,
+      aggregateType: s.aggregateType,
+      data: s.snapshotData as T,
+      version: s.version,
+      createdAt: s.createdAt,
+      expiresAt: s.expiresAt || undefined,
+    }));
   }
 
   async pruneOldSnapshots(
     aggregateId: string,
     keepLatest: number
   ): Promise<number> {
-    // Get all snapshots for the aggregate, ordered by version desc
-    const snapshots = await this.prisma.snapshot.findMany({
+    const snapshots = (await this.prisma.snapshot.findMany({
       where: { aggregateId },
       orderBy: { version: 'desc' },
       select: { id: true },
-    });
+    })) as { id: string }[];
 
-    // Keep the latest N, delete the rest
     if (snapshots.length <= keepLatest) {
       return 0;
     }
 
-    const idsToDelete = snapshots
-      .slice(keepLatest)
-      .map((s: { id: string }) => s.id);
+    const idsToDelete = snapshots.slice(keepLatest).map((s) => s.id);
 
     const result = await this.prisma.snapshot.deleteMany({
       where: {
@@ -163,13 +189,9 @@ export class PrismaSnapshotRepository implements ISnapshotRepository {
       return false;
     }
 
-    // Create snapshot every N events
     return currentVersion > 0 && currentVersion % snapshotFrequency === 0;
   }
 
-  /**
-   * Calculate expiration date
-   */
   private calculateExpiration(days: number): Date {
     const date = new Date();
     date.setDate(date.getDate() + days);

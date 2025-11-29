@@ -4,8 +4,9 @@
 export interface RabbitMQConfig {
   /**
    * RabbitMQ connection URL (amqp://user:password@host:port/vhost)
+   * Defaults to amqp://guest:guest@localhost:5672 if not provided
    */
-  url: string;
+  url?: string;
 
   /**
    * Connection options
@@ -126,6 +127,7 @@ export interface QueueBinding {
  * Default RabbitMQ configuration
  */
 export const DEFAULT_RABBITMQ_CONFIG: Partial<RabbitMQConfig> = {
+  url: 'amqp://guest:guest@localhost:5672',
   connectionOptions: {
     heartbeat: 60,
     timeout: 10000,

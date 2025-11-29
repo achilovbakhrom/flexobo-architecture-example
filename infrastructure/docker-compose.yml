@@ -1,0 +1,109 @@
+# ===========================================
+# Shared Infrastructure - Docker Compose
+# ===========================================
+# Starts shared infrastructure that all services depend on
+# Usage: docker-compose up -d
+#
+# This must be running before starting any microservice
+#
+# Access:
+#   - RabbitMQ Management: http://localhost:15672 (guest/guest)
+#   - Infisical UI: http://localhost:8080
+
+services:
+  # ===========================================
+  # RabbitMQ Message Broker
+  # ===========================================
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: flexobo-rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ===========================================
+  # Infisical - Secrets Management
+  # ===========================================
+
+  # Infisical Backend
+  infisical:
+    image: infisical/infisical:latest
+    container_name: flexobo-infisical
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - ENCRYPTION_KEY=your-32-char-encryption-key-here!
+      - AUTH_SECRET=your-auth-secret-for-jwt-tokens!!
+      - MONGO_URL=mongodb://infisical-mongo:27017/infisical
+      - REDIS_URL=redis://infisical-redis:6379
+      - SITE_URL=http://localhost:8080
+    depends_on:
+      infisical-mongo:
+        condition: service_healthy
+      infisical-redis:
+        condition: service_healthy
+    networks:
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  # MongoDB for Infisical
+  infisical-mongo:
+    image: mongo:6
+    container_name: flexobo-infisical-mongo
+    environment:
+      - MONGO_INITDB_DATABASE=infisical
+    volumes:
+      - infisical_mongo_data:/data/db
+    networks:
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Infisical
+  infisical-redis:
+    image: redis:7-alpine
+    container_name: flexobo-infisical-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - infisical_redis_data:/data
+    networks:
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  rabbitmq_data:
+    driver: local
+  infisical_mongo_data:
+    driver: local
+  infisical_redis_data:
+    driver: local
+
+networks:
+  flexobo-shared-network:
+    driver: bridge
+    name: flexobo-shared-network

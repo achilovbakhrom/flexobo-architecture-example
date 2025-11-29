@@ -1,0 +1,31 @@
+coverage:
+  status:
+    project:
+      default:
+        target: 50%
+    patch:
+      default:
+        target: 50%
+
+flags:
+  order-service:
+    paths:
+      - apps/order-service/
+    carryforward: true
+  admin-panel:
+    paths:
+      - apps/admin-panel/
+    carryforward: true
+  api-gateway:
+    paths:
+      - apps/api-gateway/
+    carryforward: true
+  core:
+    paths:
+      - libs/core/
+    carryforward: true
+
+comment:
+  layout: "header, diff, flags, components"
+  behavior: default
+  require_changes: false

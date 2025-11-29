@@ -69,3 +69,11 @@ export class BusinessRuleViolationException extends DomainException {
     super(message);
   }
 }
+
+export class AggregateRootNotFoundException extends DomainException {
+  constructor(aggregateType: string, aggregateId: string) {
+    super(
+      `Aggregate root of type "${aggregateType}" with id "${aggregateId}" not found`
+    );
+  }
+}

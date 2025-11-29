@@ -1,68 +1,67 @@
-/**
- * Order command handlers
- */
-
 import {
   CommandHandler,
   ICommandHandler,
   Result,
   Success,
 } from '@flexobo/core';
+import { Inject } from '@nestjs/common';
 import { Order } from '../../domain/order.aggregate';
-import { IEventStore } from '@flexobo/core';
-import { DomainEvent } from '@flexobo/core';
+import {
+  IOrderAggregateStore,
+  ORDER_AGGREGATE_STORE,
+} from '../../ports/order-store.port';
 import {
   CreateOrderCommand,
   AddOrderItemCommand,
   ConfirmOrderCommand,
   CancelOrderCommand,
   ShipOrderCommand,
+  MarkInventoryReservedCommand,
+  MarkInventoryFailedCommand,
+  MarkOrderPaidCommand,
+  RecordPaymentFailedCommand,
 } from './order.commands';
-import { Inject } from '@nestjs/common';
 
-// Helper function to convert StoredEvent[] to DomainEvent[]
-function toDomainEvents(
-  stored: {
-    eventData: Record<string, unknown>;
-    eventType: string;
-    version: number;
-    occurredAt: Date;
-    aggregateId: string;
-    aggregateType: string;
-  }[]
-): DomainEvent[] {
-  return stored.map((s) => ({
-    type: s.eventType,
-    aggregateId: s.aggregateId,
-    aggregateType: s.aggregateType,
-    version: s.version,
-    occurredAt: s.occurredAt,
-    data: s.eventData,
-  }));
-}
+/**
+ * Command Handlers for Order Aggregate
+ *
+ * Following Go gaze-executor pattern:
+ * - Load aggregate from store
+ * - Execute domain logic (aggregate methods raise events)
+ * - Save aggregate to store (persists events + publishes to broker)
+ *
+ * Projections (OrderEventConsumer) handle:
+ * - Listening to events from broker
+ * - Updating read models
+ * - Creating snapshots
+ */
 
 @CommandHandler(CreateOrderCommand)
 export class CreateOrderHandler
   implements ICommandHandler<CreateOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
   ) {}
 
   async execute(command: CreateOrderCommand): Promise<Result<void, Error>> {
     try {
+      const exists = await this.store.exists(command.orderId);
+      if (exists) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} already exists`),
+        };
+      }
+
       const order = Order.create(command.orderId, command.userId);
+      await this.store.save(order);
 
-      // Save events
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        0
-      );
-
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
+      console.error('ERROR creating order:', error);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -73,17 +72,22 @@ export class AddOrderItemHandler
   implements ICommandHandler<AddOrderItemCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
   ) {}
 
   async execute(command: AddOrderItemCommand): Promise<Result<void, Error>> {
     try {
-      // Load order from event store
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await this.store.load(command.orderId);
 
-      // Execute business logic
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
       order.addItem(
         command.productId,
         command.productName,
@@ -92,14 +96,8 @@ export class AddOrderItemHandler
         command.priceCurrency
       );
 
-      // Save new events
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      await this.store.save(order);
 
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -112,24 +110,25 @@ export class ConfirmOrderHandler
   implements ICommandHandler<ConfirmOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
   ) {}
 
   async execute(command: ConfirmOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.confirm();
+      await this.store.save(order);
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
-
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -142,24 +141,25 @@ export class CancelOrderHandler
   implements ICommandHandler<CancelOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
   ) {}
 
   async execute(command: CancelOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.cancel(command.reason);
+      await this.store.save(order);
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
-
-      order.markEventsAsCommitted();
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
@@ -172,24 +172,156 @@ export class ShipOrderHandler
   implements ICommandHandler<ShipOrderCommand, void>
 {
   constructor(
-    @Inject('IEventStore') private readonly eventStore: IEventStore
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
   ) {}
 
   async execute(command: ShipOrderCommand): Promise<Result<void, Error>> {
     try {
-      const storedEvents = await this.eventStore.getEvents(command.orderId);
-      const events = toDomainEvents(storedEvents);
-      const order = Order.fromEvents(events);
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
 
       order.ship(command.trackingNumber);
+      await this.store.save(order);
 
-      await this.eventStore.append(
-        command.orderId,
-        order.getUncommittedEvents(),
-        order.version - order.getUncommittedEvents().length
-      );
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
 
-      order.markEventsAsCommitted();
+@CommandHandler(MarkInventoryReservedCommand)
+export class MarkInventoryReservedHandler
+  implements ICommandHandler<MarkInventoryReservedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
+  ) {}
+
+  async execute(
+    command: MarkInventoryReservedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      order.markInventoryReserved(command.reservations);
+      await this.store.save(order);
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(MarkInventoryFailedCommand)
+export class MarkInventoryFailedHandler
+  implements ICommandHandler<MarkInventoryFailedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
+  ) {}
+
+  async execute(
+    command: MarkInventoryFailedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      order.markInventoryFailed(command.failedProductIds, command.reason);
+      await this.store.save(order);
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(MarkOrderPaidCommand)
+export class MarkOrderPaidHandler
+  implements ICommandHandler<MarkOrderPaidCommand, void>
+{
+  constructor(
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
+  ) {}
+
+  async execute(command: MarkOrderPaidCommand): Promise<Result<void, Error>> {
+    try {
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      order.markPaid(command.paymentId, command.transactionId);
+      await this.store.save(order);
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(RecordPaymentFailedCommand)
+export class RecordPaymentFailedHandler
+  implements ICommandHandler<RecordPaymentFailedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
+  ) {}
+
+  async execute(
+    command: RecordPaymentFailedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      // recordPaymentFailed handles auto-cancellation after max failures
+      order.recordPaymentFailed(command.paymentId, command.reason);
+      await this.store.save(order);
+
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
