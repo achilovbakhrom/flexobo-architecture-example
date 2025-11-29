@@ -3,7 +3,7 @@ name: Deploy
 on:
   push:
     branches:
-      - develop   # Auto-deploy to development only
+      - dev   # Auto-deploy to development only
   workflow_dispatch:
     inputs:
       environment:
@@ -140,8 +140,8 @@ jobs:
   deploy-development:
     needs: [detect-affected, build-and-push]
     runs-on: ubuntu-latest
-    # Development deploys automatically on push to develop branch only (no manual trigger)
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    # Development deploys automatically on push to dev branch only (no manual trigger)
+    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
     environment: development
 
     steps:
