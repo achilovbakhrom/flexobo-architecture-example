@@ -6,6 +6,29 @@
 
 import { ICommand } from '@flexobo/core';
 
+export interface CreateProductData {
+  productId: string;
+  sku: string;
+  name: string;
+  description?: string;
+  category?: string;
+  priceAmount: number;
+  currency?: string;
+  stockLevel?: number;
+  imageUrl?: string;
+}
+
+export interface UpdateProductData {
+  name?: string;
+  description?: string;
+  category?: string;
+  priceAmount?: number;
+  currency?: string;
+  stockLevel?: number;
+  isActive?: boolean;
+  imageUrl?: string;
+}
+
 export class CreateProductCommand implements ICommand {
   public readonly productId: string;
   public readonly sku: string;
@@ -17,18 +40,7 @@ export class CreateProductCommand implements ICommand {
   public readonly stockLevel?: number;
   public readonly imageUrl?: string;
 
-  constructor(...args: unknown[]) {
-    const data = args[0] as {
-      productId: string;
-      sku: string;
-      name: string;
-      description?: string;
-      category?: string;
-      priceAmount: number;
-      currency?: string;
-      stockLevel?: number;
-      imageUrl?: string;
-    };
+  constructor(data: CreateProductData) {
     this.productId = data.productId;
     this.sku = data.sku;
     this.name = data.name;
@@ -52,18 +64,8 @@ export class UpdateProductCommand implements ICommand {
   public readonly isActive?: boolean;
   public readonly imageUrl?: string;
 
-  constructor(...args: unknown[]) {
-    this.productId = args[0] as string;
-    const data = args[1] as {
-      name?: string;
-      description?: string;
-      category?: string;
-      priceAmount?: number;
-      currency?: string;
-      stockLevel?: number;
-      isActive?: boolean;
-      imageUrl?: string;
-    };
+  constructor(productId: string, data: UpdateProductData) {
+    this.productId = productId;
     this.name = data.name;
     this.description = data.description;
     this.category = data.category;
@@ -76,19 +78,12 @@ export class UpdateProductCommand implements ICommand {
 }
 
 export class DeleteProductCommand implements ICommand {
-  public readonly productId: string;
-
-  constructor(...args: unknown[]) {
-    this.productId = args[0] as string;
-  }
+  constructor(public readonly productId: string) {}
 }
 
 export class UpdateProductStockCommand implements ICommand {
-  public readonly productId: string;
-  public readonly quantity: number;
-
-  constructor(...args: unknown[]) {
-    this.productId = args[0] as string;
-    this.quantity = args[1] as number;
-  }
+  constructor(
+    public readonly productId: string,
+    public readonly quantity: number
+  ) {}
 }

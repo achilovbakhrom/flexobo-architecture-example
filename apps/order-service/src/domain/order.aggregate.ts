@@ -50,6 +50,44 @@ export class Order extends AggregateRoot {
     return order;
   }
 
+  /**
+   * Restore an Order from a snapshot and subsequent events
+   * @param snapshotData The snapshot data containing aggregate state
+   * @param snapshotVersion The version at which the snapshot was taken
+   * @param subsequentEvents Events that occurred after the snapshot
+   */
+  static fromSnapshot(
+    snapshotData: {
+      _id: string;
+      userId: string;
+      items: OrderItem[];
+      status: OrderStatus;
+      totalAmount: number;
+      currency: string;
+      trackingNumber?: string;
+    },
+    snapshotVersion: number,
+    subsequentEvents: DomainEvent[]
+  ): Order {
+    const order = new Order(snapshotData._id);
+
+    // Restore state from snapshot
+    order.userId = snapshotData.userId;
+    order.items = snapshotData.items || [];
+    order.status = snapshotData.status;
+    order.totalAmount = snapshotData.totalAmount;
+    order.currency = snapshotData.currency;
+    order.trackingNumber = snapshotData.trackingNumber;
+    order._version = snapshotVersion;
+
+    // Apply any events that occurred after the snapshot
+    if (subsequentEvents.length > 0) {
+      order.loadFromHistory(subsequentEvents);
+    }
+
+    return order;
+  }
+
   addItem(
     productId: string,
     productName: string,
@@ -143,6 +181,20 @@ export class Order extends AggregateRoot {
     this.apply(event);
   }
 
+  markPaid(paymentId: string, transactionId: string): void {
+    if (this.status !== OrderStatus.INVENTORY_RESERVED) {
+      throw new Error('Can only mark as paid orders with reserved inventory');
+    }
+
+    const event = this.createEvent('OrderPaid', {
+      paymentId,
+      transactionId,
+      paidAt: new Date().toISOString(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
   ship(trackingNumber: string): void {
     if (this.status !== OrderStatus.PAID) {
       throw new Error('Can only ship paid orders');
@@ -198,6 +250,10 @@ export class Order extends AggregateRoot {
 
       case 'OrderInventoryFailed':
         this.status = OrderStatus.INVENTORY_FAILED;
+        break;
+
+      case 'OrderPaid':
+        this.status = OrderStatus.PAID;
         break;
 
       case 'OrderCancelled':

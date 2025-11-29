@@ -2,10 +2,13 @@ import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { CommandBus } from '@flexobo/core';
 import { RefundPaymentCommand } from '../commands/payment.commands';
+import { MarkOrderPaidCommand, CancelOrderCommand } from '../commands/order.commands';
 import {
   ORDER_EVENTS,
   PAYMENT_EVENTS,
 } from '../../domain/events/event.constants';
+
+const MAX_PAYMENT_FAILURES = 2;
 
 interface LocalEventData {
   aggregateId: string;
@@ -27,6 +30,7 @@ interface SagaState {
   inventoryReserved: boolean;
   paymentId?: string;
   paymentCompleted: boolean;
+  failedPaymentCount: number;
   failureReason?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -53,6 +57,7 @@ export class OrderFulfillmentSaga {
       status: 'STARTED',
       inventoryReserved: false,
       paymentCompleted: false,
+      failedPaymentCount: 0,
       createdAt: new Date(),
       updatedAt: new Date(),
     });
@@ -109,6 +114,7 @@ export class OrderFulfillmentSaga {
   async onPaymentCompleted(event: LocalEventData): Promise<void> {
     const paymentId = event.aggregateId;
     const orderId = event.data['orderId'] as string;
+    const transactionId = event.data['transactionId'] as string;
 
     if (!orderId) {
       this.logger.warn(
@@ -117,22 +123,135 @@ export class OrderFulfillmentSaga {
       return;
     }
 
+    this.logger.log(`[SAGA] Order ${orderId}: Payment ${paymentId} completed`);
+
+    // Mark the order as paid (don't require saga state - it may have been lost on restart)
+    try {
+      const markPaidCommand = new MarkOrderPaidCommand(
+        orderId,
+        paymentId,
+        transactionId || 'unknown'
+      );
+      await this.commandBus.execute(markPaidCommand);
+      this.logger.log(`[SAGA] Order ${orderId}: Marked as PAID`);
+    } catch (error) {
+      this.logger.error(
+        `[SAGA] Order ${orderId}: Failed to mark as paid`,
+        error
+      );
+    }
+
+    // Update saga state if exists
     const state = this.sagaStates.get(orderId);
-    if (!state) {
-      this.logger.debug(
-        `[SAGA] No saga state for order ${orderId}, payment ${paymentId}`
+    if (state) {
+      state.status = 'PAYMENT_COMPLETED';
+      state.paymentId = paymentId;
+      state.paymentCompleted = true;
+      state.updatedAt = new Date();
+    }
+
+    this.logger.log(`[SAGA] Order ${orderId}: Ready for shipping`);
+  }
+
+  @OnEvent(PAYMENT_EVENTS.FAILED)
+  async onPaymentFailed(event: LocalEventData): Promise<void> {
+    const paymentId = event.aggregateId;
+    const orderId = event.data['orderId'] as string;
+    const reason = (event.data['reason'] as string) || 'Payment failed';
+
+    if (!orderId) {
+      this.logger.warn(
+        `[SAGA] Payment ${paymentId} failed but no orderId found`
       );
       return;
     }
 
-    this.logger.log(`[SAGA] Order ${orderId}: Payment ${paymentId} completed`);
+    this.logger.warn(`[SAGA] Order ${orderId}: Payment ${paymentId} failed - ${reason}`);
 
-    state.status = 'PAYMENT_COMPLETED';
-    state.paymentId = paymentId;
-    state.paymentCompleted = true;
+    // Get or create state for tracking failures
+    let state = this.sagaStates.get(orderId);
+    if (!state) {
+      // Create minimal state for tracking if it doesn't exist
+      state = {
+        orderId,
+        status: 'STARTED',
+        inventoryReserved: true,
+        paymentCompleted: false,
+        failedPaymentCount: 0,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      this.sagaStates.set(orderId, state);
+    }
+
+    state.failedPaymentCount++;
     state.updatedAt = new Date();
 
-    this.logger.log(`[SAGA] Order ${orderId}: Ready for shipping`);
+    this.logger.log(
+      `[SAGA] Order ${orderId}: Payment failure count: ${state.failedPaymentCount}/${MAX_PAYMENT_FAILURES}`
+    );
+
+    // Cancel order after max failures
+    if (state.failedPaymentCount >= MAX_PAYMENT_FAILURES) {
+      this.logger.warn(
+        `[SAGA] Order ${orderId}: Max payment failures reached, cancelling order`
+      );
+
+      try {
+        const cancelCommand = new CancelOrderCommand(
+          orderId,
+          `Payment failed ${MAX_PAYMENT_FAILURES} times`
+        );
+        await this.commandBus.execute(cancelCommand);
+        this.logger.log(`[SAGA] Order ${orderId}: Cancelled due to payment failures`);
+      } catch (error) {
+        this.logger.error(
+          `[SAGA] Order ${orderId}: Failed to cancel order`,
+          error
+        );
+      }
+    }
+  }
+
+  @OnEvent(PAYMENT_EVENTS.REFUNDED)
+  async onPaymentRefunded(event: LocalEventData): Promise<void> {
+    const paymentId = event.aggregateId;
+    const orderId = event.data['orderId'] as string;
+    const amount = event.data['amount'] as number;
+    const reason = (event.data['reason'] as string) || 'Payment refunded';
+
+    if (!orderId) {
+      this.logger.warn(
+        `[SAGA] Payment ${paymentId} refunded but no orderId found`
+      );
+      return;
+    }
+
+    this.logger.log(
+      `[SAGA] Order ${orderId}: Payment ${paymentId} refunded (amount: ${amount}) - ${reason}`
+    );
+
+    // Cancel the order when payment is refunded
+    try {
+      const cancelCommand = new CancelOrderCommand(
+        orderId,
+        `Payment refunded: ${reason}`
+      );
+      await this.commandBus.execute(cancelCommand);
+      this.logger.log(`[SAGA] Order ${orderId}: Cancelled due to payment refund`);
+    } catch (error) {
+      this.logger.error(
+        `[SAGA] Order ${orderId}: Failed to cancel order after refund`,
+        error
+      );
+    }
+
+    // Clean up saga state
+    const state = this.sagaStates.get(orderId);
+    if (state) {
+      state.status = 'CANCELLED';
+      state.updatedAt = new Date();
+    }
   }
 
   @OnEvent(ORDER_EVENTS.SHIPPED)

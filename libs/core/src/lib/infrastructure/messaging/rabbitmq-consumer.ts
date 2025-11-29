@@ -301,6 +301,9 @@ export class RabbitMQConsumer
     const retryCount = this.getRetryCount(msg);
     const maxRetries = options.maxRetries || this.retryConfig.maxRetries;
 
+    // Track if message was already acknowledged by the handler
+    let acknowledged = false;
+
     try {
       const content = JSON.parse(msg.content.toString());
 
@@ -317,17 +320,20 @@ export class RabbitMQConsumer
           routingKey: msg.fields.routingKey,
         },
         ack: () => {
-          if (!options.noAck) {
+          if (!options.noAck && !acknowledged) {
+            acknowledged = true;
             channel.ack(msg);
           }
         },
         nack: (requeue = true) => {
-          if (!options.noAck) {
+          if (!options.noAck && !acknowledged) {
+            acknowledged = true;
             channel.nack(msg, false, requeue);
           }
         },
         reject: (requeue = false) => {
-          if (!options.noAck) {
+          if (!options.noAck && !acknowledged) {
+            acknowledged = true;
             channel.reject(msg, requeue);
           }
         },
@@ -335,8 +341,9 @@ export class RabbitMQConsumer
 
       await handler(incomingMessage);
 
-      // Message processed successfully, auto-ack if handler didn't
-      if (!options.noAck) {
+      // Message processed successfully, auto-ack if handler didn't already
+      if (!options.noAck && !acknowledged) {
+        acknowledged = true;
         channel.ack(msg);
       }
 
@@ -352,6 +359,11 @@ export class RabbitMQConsumer
         error instanceof Error ? error.stack : undefined
       );
 
+      // Don't retry/reject if already acknowledged
+      if (acknowledged) {
+        return;
+      }
+
       if (retryCount < maxRetries) {
         // Retry with delay
         const delay = this.calculateBackoff(retryCount);
@@ -361,7 +373,10 @@ export class RabbitMQConsumer
 
         setTimeout(() => {
           this.republishForRetry(msg, queue, retryCount + 1);
-          channel.ack(msg);
+          if (!acknowledged) {
+            acknowledged = true;
+            channel.ack(msg);
+          }
         }, delay);
       } else {
         // Max retries exceeded, send to DLQ
@@ -369,7 +384,8 @@ export class RabbitMQConsumer
           `Message exceeded max retries (${maxRetries}), sending to DLQ`
         );
 
-        if (!options.noAck) {
+        if (!options.noAck && !acknowledged) {
+          acknowledged = true;
           // Reject without requeue - goes to DLX
           channel.reject(msg, false);
         }

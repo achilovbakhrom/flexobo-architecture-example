@@ -38,6 +38,17 @@ export interface IEventStore {
   getEvents(aggregateId: string): Promise<StoredEvent[]>;
 
   /**
+   * Gets events for an aggregate starting from a specific version (exclusive)
+   * Used for snapshot-based loading: load snapshot at version N, then get events > N
+   * @param aggregateId The aggregate identifier
+   * @param fromVersion Get events with version > fromVersion
+   */
+  getEventsFromVersion(
+    aggregateId: string,
+    fromVersion: number
+  ): Promise<StoredEvent[]>;
+
+  /**
    * Gets events by event type
    * @param eventType The event type to filter by
    * @param limit Optional limit

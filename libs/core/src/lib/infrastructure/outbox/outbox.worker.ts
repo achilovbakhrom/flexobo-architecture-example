@@ -218,18 +218,26 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       // Mark as processing
       await this.outboxService.markAsProcessing(message.id);
 
+      // Derive routing key from event type (e.g., OrderCreated -> order.created)
+      const routingKey = this.eventTypeToRoutingKey(message.eventType);
+
       // Publish to message broker
+      // Always publish to 'flexobo.events' exchange with routing key
       await this.messagePublisher.publish(
-        message.eventType,
+        'flexobo.events',
         message.payload,
-        message.metadata
+        {
+          ...message.metadata,
+          routingKey,
+          aggregateId: message.aggregateId,
+        }
       );
 
       // Mark as published
       await this.outboxService.markAsPublished(message.id);
 
       this.logger.debug(
-        `Published message ${message.id} (${message.eventType})`
+        `Published message ${message.id} (${message.eventType}) with routing key: ${routingKey}`
       );
     } catch (error) {
       const errorMessage =
@@ -243,6 +251,24 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
       // Mark as failed
       await this.outboxService.markAsFailed(message.id, errorMessage);
     }
+  }
+
+  /**
+   * Convert event type to routing key
+   * e.g., OrderCreated -> order.created
+   *       OrderItemAdded -> order.item_added
+   *       PaymentCompleted -> payment.completed
+   */
+  private eventTypeToRoutingKey(eventType: string): string {
+    // Convert PascalCase to snake_case with dots
+    // OrderCreated -> order.created
+    // OrderItemAdded -> order.item_added
+    // PaymentCompleted -> payment.completed
+    return eventType
+      .replace(/([A-Z])/g, '_$1')
+      .toLowerCase()
+      .replace(/^_/, '')
+      .replace(/_([a-z])/, '.$1');
   }
 
   /**

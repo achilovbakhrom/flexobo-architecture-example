@@ -5,6 +5,7 @@
  * - Load aggregate from events
  * - Execute business logic on aggregate
  * - Save uncommitted events
+ * - Publish events via outbox for reliable messaging
  */
 
 import {
@@ -13,6 +14,7 @@ import {
   Result,
   Success,
   DomainEvent,
+  OutboxService,
 } from '@flexobo/core';
 import { Payment, PaymentMethod } from '../../domain/payment.aggregate';
 import {
@@ -27,7 +29,7 @@ import {
   FailPaymentCommand,
   RefundPaymentCommand,
 } from './payment.commands';
-import { Inject } from '@nestjs/common';
+import { Inject, Logger } from '@nestjs/common';
 
 /**
  * Converts stored events to domain events for aggregate reconstruction
@@ -61,11 +63,12 @@ async function loadPayment(
 }
 
 /**
- * Saves uncommitted events from a Payment aggregate
+ * Saves uncommitted events from a Payment aggregate and publishes via outbox
  */
 async function savePayment(
   repository: IPaymentEventRepository,
-  payment: Payment
+  payment: Payment,
+  outboxService: OutboxService
 ): Promise<void> {
   const uncommittedEvents = payment.getUncommittedEvents();
 
@@ -83,6 +86,9 @@ async function savePayment(
 
   await repository.appendEvents(payment.id, events, expectedVersion);
 
+  // Publish events via outbox for reliable messaging
+  await outboxService.saveEvents(uncommittedEvents, payment.id, 'Payment');
+
   payment.markEventsAsCommitted();
 }
 
@@ -90,9 +96,12 @@ async function savePayment(
 export class CreatePaymentHandler
   implements ICommandHandler<CreatePaymentCommand, void>
 {
+  private readonly logger = new Logger(CreatePaymentHandler.name);
+
   constructor(
     @Inject(PAYMENT_EVENT_REPOSITORY)
-    private readonly eventRepository: IPaymentEventRepository
+    private readonly eventRepository: IPaymentEventRepository,
+    private readonly outboxService: OutboxService
   ) {}
 
   async execute(command: CreatePaymentCommand): Promise<Result<void, Error>> {
@@ -114,10 +123,13 @@ export class CreatePaymentHandler
         command.paymentMethod as PaymentMethod
       );
 
-      await savePayment(this.eventRepository, payment);
+      await savePayment(this.eventRepository, payment, this.outboxService);
+
+      this.logger.log(`Created payment ${command.paymentId} for order ${command.orderId}`);
 
       return new Success(undefined);
     } catch (error) {
+      this.logger.error(`Failed to create payment: ${error}`);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -127,9 +139,12 @@ export class CreatePaymentHandler
 export class ProcessPaymentHandler
   implements ICommandHandler<ProcessPaymentCommand, void>
 {
+  private readonly logger = new Logger(ProcessPaymentHandler.name);
+
   constructor(
     @Inject(PAYMENT_EVENT_REPOSITORY)
-    private readonly eventRepository: IPaymentEventRepository
+    private readonly eventRepository: IPaymentEventRepository,
+    private readonly outboxService: OutboxService
   ) {}
 
   async execute(command: ProcessPaymentCommand): Promise<Result<void, Error>> {
@@ -146,10 +161,13 @@ export class ProcessPaymentHandler
 
       payment.process();
 
-      await savePayment(this.eventRepository, payment);
+      await savePayment(this.eventRepository, payment, this.outboxService);
+
+      this.logger.log(`Processing payment ${command.paymentId}`);
 
       return new Success(undefined);
     } catch (error) {
+      this.logger.error(`Failed to process payment: ${error}`);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -159,9 +177,12 @@ export class ProcessPaymentHandler
 export class CompletePaymentHandler
   implements ICommandHandler<CompletePaymentCommand, void>
 {
+  private readonly logger = new Logger(CompletePaymentHandler.name);
+
   constructor(
     @Inject(PAYMENT_EVENT_REPOSITORY)
-    private readonly eventRepository: IPaymentEventRepository
+    private readonly eventRepository: IPaymentEventRepository,
+    private readonly outboxService: OutboxService
   ) {}
 
   async execute(command: CompletePaymentCommand): Promise<Result<void, Error>> {
@@ -178,10 +199,13 @@ export class CompletePaymentHandler
 
       payment.complete(command.transactionId);
 
-      await savePayment(this.eventRepository, payment);
+      await savePayment(this.eventRepository, payment, this.outboxService);
+
+      this.logger.log(`Completed payment ${command.paymentId} with transaction ${command.transactionId}`);
 
       return new Success(undefined);
     } catch (error) {
+      this.logger.error(`Failed to complete payment: ${error}`);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -191,9 +215,12 @@ export class CompletePaymentHandler
 export class FailPaymentHandler
   implements ICommandHandler<FailPaymentCommand, void>
 {
+  private readonly logger = new Logger(FailPaymentHandler.name);
+
   constructor(
     @Inject(PAYMENT_EVENT_REPOSITORY)
-    private readonly eventRepository: IPaymentEventRepository
+    private readonly eventRepository: IPaymentEventRepository,
+    private readonly outboxService: OutboxService
   ) {}
 
   async execute(command: FailPaymentCommand): Promise<Result<void, Error>> {
@@ -210,10 +237,13 @@ export class FailPaymentHandler
 
       payment.fail(command.reason);
 
-      await savePayment(this.eventRepository, payment);
+      await savePayment(this.eventRepository, payment, this.outboxService);
+
+      this.logger.log(`Failed payment ${command.paymentId}: ${command.reason}`);
 
       return new Success(undefined);
     } catch (error) {
+      this.logger.error(`Failed to fail payment: ${error}`);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
@@ -223,9 +253,12 @@ export class FailPaymentHandler
 export class RefundPaymentHandler
   implements ICommandHandler<RefundPaymentCommand, void>
 {
+  private readonly logger = new Logger(RefundPaymentHandler.name);
+
   constructor(
     @Inject(PAYMENT_EVENT_REPOSITORY)
-    private readonly eventRepository: IPaymentEventRepository
+    private readonly eventRepository: IPaymentEventRepository,
+    private readonly outboxService: OutboxService
   ) {}
 
   async execute(command: RefundPaymentCommand): Promise<Result<void, Error>> {
@@ -242,10 +275,13 @@ export class RefundPaymentHandler
 
       payment.refund(command.amount, command.reason);
 
-      await savePayment(this.eventRepository, payment);
+      await savePayment(this.eventRepository, payment, this.outboxService);
+
+      this.logger.log(`Refunded payment ${command.paymentId}: amount=${command.amount}`);
 
       return new Success(undefined);
     } catch (error) {
+      this.logger.error(`Failed to refund payment: ${error}`);
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }

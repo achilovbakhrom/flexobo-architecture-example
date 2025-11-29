@@ -1,43 +1,136 @@
 /**
- * Order History Event Consumer
+ * Order History Event Consumer (Projection)
  *
- * Consumes all order events and creates audit log entries.
- * In production, this would use RabbitMQ, Kafka, or similar message broker.
- * Currently uses NestJS EventEmitter for local development.
+ * Subscribes to order events from RabbitMQ and creates audit log entries.
+ * This is a projection in the CQRS pattern - it listens to events published
+ * by the outbox worker and creates audit trail records for orders.
  */
 
-import { Injectable, Inject, OnModuleInit, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import {
+  Injectable,
+  Inject,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
+import {
+  RabbitMQConsumer,
+  MESSAGE_CONSUMER,
+  IncomingMessage,
+} from '@flexobo/core';
 import {
   IOrderHistoryRepository,
   ORDER_HISTORY_REPOSITORY,
 } from '../../ports/order-history.repository.port';
-import { ORDER_EVENTS } from '../../domain/events/event.constants';
+import {
+  ROUTING_KEYS,
+  EVENT_TYPES,
+  QUEUES,
+} from '../../domain/events/event.constants';
 
-interface OrderEventData {
+interface OrderEventPayload {
   aggregateId: string;
-  eventType: string;
-  data: Record<string, unknown>;
+  aggregateType: string;
+  type: string;
   version: number;
+  occurredAt: string;
+  data: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 
 @Injectable()
-export class OrderHistoryEventConsumer implements OnModuleInit {
+export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OrderHistoryEventConsumer.name);
+  private isSubscribed = false;
 
   constructor(
     @Inject(ORDER_HISTORY_REPOSITORY)
-    private readonly historyRepository: IOrderHistoryRepository
+    private readonly historyRepository: IOrderHistoryRepository,
+    @Inject(MESSAGE_CONSUMER)
+    private readonly rabbitMQConsumer: RabbitMQConsumer
   ) {}
 
-  onModuleInit() {
-    this.logger.log('Order history event consumer initialized');
+  async onModuleInit() {
+    await this.subscribeToOrderEvents();
   }
 
-  @OnEvent(ORDER_EVENTS.CREATED)
-  async handleOrderCreated(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderCreated: ${event.aggregateId} (version: ${event.version})`);
+  async onModuleDestroy() {
+    if (this.isSubscribed) {
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.ORDER.HISTORY);
+    }
+  }
+
+  private async subscribeToOrderEvents(): Promise<void> {
+    if (!this.rabbitMQConsumer.isConnected()) {
+      throw new Error(
+        'RabbitMQ is not connected. Cannot start order history consumer.'
+      );
+    }
+
+    await this.rabbitMQConsumer.subscribeToEvents(
+      QUEUES.ORDER.HISTORY,
+      [ROUTING_KEYS.ORDER.ALL],
+      async (message: IncomingMessage) => {
+        await this.handleOrderEvent(message);
+      },
+      {
+        durable: true,
+        maxRetries: 3,
+      }
+    );
+
+    this.isSubscribed = true;
+    this.logger.log(
+      `Order history consumer subscribed to queue: ${QUEUES.ORDER.HISTORY}`
+    );
+  }
+
+  private async handleOrderEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as OrderEventPayload;
+
+    this.logger.debug(
+      `Received order event for history: ${payload.type} for aggregate ${payload.aggregateId} (version: ${payload.version})`
+    );
+
+    // Framework auto-acks on success, auto-nacks on error
+    switch (payload.type) {
+      case EVENT_TYPES.ORDER.CREATED:
+        await this.handleOrderCreated(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.ITEM_ADDED:
+        await this.handleOrderItemAdded(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.CONFIRMED:
+        await this.handleOrderConfirmed(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.CANCELLED:
+        await this.handleOrderCancelled(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.SHIPPED:
+        await this.handleOrderShipped(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.INVENTORY_RESERVED:
+        await this.handleOrderInventoryReserved(payload);
+        break;
+
+      case EVENT_TYPES.ORDER.INVENTORY_FAILED:
+        await this.handleOrderInventoryFailed(payload);
+        break;
+
+      default:
+        this.logger.warn(`Unknown order event type for history: ${payload.type}`);
+    }
+  }
+
+  private async handleOrderCreated(event: OrderEventPayload): Promise<void> {
+    this.logger.debug(
+      `Recording OrderCreated: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -51,9 +144,10 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.ITEM_ADDED)
-  async handleOrderItemAdded(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderItemAdded: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderItemAdded(event: OrderEventPayload): Promise<void> {
+    this.logger.debug(
+      `Recording OrderItemAdded: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -68,9 +162,10 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.CONFIRMED)
-  async handleOrderConfirmed(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderConfirmed: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderConfirmed(event: OrderEventPayload): Promise<void> {
+    this.logger.debug(
+      `Recording OrderConfirmed: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -85,9 +180,10 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.CANCELLED)
-  async handleOrderCancelled(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderCancelled: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderCancelled(event: OrderEventPayload): Promise<void> {
+    this.logger.debug(
+      `Recording OrderCancelled: ${event.aggregateId} (version: ${event.version})`
+    );
 
     const lastEntry = await this.historyRepository.findLatestByOrderId(
       event.aggregateId
@@ -106,9 +202,10 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.SHIPPED)
-  async handleOrderShipped(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderShipped: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderShipped(event: OrderEventPayload): Promise<void> {
+    this.logger.debug(
+      `Recording OrderShipped: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -123,9 +220,12 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.INVENTORY_RESERVED)
-  async handleOrderInventoryReserved(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderInventoryReserved: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderInventoryReserved(
+    event: OrderEventPayload
+  ): Promise<void> {
+    this.logger.debug(
+      `Recording OrderInventoryReserved: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -140,9 +240,12 @@ export class OrderHistoryEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(ORDER_EVENTS.INVENTORY_FAILED)
-  async handleOrderInventoryFailed(event: OrderEventData): Promise<void> {
-    this.logger.debug(`Recording OrderInventoryFailed: ${event.aggregateId} (version: ${event.version})`);
+  private async handleOrderInventoryFailed(
+    event: OrderEventPayload
+  ): Promise<void> {
+    this.logger.debug(
+      `Recording OrderInventoryFailed: ${event.aggregateId} (version: ${event.version})`
+    );
 
     await this.historyRepository.create({
       orderId: event.aggregateId,

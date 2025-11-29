@@ -112,10 +112,10 @@ export class OrderController {
     @Query('offset') offset?: string
   ) {
     return await this.queryBus.execute(
-      new GetAllOrdersQuery({
-        limit: limit ? parseInt(limit, 10) : undefined,
-        offset: offset ? parseInt(offset, 10) : undefined,
-      })
+      new GetAllOrdersQuery(
+        limit ? parseInt(limit, 10) : undefined,
+        offset ? parseInt(offset, 10) : undefined
+      )
     );
   }
 

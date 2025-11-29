@@ -91,14 +91,34 @@ export class PrismaEventStore implements IEventStore {
   async getEvents(aggregateId: string): Promise<StoredEvent[]> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const events = (await (this.prisma.$queryRawUnsafe as any)(
-      `SELECT 
+      `SELECT
         id, aggregate_id as "aggregateId", aggregate_type as "aggregateType",
-        event_type as "eventType", event_data as "eventData", 
+        event_type as "eventType", event_data as "eventData",
         version, occurred_at as "occurredAt", metadata
-       FROM events 
-       WHERE aggregate_id = $1 
+       FROM events
+       WHERE aggregate_id = $1
        ORDER BY version ASC`,
       aggregateId
+    )) as StoredEvent[];
+
+    return events.map(this.mapStoredEvent);
+  }
+
+  async getEventsFromVersion(
+    aggregateId: string,
+    fromVersion: number
+  ): Promise<StoredEvent[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const events = (await (this.prisma.$queryRawUnsafe as any)(
+      `SELECT
+        id, aggregate_id as "aggregateId", aggregate_type as "aggregateType",
+        event_type as "eventType", event_data as "eventData",
+        version, occurred_at as "occurredAt", metadata
+       FROM events
+       WHERE aggregate_id = $1 AND version > $2
+       ORDER BY version ASC`,
+      aggregateId,
+      fromVersion
     )) as StoredEvent[];
 
     return events.map(this.mapStoredEvent);

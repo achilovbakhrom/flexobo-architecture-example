@@ -200,21 +200,23 @@ export class PrismaOutboxRepository implements IOutboxRepository {
     );
   }
 
-  private toDomain(prismaMessage: OutboxMessageRecord): OutboxMessage {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private toDomain(prismaMessage: OutboxMessageRecord | any): OutboxMessage {
+    // Handle both raw SQL (snake_case) and Prisma model (camelCase) results
     return {
       id: prismaMessage.id,
-      aggregateId: prismaMessage.aggregateId,
-      aggregateType: prismaMessage.aggregateType,
-      eventType: prismaMessage.eventType,
-      payload: prismaMessage.payload as Record<string, unknown>,
-      status: prismaMessage.status as OutboxMessageStatus,
-      retryCount: prismaMessage.retryCount,
-      maxRetries: prismaMessage.maxRetries,
-      createdAt: prismaMessage.createdAt,
-      processedAt: prismaMessage.processedAt || undefined,
-      publishedAt: prismaMessage.publishedAt || undefined,
+      aggregateId: prismaMessage.aggregateId || prismaMessage.aggregate_id,
+      aggregateType: prismaMessage.aggregateType || prismaMessage.aggregate_type,
+      eventType: prismaMessage.eventType || prismaMessage.event_type,
+      payload: (prismaMessage.payload as Record<string, unknown>) || {},
+      status: (prismaMessage.status as OutboxMessageStatus) || OutboxMessageStatus.PENDING,
+      retryCount: prismaMessage.retryCount ?? prismaMessage.retry_count ?? 0,
+      maxRetries: prismaMessage.maxRetries ?? prismaMessage.max_retries ?? 5,
+      createdAt: prismaMessage.createdAt || prismaMessage.created_at,
+      processedAt: prismaMessage.processedAt || prismaMessage.processed_at || undefined,
+      publishedAt: prismaMessage.publishedAt || prismaMessage.published_at || undefined,
       error: prismaMessage.error || undefined,
-      companyId: prismaMessage.companyId || undefined,
+      companyId: prismaMessage.companyId || prismaMessage.company_id || undefined,
       metadata:
         (prismaMessage.metadata as Record<string, unknown>) || undefined,
     };

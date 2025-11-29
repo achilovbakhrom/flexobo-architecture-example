@@ -10,3 +10,4 @@ export * from './observability';
 export * from './versioning';
 export * from './health';
 export * from './auth';
+export * from './aggregate-store';

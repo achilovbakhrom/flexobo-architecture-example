@@ -166,27 +166,38 @@ export class OrderEventHandler implements OnModuleInit, OnModuleDestroy {
       `Processing OrderConfirmed for order ${orderId} with ${items.length} items`
     );
 
+    // Aggregate quantities by productId (order can have multiple items with same product)
+    const aggregatedItems = new Map<string, number>();
+    for (const item of items) {
+      const currentQty = aggregatedItems.get(item.productId) || 0;
+      aggregatedItems.set(item.productId, currentQty + item.quantity);
+    }
+
+    this.logger.debug(
+      `Aggregated ${items.length} items into ${aggregatedItems.size} unique products`
+    );
+
     const reservationResults: Array<{
       productId: string;
       success: boolean;
       quantity: number;
     }> = [];
 
-    // Try to reserve stock for each item
-    for (const item of items) {
+    // Try to reserve stock for each unique product
+    for (const [productId, quantity] of aggregatedItems) {
       const command = new ReserveStockByProductCommand(
-        item.productId,
+        productId,
         orderId,
-        item.quantity,
+        quantity,
         30 // 30 minutes expiration
       );
 
       const result = await this.commandBus.execute(command);
 
       reservationResults.push({
-        productId: item.productId,
+        productId,
         success: result.isSuccess && result.value === true,
-        quantity: item.quantity,
+        quantity,
       });
     }
 

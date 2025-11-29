@@ -92,7 +92,6 @@ export class ProductController {
         currency: dto.currency,
         stockLevel: dto.stockLevel,
         imageUrl: dto.imageUrl,
-        metadata: dto.metadata,
       })
     );
 
@@ -178,7 +177,7 @@ export class ProductController {
     @Query('offset') offset?: number
   ): Promise<ProductDto[]> {
     return this.queryBus.execute<ProductDto[]>(
-      new GetProductsByCategoryQuery(category, { limit, offset })
+      new GetProductsByCategoryQuery(category, limit, offset)
     );
   }
 
@@ -201,7 +200,7 @@ export class ProductController {
     @Query('offset') offset?: number
   ): Promise<ProductDto[]> {
     return this.queryBus.execute<ProductDto[]>(
-      new GetActiveProductsQuery({ limit, offset })
+      new GetActiveProductsQuery(limit, offset)
     );
   }
 
@@ -226,7 +225,7 @@ export class ProductController {
     @Query('offset') offset?: number
   ): Promise<ProductDto[]> {
     return this.queryBus.execute<ProductDto[]>(
-      new SearchProductsQuery(query, { limit, offset })
+      new SearchProductsQuery(query, limit, offset)
     );
   }
 

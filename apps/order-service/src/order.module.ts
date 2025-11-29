@@ -38,11 +38,12 @@ import { OrderController } from './adapters/http/v1/order.controller';
 import { ProductController } from './adapters/http/v1/product.controller';
 import { PaymentController } from './adapters/http/v1/payment.controller';
 import { OrderHistoryController } from './adapters/http/v1/order-history.controller';
+import { TestController } from './adapters/http/v1/test.controller';
 
 // ============================================================
 // Ports
 // ============================================================
-import { ORDER_EVENT_REPOSITORY } from './ports/order.repository.port';
+import { ORDER_AGGREGATE_STORE } from './ports/order-store.port';
 import { ORDER_READ_MODEL_REPOSITORY } from './ports/order-read-model.port';
 import {
   PRODUCT_EVENT_REPOSITORY,
@@ -53,17 +54,19 @@ import {
   PAYMENT_READ_MODEL_REPOSITORY,
 } from './ports/payment.repository.port';
 import { ORDER_HISTORY_REPOSITORY } from './ports/order-history.repository.port';
+import { DEAD_LETTER_REPOSITORY } from './ports/dead-letter.repository.port';
 
 // ============================================================
-// Persistence Adapters (Repositories)
+// Persistence Adapters (Stores & Repositories)
 // ============================================================
-import { EventSourcedOrderRepository } from './adapters/persistence/event-sourced-order.repository';
+import { OrderAggregateStore } from './adapters/persistence/order-aggregate.store';
 import { PrismaOrderReadModelRepository } from './adapters/persistence/prisma-order-read-model.repository';
 import { EventSourcedProductRepository } from './adapters/persistence/event-sourced-product.repository';
 import { PrismaProductReadModelRepository } from './adapters/persistence/prisma-product-read-model.repository';
 import { EventSourcedPaymentRepository } from './adapters/persistence/event-sourced-payment.repository';
 import { PrismaPaymentReadModelRepository } from './adapters/persistence/prisma-payment-read-model.repository';
 import { PrismaOrderHistoryRepository } from './adapters/persistence/prisma-order-history.repository';
+import { PrismaDeadLetterRepository } from './adapters/persistence/prisma-dead-letter.repository';
 
 // ============================================================
 // Queue Adapters (Event Consumers)
@@ -72,6 +75,7 @@ import { OrderEventConsumer } from './adapters/queue/order-event.consumer';
 import { PaymentEventConsumer } from './adapters/queue/payment-event.consumer';
 import { OrderHistoryEventConsumer } from './adapters/queue/order-history-event.consumer';
 import { ProductEventConsumer } from './adapters/queue/product-event.consumer';
+import { DeadLetterConsumer } from './adapters/queue/dead-letter.consumer';
 
 // ============================================================
 // Messaging Adapters (RabbitMQ Event Handlers)
@@ -89,6 +93,7 @@ import {
   ShipOrderHandler,
   MarkInventoryReservedHandler,
   MarkInventoryFailedHandler,
+  MarkOrderPaidHandler,
 } from './application/commands/order.handlers';
 
 // ============================================================
@@ -201,6 +206,7 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
         ShipOrderHandler,
         MarkInventoryReservedHandler,
         MarkInventoryFailedHandler,
+        MarkOrderPaidHandler,
         CreateProductHandler,
         UpdateProductHandler,
         DeleteProductHandler,
@@ -288,14 +294,15 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     ProductController,
     PaymentController,
     OrderHistoryController,
+    TestController,
   ],
   providers: [
     // ============================================================
-    // Order Repositories
+    // Order Aggregate Store & Read Model Repository
     // ============================================================
     {
-      provide: ORDER_EVENT_REPOSITORY,
-      useClass: EventSourcedOrderRepository,
+      provide: ORDER_AGGREGATE_STORE,
+      useClass: OrderAggregateStore,
     },
     {
       provide: ORDER_READ_MODEL_REPOSITORY,
@@ -335,12 +342,21 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     },
 
     // ============================================================
+    // Dead Letter Repository
+    // ============================================================
+    {
+      provide: DEAD_LETTER_REPOSITORY,
+      useClass: PrismaDeadLetterRepository,
+    },
+
+    // ============================================================
     // Queue Event Consumers - update read models from events
     // ============================================================
     OrderEventConsumer,
     ProductEventConsumer,
     PaymentEventConsumer,
     OrderHistoryEventConsumer,
+    DeadLetterConsumer,
 
     // ============================================================
     // Messaging Event Handlers - RabbitMQ cross-service handlers
@@ -367,6 +383,7 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     ShipOrderHandler,
     MarkInventoryReservedHandler,
     MarkInventoryFailedHandler,
+    MarkOrderPaidHandler,
     CreateProductHandler,
     UpdateProductHandler,
     DeleteProductHandler,

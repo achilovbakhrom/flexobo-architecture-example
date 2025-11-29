@@ -3,9 +3,11 @@ import { IQuery } from './query.interface';
 
 export const QUERY_HANDLER_METADATA = Symbol('QUERY_HANDLER_METADATA');
 
-export type QueryConstructor<T extends IQuery = IQuery> = new (
-  ...args: unknown[]
-) => T;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type QueryConstructor<T extends IQuery = IQuery> = new (...args: any[]) => T;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Constructor = new (...args: any[]) => object;
 
 /**
  * Decorator for query handlers
@@ -13,9 +15,10 @@ export type QueryConstructor<T extends IQuery = IQuery> = new (
  */
 export function QueryHandler<T extends IQuery>(
   query: QueryConstructor<T>
-): ClassDecorator {
-  return (target: object) => {
+): <TClass extends Constructor>(target: TClass) => TClass {
+  return <TClass extends Constructor>(target: TClass): TClass => {
     Reflect.defineMetadata(QUERY_HANDLER_METADATA, query, target);
+    return target;
   };
 }
 

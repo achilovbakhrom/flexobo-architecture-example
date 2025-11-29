@@ -3,9 +3,11 @@ import { ICommand } from './command.interface';
 
 export const COMMAND_HANDLER_METADATA = Symbol('COMMAND_HANDLER_METADATA');
 
-export type CommandConstructor<T extends ICommand = ICommand> = new (
-  ...args: unknown[]
-) => T;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type CommandConstructor<T extends ICommand = ICommand> = new (...args: any[]) => T;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Constructor = new (...args: any[]) => object;
 
 /**
  * Decorator for command handlers
@@ -13,9 +15,10 @@ export type CommandConstructor<T extends ICommand = ICommand> = new (
  */
 export function CommandHandler<T extends ICommand>(
   command: CommandConstructor<T>
-): ClassDecorator {
-  return (target: object) => {
+): <TClass extends Constructor>(target: TClass) => TClass {
+  return <TClass extends Constructor>(target: TClass): TClass => {
     Reflect.defineMetadata(COMMAND_HANDLER_METADATA, command, target);
+    return target;
   };
 }
 

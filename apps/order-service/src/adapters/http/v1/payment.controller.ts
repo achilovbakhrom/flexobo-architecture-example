@@ -172,7 +172,7 @@ export class PaymentController {
     @Query('offset') offset?: number
   ): Promise<PaymentDto[]> {
     return this.queryBus.execute<PaymentDto[]>(
-      new GetPaymentsByStatusQuery(status, { limit, offset })
+      new GetPaymentsByStatusQuery(status, limit, offset)
     );
   }
 

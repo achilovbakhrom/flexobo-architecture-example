@@ -1,42 +1,139 @@
 /**
- * Payment Event Consumer
+ * Payment Event Consumer (Projection)
  *
- * Consumes payment events from the message queue and updates the read model.
- * In production, this would use RabbitMQ, Kafka, or similar message broker.
- * Currently uses NestJS EventEmitter for local development.
+ * Subscribes to payment events from RabbitMQ and updates the read model.
+ * This is a projection in the CQRS pattern - it listens to events published
+ * by the outbox worker and updates the denormalized read model for queries.
  */
 
-import { Injectable, Inject, OnModuleInit, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
+import {
+  Injectable,
+  Inject,
+  OnModuleInit,
+  OnModuleDestroy,
+  Logger,
+} from '@nestjs/common';
+import {
+  RabbitMQConsumer,
+  MESSAGE_CONSUMER,
+  IncomingMessage,
+} from '@flexobo/core';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   IPaymentReadModelRepository,
   PAYMENT_READ_MODEL_REPOSITORY,
 } from '../../ports/payment.repository.port';
-import { PAYMENT_EVENTS } from '../../domain/events/event.constants';
+import {
+  ROUTING_KEYS,
+  EVENT_TYPES,
+  QUEUES,
+  PAYMENT_EVENTS,
+} from '../../domain/events/event.constants';
 
-interface PaymentEventData {
+// Test event type for simulating consumer failures (goes to DLQ after max retries)
+const TEST_POISON_EVENT = 'PaymentPoisonTest';
+
+interface PaymentEventPayload {
   aggregateId: string;
-  eventType: string;
-  data: Record<string, unknown>;
+  aggregateType: string;
+  type: string;
   version: number;
+  occurredAt: string;
+  data: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
-export class PaymentEventConsumer implements OnModuleInit {
+export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PaymentEventConsumer.name);
+  private isSubscribed = false;
 
   constructor(
     @Inject(PAYMENT_READ_MODEL_REPOSITORY)
-    private readonly readModelRepository: IPaymentReadModelRepository
+    private readonly readModelRepository: IPaymentReadModelRepository,
+    @Inject(MESSAGE_CONSUMER)
+    private readonly rabbitMQConsumer: RabbitMQConsumer,
+    private readonly eventEmitter: EventEmitter2
   ) {}
 
-  onModuleInit() {
-    this.logger.log('Payment event consumer initialized');
+  async onModuleInit() {
+    await this.subscribeToPaymentEvents();
   }
 
-  @OnEvent(PAYMENT_EVENTS.CREATED)
-  async handlePaymentCreated(event: PaymentEventData): Promise<void> {
-    this.logger.debug(`Consuming PaymentCreated: ${event.aggregateId}`);
+  async onModuleDestroy() {
+    if (this.isSubscribed) {
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.PAYMENT.PROJECTIONS);
+    }
+  }
+
+  private async subscribeToPaymentEvents(): Promise<void> {
+    if (!this.rabbitMQConsumer.isConnected()) {
+      throw new Error(
+        'RabbitMQ is not connected. Cannot start payment event consumer.'
+      );
+    }
+
+    await this.rabbitMQConsumer.subscribeToEvents(
+      QUEUES.PAYMENT.PROJECTIONS,
+      [ROUTING_KEYS.PAYMENT.ALL],
+      async (message: IncomingMessage) => {
+        await this.handlePaymentEvent(message);
+      },
+      {
+        durable: true,
+        maxRetries: 3,
+      }
+    );
+
+    this.isSubscribed = true;
+    this.logger.log(
+      `Payment projection subscribed to queue: ${QUEUES.PAYMENT.PROJECTIONS}`
+    );
+  }
+
+  private async handlePaymentEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as PaymentEventPayload;
+
+    this.logger.debug(
+      `Received payment event: ${payload.type} for aggregate ${payload.aggregateId}`
+    );
+
+    // Framework auto-acks on success, auto-nacks on error
+    switch (payload.type) {
+      case EVENT_TYPES.PAYMENT.CREATED:
+        await this.handlePaymentCreated(payload);
+        break;
+
+      case EVENT_TYPES.PAYMENT.PROCESSING:
+        await this.handlePaymentProcessing(payload);
+        break;
+
+      case EVENT_TYPES.PAYMENT.COMPLETED:
+        await this.handlePaymentCompleted(payload);
+        break;
+
+      case EVENT_TYPES.PAYMENT.FAILED:
+        await this.handlePaymentFailed(payload);
+        break;
+
+      case EVENT_TYPES.PAYMENT.REFUNDED:
+        await this.handlePaymentRefunded(payload);
+        break;
+
+      case TEST_POISON_EVENT:
+        // This is a test event that always fails to demonstrate DLQ flow
+        await this.handlePoisonEvent(payload);
+        break;
+
+      default:
+        this.logger.warn(`Unknown payment event type: ${payload.type}`);
+    }
+  }
+
+  private async handlePaymentCreated(
+    event: PaymentEventPayload
+  ): Promise<void> {
+    this.logger.debug(`Processing PaymentCreated: ${event.aggregateId}`);
 
     await this.readModelRepository.upsert({
       id: event.aggregateId,
@@ -53,9 +150,10 @@ export class PaymentEventConsumer implements OnModuleInit {
     });
   }
 
-  @OnEvent(PAYMENT_EVENTS.PROCESSING)
-  async handlePaymentProcessing(event: PaymentEventData): Promise<void> {
-    this.logger.debug(`Consuming PaymentProcessing: ${event.aggregateId}`);
+  private async handlePaymentProcessing(
+    event: PaymentEventPayload
+  ): Promise<void> {
+    this.logger.debug(`Processing PaymentProcessing: ${event.aggregateId}`);
 
     const payment = await this.readModelRepository.findById(event.aggregateId);
     if (payment) {
@@ -75,9 +173,10 @@ export class PaymentEventConsumer implements OnModuleInit {
     }
   }
 
-  @OnEvent(PAYMENT_EVENTS.COMPLETED)
-  async handlePaymentCompleted(event: PaymentEventData): Promise<void> {
-    this.logger.debug(`Consuming PaymentCompleted: ${event.aggregateId}`);
+  private async handlePaymentCompleted(
+    event: PaymentEventPayload
+  ): Promise<void> {
+    this.logger.debug(`Processing PaymentCompleted: ${event.aggregateId}`);
 
     const payment = await this.readModelRepository.findById(event.aggregateId);
     if (payment) {
@@ -94,12 +193,28 @@ export class PaymentEventConsumer implements OnModuleInit {
         processedAt: new Date(event.data['processedAt'] as string),
         updatedAt: new Date(),
       });
+
+      // Emit local event for saga to handle
+      this.eventEmitter.emit(PAYMENT_EVENTS.COMPLETED, {
+        aggregateId: event.aggregateId,
+        eventType: event.type,
+        data: {
+          ...event.data,
+          orderId: payment.orderId,
+        },
+        version: event.version,
+      });
+
+      this.logger.debug(
+        `Emitted local PAYMENT_EVENTS.COMPLETED for saga (orderId: ${payment.orderId})`
+      );
     }
   }
 
-  @OnEvent(PAYMENT_EVENTS.FAILED)
-  async handlePaymentFailed(event: PaymentEventData): Promise<void> {
-    this.logger.debug(`Consuming PaymentFailed: ${event.aggregateId}`);
+  private async handlePaymentFailed(
+    event: PaymentEventPayload
+  ): Promise<void> {
+    this.logger.debug(`Processing PaymentFailed: ${event.aggregateId}`);
 
     const payment = await this.readModelRepository.findById(event.aggregateId);
     if (payment) {
@@ -116,12 +231,44 @@ export class PaymentEventConsumer implements OnModuleInit {
         processedAt: new Date(event.data['processedAt'] as string),
         updatedAt: new Date(),
       });
+
+      // Emit local event for saga to handle
+      this.eventEmitter.emit(PAYMENT_EVENTS.FAILED, {
+        aggregateId: event.aggregateId,
+        eventType: event.type,
+        data: {
+          ...event.data,
+          orderId: payment.orderId,
+        },
+        version: event.version,
+      });
+
+      this.logger.debug(
+        `Emitted local PAYMENT_EVENTS.FAILED for saga (orderId: ${payment.orderId})`
+      );
     }
   }
 
-  @OnEvent(PAYMENT_EVENTS.REFUNDED)
-  async handlePaymentRefunded(event: PaymentEventData): Promise<void> {
-    this.logger.debug(`Consuming PaymentRefunded: ${event.aggregateId}`);
+  /**
+   * Poison event handler - always throws an error to test DLQ flow
+   * After 3 retries, the message will be sent to dead-letter queue
+   */
+  private async handlePoisonEvent(event: PaymentEventPayload): Promise<void> {
+    const retryInfo = event.metadata?.['x-retry-count'] || 0;
+    this.logger.warn(
+      `[POISON TEST] Processing poison event: ${event.aggregateId} (retry: ${retryInfo})`
+    );
+
+    // Always throw an error - this will trigger retry mechanism
+    throw new Error(
+      `[POISON TEST] Simulated consumer failure for event ${event.aggregateId}. This message will go to DLQ after max retries.`
+    );
+  }
+
+  private async handlePaymentRefunded(
+    event: PaymentEventPayload
+  ): Promise<void> {
+    this.logger.debug(`Processing PaymentRefunded: ${event.aggregateId}`);
 
     const payment = await this.readModelRepository.findById(event.aggregateId);
     if (payment) {
@@ -138,6 +285,21 @@ export class PaymentEventConsumer implements OnModuleInit {
         processedAt: payment.processedAt,
         updatedAt: new Date(),
       });
+
+      // Emit local event for saga to handle
+      this.eventEmitter.emit(PAYMENT_EVENTS.REFUNDED, {
+        aggregateId: event.aggregateId,
+        eventType: event.type,
+        data: {
+          ...event.data,
+          orderId: payment.orderId,
+        },
+        version: event.version,
+      });
+
+      this.logger.debug(
+        `Emitted local PAYMENT_EVENTS.REFUNDED for saga (orderId: ${payment.orderId})`
+      );
     }
   }
 }
