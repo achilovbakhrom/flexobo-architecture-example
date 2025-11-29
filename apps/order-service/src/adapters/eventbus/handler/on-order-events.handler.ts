@@ -1,13 +1,3 @@
-/**
- * Order Event Handler (Event → Command)
- *
- * Subscribes to order events and executes payment commands.
- * Following Go pattern: event handlers trigger commands on other aggregates.
- *
- * Responsibilities:
- * - OrderCancelled -> RefundPaymentCommand (if payment exists)
- */
-
 import {
   Injectable,
   Inject,
@@ -22,12 +12,11 @@ import {
   CommandBus,
 } from '@flexobo/core';
 import {
+  QUEUES,
   ROUTING_KEYS,
   EVENT_TYPES,
-} from '../../domain/events/event.constants';
-import { RefundPaymentCommand } from '../../application/commands/payment.commands';
-
-const QUEUE_NAME = 'order-service.order-workflow';
+} from '../../../domain/events/event.constants';
+import { RefundPaymentCommand } from '../../../application/commands/payment.commands';
 
 interface OrderEventPayload {
   aggregateId: string;
@@ -56,40 +45,30 @@ export class OnOrderEventsHandler implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.ORDER.HANDLER);
     }
   }
 
   private async subscribe(): Promise<void> {
     if (!this.rabbitMQConsumer.isConnected()) {
-      throw new Error(
-        'RabbitMQ is not connected. Cannot start order workflow handler.'
-      );
+      throw new Error('RabbitMQ not connected');
     }
 
-    // Subscribe to order cancelled events
     await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
+      QUEUES.ORDER.HANDLER,
       [ROUTING_KEYS.ORDER.CANCELLED],
       async (message: IncomingMessage) => {
         await this.handleEvent(message);
       },
-      {
-        durable: true,
-        maxRetries: 3,
-      }
+      { durable: true, maxRetries: 3 }
     );
 
     this.isSubscribed = true;
-    this.logger.log(`Order workflow handler subscribed to queue: ${QUEUE_NAME}`);
+    this.logger.log(`Subscribed to queue: ${QUEUES.ORDER.HANDLER}`);
   }
 
   private async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as OrderEventPayload;
-
-    this.logger.debug(
-      `[Workflow] Order event: ${payload.type} for ${payload.aggregateId}`
-    );
 
     switch (payload.type) {
       case EVENT_TYPES.ORDER.CANCELLED:
@@ -98,38 +77,24 @@ export class OnOrderEventsHandler implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * When order is cancelled, initiate refund if payment exists
-   */
   private async onOrderCancelled(event: OrderEventPayload): Promise<void> {
     const paymentId = event.data['paymentId'] as string | undefined;
     const reason = (event.data['reason'] as string) || 'Order cancelled';
 
     if (!paymentId) {
-      this.logger.debug(
-        `Order ${event.aggregateId} cancelled without payment - no refund needed`
-      );
+      this.logger.debug(`Order ${event.aggregateId} cancelled without payment`);
       return;
     }
 
-    this.logger.log(
-      `Order ${event.aggregateId} cancelled with payment ${paymentId}, initiating refund`
-    );
+    this.logger.log(`Order ${event.aggregateId} cancelled, initiating refund`);
 
-    try {
-      const command = new RefundPaymentCommand(paymentId, 0, reason);
-      const result = await this.commandBus.execute(command);
+    const command = new RefundPaymentCommand(paymentId, 0, reason);
+    const result = await this.commandBus.execute(command);
 
-      if (result.isSuccess) {
-        this.logger.log(`Payment ${paymentId} refund initiated`);
-      } else {
-        this.logger.error(
-          `Failed to refund payment ${paymentId}: ${result.error?.message}`
-        );
-      }
-    } catch (error) {
-      this.logger.error(`Error refunding payment ${paymentId}`, error);
-      throw error; // Re-throw to trigger retry
+    if (result.isSuccess) {
+      this.logger.log(`Payment ${paymentId} refund initiated`);
+    } else {
+      this.logger.error(`Failed to refund payment: ${result.error?.message}`);
     }
   }
 }

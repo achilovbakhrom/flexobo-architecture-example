@@ -10,10 +10,13 @@ import {
   PAYMENT_READ_MODEL_REPOSITORY,
 } from '../../ports/payment.repository.port';
 import { PaymentDto } from '../../application/dto/payment.dto';
+import { noop } from 'rxjs';
 
 interface PaymentPrismaClient {
   paymentReadModel: {
-    findUnique: (args: { where: { id?: string; transactionId?: string } }) => Promise<PaymentRecord | null>;
+    findUnique: (args: {
+      where: { id?: string; transactionId?: string };
+    }) => Promise<PaymentRecord | null>;
     findMany: (args: {
       where?: { orderId?: string; status?: string };
       orderBy?: { createdAt: 'asc' | 'desc' };
@@ -45,13 +48,17 @@ interface PaymentRecord {
 }
 
 @Injectable()
-export class PrismaPaymentReadModelRepository implements IPaymentReadModelRepository {
+export class PrismaPaymentReadModelRepository
+  implements IPaymentReadModelRepository
+{
   constructor(
     @Inject('PrismaClient') private readonly prisma: PaymentPrismaClient
   ) {}
 
   async findById(paymentId: string): Promise<PaymentDto | null> {
-    const payment = await this.prisma.paymentReadModel.findUnique({ where: { id: paymentId } });
+    const payment = await this.prisma.paymentReadModel.findUnique({
+      where: { id: paymentId },
+    });
     return payment ? this.mapToDto(payment) : null;
   }
 
@@ -63,7 +70,10 @@ export class PrismaPaymentReadModelRepository implements IPaymentReadModelReposi
     return payments.map((p) => this.mapToDto(p));
   }
 
-  async findByStatus(status: string, options?: { limit?: number; offset?: number }): Promise<PaymentDto[]> {
+  async findByStatus(
+    status: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<PaymentDto[]> {
     const payments = await this.prisma.paymentReadModel.findMany({
       where: { status },
       orderBy: { createdAt: 'desc' },
@@ -74,7 +84,9 @@ export class PrismaPaymentReadModelRepository implements IPaymentReadModelReposi
   }
 
   async findByTransactionId(transactionId: string): Promise<PaymentDto | null> {
-    const payment = await this.prisma.paymentReadModel.findUnique({ where: { transactionId } });
+    const payment = await this.prisma.paymentReadModel.findUnique({
+      where: { transactionId },
+    });
     return payment ? this.mapToDto(payment) : null;
   }
 
@@ -104,7 +116,9 @@ export class PrismaPaymentReadModelRepository implements IPaymentReadModelReposi
   }
 
   async delete(paymentId: string): Promise<void> {
-    await this.prisma.paymentReadModel.delete({ where: { id: paymentId } }).catch(() => {});
+    await this.prisma.paymentReadModel
+      .delete({ where: { id: paymentId } })
+      .catch(noop);
   }
 
   private mapToDto(payment: PaymentRecord): PaymentDto {
@@ -117,7 +131,9 @@ export class PrismaPaymentReadModelRepository implements IPaymentReadModelReposi
       paymentMethod: payment.paymentMethod,
       transactionId: payment.transactionId,
       failureReason: payment.failureReason,
-      refundedAmount: payment.refundedAmount ? Number(payment.refundedAmount) : null,
+      refundedAmount: payment.refundedAmount
+        ? Number(payment.refundedAmount)
+        : null,
       processedAt: payment.processedAt,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,

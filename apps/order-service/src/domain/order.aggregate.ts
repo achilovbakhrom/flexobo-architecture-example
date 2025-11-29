@@ -1,4 +1,5 @@
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
+import { EVENT_TYPES } from './events/event.constants';
 
 export interface OrderItem {
   productId: string;
@@ -35,7 +36,7 @@ export class Order extends AggregateRoot {
   static create(orderId: string, userId: string): Order {
     const order = new Order(orderId);
 
-    const event = order.createEvent('OrderCreated', {
+    const event = order.createEvent(EVENT_TYPES.ORDER.CREATED, {
       userId,
       items: [],
       totalAmount: 0,
@@ -119,7 +120,7 @@ export class Order extends AggregateRoot {
       priceCurrency,
     };
 
-    const event = this.createEvent('OrderItemAdded', { item });
+    const event = this.createEvent(EVENT_TYPES.ORDER.ITEM_ADDED, { item });
     this.addEvent(event);
     this.apply(event);
   }
@@ -133,7 +134,7 @@ export class Order extends AggregateRoot {
       throw new Error('Cannot confirm order with no items');
     }
 
-    const event = this.createEvent('OrderConfirmed', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.CONFIRMED, {
       items: this.items,
       userId: this.userId,
     });
@@ -150,7 +151,7 @@ export class Order extends AggregateRoot {
       );
     }
 
-    const event = this.createEvent('OrderInventoryReserved', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.INVENTORY_RESERVED, {
       reservations,
       reservedAt: new Date().toISOString(),
     });
@@ -163,7 +164,7 @@ export class Order extends AggregateRoot {
       throw new Error('Can only fail inventory for orders awaiting inventory');
     }
 
-    const event = this.createEvent('OrderInventoryFailed', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.INVENTORY_FAILED, {
       failedProductIds,
       reason,
       failedAt: new Date().toISOString(),
@@ -184,9 +185,9 @@ export class Order extends AggregateRoot {
       throw new Error('Cannot cancel shipped or delivered order');
     }
 
-    const event = this.createEvent('OrderCancelled', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.CANCELLED, {
       reason,
-      paymentId: this.paymentId, // Include for refund processing
+      paymentId: this.paymentId,
     });
     this.addEvent(event);
     this.apply(event);
@@ -197,7 +198,7 @@ export class Order extends AggregateRoot {
       throw new Error('Can only mark as paid orders with reserved inventory');
     }
 
-    const event = this.createEvent('OrderPaid', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.PAID, {
       paymentId,
       transactionId,
       paidAt: new Date().toISOString(),
@@ -211,7 +212,7 @@ export class Order extends AggregateRoot {
       throw new Error('Can only ship paid orders');
     }
 
-    const event = this.createEvent('OrderShipped', { trackingNumber });
+    const event = this.createEvent(EVENT_TYPES.ORDER.SHIPPED, { trackingNumber });
     this.addEvent(event);
     this.apply(event);
   }
@@ -228,7 +229,7 @@ export class Order extends AggregateRoot {
     const newCount = this.failedPaymentCount + 1;
     const shouldCancel = newCount >= Order.MAX_PAYMENT_FAILURES;
 
-    const event = this.createEvent('OrderPaymentFailed', {
+    const event = this.createEvent(EVENT_TYPES.ORDER.PAYMENT_FAILED, {
       paymentId,
       reason,
       failureCount: newCount,
@@ -264,7 +265,7 @@ export class Order extends AggregateRoot {
 
   protected apply(event: DomainEvent): void {
     switch (event.type) {
-      case 'OrderCreated':
+      case EVENT_TYPES.ORDER.CREATED:
         this.userId = event.data['userId'] as string;
         this.items = event.data['items'] as OrderItem[];
         this.totalAmount = event.data['totalAmount'] as number;
@@ -272,7 +273,7 @@ export class Order extends AggregateRoot {
         this.status = OrderStatus.DRAFT;
         break;
 
-      case 'OrderItemAdded':
+      case EVENT_TYPES.ORDER.ITEM_ADDED:
         {
           const item = event.data['item'] as OrderItem;
           this.items.push(item);
@@ -284,32 +285,32 @@ export class Order extends AggregateRoot {
         }
         break;
 
-      case 'OrderConfirmed':
+      case EVENT_TYPES.ORDER.CONFIRMED:
         this.status = OrderStatus.AWAITING_INVENTORY;
         break;
 
-      case 'OrderInventoryReserved':
+      case EVENT_TYPES.ORDER.INVENTORY_RESERVED:
         this.status = OrderStatus.INVENTORY_RESERVED;
         break;
 
-      case 'OrderInventoryFailed':
+      case EVENT_TYPES.ORDER.INVENTORY_FAILED:
         this.status = OrderStatus.INVENTORY_FAILED;
         break;
 
-      case 'OrderPaid':
+      case EVENT_TYPES.ORDER.PAID:
         this.status = OrderStatus.PAID;
         this.paymentId = event.data['paymentId'] as string;
         break;
 
-      case 'OrderPaymentFailed':
+      case EVENT_TYPES.ORDER.PAYMENT_FAILED:
         this.failedPaymentCount = event.data['failureCount'] as number;
         break;
 
-      case 'OrderCancelled':
+      case EVENT_TYPES.ORDER.CANCELLED:
         this.status = OrderStatus.CANCELLED;
         break;
 
-      case 'OrderShipped':
+      case EVENT_TYPES.ORDER.SHIPPED:
         this.status = OrderStatus.SHIPPED;
         this.trackingNumber = event.data['trackingNumber'] as string;
         break;

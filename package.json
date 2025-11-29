@@ -27,6 +27,9 @@
     "docker:build:all": "npm run docker:build:order && npm run docker:build:gateway && npm run docker:build:admin"
   },
   "private": true,
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.2",

@@ -1,22 +1,4 @@
-import { PaymentDto, PaymentStoredEventDto } from '../application/dto/payment.dto';
-
-export interface IPaymentEventRepository {
-  getEvents(paymentId: string): Promise<PaymentStoredEventDto[]>;
-
-  appendEvents(
-    paymentId: string,
-    events: Array<{
-      type: string;
-      data: Record<string, unknown>;
-      aggregateType: string;
-    }>,
-    expectedVersion: number
-  ): Promise<void>;
-
-  exists(paymentId: string): Promise<boolean>;
-}
-
-export const PAYMENT_EVENT_REPOSITORY = Symbol('IPaymentEventRepository');
+import { PaymentDto } from '../application/dto/payment.dto';
 
 export interface IPaymentReadModelRepository {
   findById(paymentId: string): Promise<PaymentDto | null>;

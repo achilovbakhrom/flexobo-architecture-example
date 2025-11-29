@@ -6,8 +6,8 @@ export * from './prisma-order-read-model.repository';
 export * from './event-sourced-product.repository';
 export * from './prisma-product-read-model.repository';
 
-// Payment repositories
-export * from './event-sourced-payment.repository';
+// Payment aggregate store & read model repository
+export * from './payment-aggregate.store';
 export * from './prisma-payment-read-model.repository';
 
 // Order History repositories

@@ -1,11 +1,3 @@
-/**
- * Order History Event Consumer (Projection)
- *
- * Subscribes to order events from RabbitMQ and creates audit log entries.
- * This is a projection in the CQRS pattern - it listens to events published
- * by the outbox worker and creates audit trail records for orders.
- */
-
 import {
   Injectable,
   Inject,
@@ -21,12 +13,12 @@ import {
 import {
   IOrderHistoryRepository,
   ORDER_HISTORY_REPOSITORY,
-} from '../../ports/order-history.repository.port';
+} from '../../../ports/order-history.repository.port';
 import {
+  QUEUES,
   ROUTING_KEYS,
   EVENT_TYPES,
-  QUEUES,
-} from '../../domain/events/event.constants';
+} from '../../../domain/events/event.constants';
 
 interface OrderEventPayload {
   aggregateId: string;
@@ -39,8 +31,8 @@ interface OrderEventPayload {
 }
 
 @Injectable()
-export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(OrderHistoryEventConsumer.name);
+export class OrderHistoryProjection implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(OrderHistoryProjection.name);
   private isSubscribed = false;
 
   constructor(
@@ -51,7 +43,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
   ) {}
 
   async onModuleInit() {
-    await this.subscribeToOrderEvents();
+    await this.subscribe();
   }
 
   async onModuleDestroy() {
@@ -60,78 +52,53 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     }
   }
 
-  private async subscribeToOrderEvents(): Promise<void> {
+  private async subscribe(): Promise<void> {
     if (!this.rabbitMQConsumer.isConnected()) {
-      throw new Error(
-        'RabbitMQ is not connected. Cannot start order history consumer.'
-      );
+      throw new Error('RabbitMQ not connected');
     }
 
     await this.rabbitMQConsumer.subscribeToEvents(
       QUEUES.ORDER.HISTORY,
       [ROUTING_KEYS.ORDER.ALL],
       async (message: IncomingMessage) => {
-        await this.handleOrderEvent(message);
+        await this.handleEvent(message);
       },
-      {
-        durable: true,
-        maxRetries: 3,
-      }
+      { durable: true, maxRetries: 3 }
     );
 
     this.isSubscribed = true;
-    this.logger.log(
-      `Order history consumer subscribed to queue: ${QUEUES.ORDER.HISTORY}`
-    );
+    this.logger.log(`Subscribed to queue: ${QUEUES.ORDER.HISTORY}`);
   }
 
-  private async handleOrderEvent(message: IncomingMessage): Promise<void> {
+  private async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as OrderEventPayload;
 
-    this.logger.debug(
-      `Received order event for history: ${payload.type} for aggregate ${payload.aggregateId} (version: ${payload.version})`
-    );
-
-    // Framework auto-acks on success, auto-nacks on error
     switch (payload.type) {
       case EVENT_TYPES.ORDER.CREATED:
-        await this.handleOrderCreated(payload);
+        await this.onOrderCreated(payload);
         break;
-
       case EVENT_TYPES.ORDER.ITEM_ADDED:
-        await this.handleOrderItemAdded(payload);
+        await this.onOrderItemAdded(payload);
         break;
-
       case EVENT_TYPES.ORDER.CONFIRMED:
-        await this.handleOrderConfirmed(payload);
+        await this.onOrderConfirmed(payload);
         break;
-
       case EVENT_TYPES.ORDER.CANCELLED:
-        await this.handleOrderCancelled(payload);
+        await this.onOrderCancelled(payload);
         break;
-
       case EVENT_TYPES.ORDER.SHIPPED:
-        await this.handleOrderShipped(payload);
+        await this.onOrderShipped(payload);
         break;
-
       case EVENT_TYPES.ORDER.INVENTORY_RESERVED:
-        await this.handleOrderInventoryReserved(payload);
+        await this.onOrderInventoryReserved(payload);
         break;
-
       case EVENT_TYPES.ORDER.INVENTORY_FAILED:
-        await this.handleOrderInventoryFailed(payload);
+        await this.onOrderInventoryFailed(payload);
         break;
-
-      default:
-        this.logger.warn(`Unknown order event type for history: ${payload.type}`);
     }
   }
 
-  private async handleOrderCreated(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Recording OrderCreated: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderCreated(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderCreated',
@@ -144,11 +111,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderItemAdded(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Recording OrderItemAdded: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderItemAdded(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderItemAdded',
@@ -162,11 +125,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderConfirmed(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Recording OrderConfirmed: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderConfirmed(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderConfirmed',
@@ -180,14 +139,8 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderCancelled(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Recording OrderCancelled: ${event.aggregateId} (version: ${event.version})`
-    );
-
-    const lastEntry = await this.historyRepository.findLatestByOrderId(
-      event.aggregateId
-    );
+  private async onOrderCancelled(event: OrderEventPayload): Promise<void> {
+    const lastEntry = await this.historyRepository.findLatestByOrderId(event.aggregateId);
 
     await this.historyRepository.create({
       orderId: event.aggregateId,
@@ -202,11 +155,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderShipped(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Recording OrderShipped: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderShipped(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderShipped',
@@ -220,13 +169,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderInventoryReserved(
-    event: OrderEventPayload
-  ): Promise<void> {
-    this.logger.debug(
-      `Recording OrderInventoryReserved: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderInventoryReserved(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderInventoryReserved',
@@ -240,13 +183,7 @@ export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy 
     });
   }
 
-  private async handleOrderInventoryFailed(
-    event: OrderEventPayload
-  ): Promise<void> {
-    this.logger.debug(
-      `Recording OrderInventoryFailed: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderInventoryFailed(event: OrderEventPayload): Promise<void> {
     await this.historyRepository.create({
       orderId: event.aggregateId,
       eventType: 'OrderInventoryFailed',

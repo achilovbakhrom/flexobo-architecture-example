@@ -48,17 +48,3 @@ export interface RefundPaymentDto {
   amount: number;
   reason: string;
 }
-
-/**
- * Stored event format for payment events
- */
-export interface PaymentStoredEventDto {
-  id: string;
-  aggregateId: string;
-  aggregateType: string;
-  eventType: string;
-  eventData: Record<string, unknown>;
-  version: number;
-  occurredAt: Date;
-  metadata?: Record<string, unknown> | null;
-}

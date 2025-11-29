@@ -1,368 +1,424 @@
 # Developer Guide
 
-Complete guide for developing with this microservices architecture.
-
-## Table of Contents
-
-- [Quick Start](#quick-start)
-- [Architecture](#architecture)
-- [Development Workflow](#development-workflow)
-- [Database Setup](#database-setup)
-- [Hot Module Reload](#hot-module-reload)
-- [Adding New Service](#adding-new-service)
-- [API Documentation](#api-documentation)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
-
----
-
 ## Quick Start
 
 ```bash
-# 1. Install dependencies
+# Install dependencies
 yarn install
 
-# 2. Start infrastructure
-yarn infra:up
+# Start infrastructure (shared RabbitMQ)
+cd infrastructure && docker-compose up -d && cd ..
 
-# 3. Setup databases
-yarn db:setup
-yarn db:migrate:all
+# Start order-service infrastructure (PostgreSQL, Redis)
+cd apps/order-service && docker-compose up -d && cd ../..
 
-# 4. Run all services with hot reload
-yarn dev
+# Run migrations
+yarn db:migration:apply:order
+
+# Start service
+yarn start:order
 ```
 
 **Services:**
-- Order Service → `http://localhost:3000/api`
-- API Gateway → `http://localhost:3001/api`
-- Admin Panel → `http://localhost:3002/api`
-- Swagger UI → `http://localhost:3001/api/docs`
+| Service | Port | URL |
+|---------|------|-----|
+| Order Service | 3000 | http://localhost:3000/api |
+| API Gateway | 3001 | http://localhost:3001/api |
+| Admin Panel | 3002 | http://localhost:3002/api |
+| Swagger UI | 3001 | http://localhost:3001/api/docs |
+| RabbitMQ Management | 15672 | http://localhost:15672 |
 
 ---
 
 ## Architecture
 
-### Services
-
-**Order Service (Port 3000)**
-- Order management with event sourcing
-- CQRS pattern (commands/queries)
-- Event store for complete audit trail
-
-**API Gateway (Port 3001)**
-- Single entry point for all requests
-- Rate limiting and circuit breaker
-- Request routing and aggregation
-
-**Admin Panel (Port 3002)**
-- System administration
-- User management
-- Audit logging
-
 ### Tech Stack
 
-- **Runtime:** Node.js 20
-- **Framework:** NestJS
-- **Language:** TypeScript (strict mode)
-- **Database:** PostgreSQL + Prisma
-- **Cache:** Redis
-- **Message Queue:** RabbitMQ
-- **Monorepo:** Nx
-- **API Docs:** Swagger/OpenAPI
+| Component | Technology |
+|-----------|------------|
+| Runtime | Node.js 22 |
+| Framework | NestJS |
+| Language | TypeScript (strict) |
+| Database | PostgreSQL + Prisma |
+| Cache | Redis |
+| Message Queue | RabbitMQ |
+| Monorepo | Nx |
+| Observability | OpenTelemetry |
 
 ### Project Structure
 
 ```
 apps/
-├── order-service/       # Order management
-│   ├── prisma/         # Database schema
+├── order-service/
+│   ├── prisma/              # Database schema and migrations
 │   └── src/
-│       ├── domain/     # Business logic
-│       ├── application/ # Commands & queries
-│       └── presentation/ # Controllers
-├── api-gateway/        # Entry point
-└── admin-panel/        # Admin UI
+│       ├── domain/          # Aggregates, entities, events
+│       ├── application/     # Commands, queries, use-cases
+│       ├── adapters/        # Infrastructure implementations
+│       │   ├── http/        # REST controllers
+│       │   ├── persistence/ # Repositories
+│       │   ├── eventbus/    # Event handlers and projections
+│       │   └── messaging/   # External message handlers
+│       └── ports/           # Repository interfaces
+├── api-gateway/
+└── admin-panel/
 
 libs/
-├── core/              # CQRS, event sourcing
-└── shared-kernel/     # Common utilities
+├── core/                    # CQRS, event sourcing, messaging
+└── shared-kernel/           # Common utilities
+
+infrastructure/
+└── docker-compose.yml       # Shared RabbitMQ, Infisical
 ```
+
+### Patterns
+
+- **Event Sourcing** - All state changes stored as events
+- **CQRS** - Separate command and query models
+- **Hexagonal Architecture** - Ports and adapters
+- **Outbox Pattern** - Reliable event publishing
+- **Projections** - Event handlers that update read models
 
 ---
 
-## Development Workflow
+## Development
 
-### Run Individual Service
-
-```bash
-yarn dev:order:watch    # Order service with HMR
-yarn dev:gateway:watch  # Gateway with HMR
-yarn dev:admin:watch    # Admin with HMR
-```
-
-### Run All Services
+### Run Services
 
 ```bash
-yarn dev  # All services with hot reload
+yarn start              # All services
+yarn start:order        # Order service only
+yarn start:gateway      # Gateway only
+yarn start:admin        # Admin only
+yarn stop               # Stop all services
 ```
 
 ### Build & Test
 
 ```bash
-yarn build:all   # Build all services
-yarn test:all    # Run tests
-yarn lint:all    # Lint code
+yarn build              # Build all
+yarn test               # Test all
+yarn lint               # Lint all
 ```
 
 ### Infrastructure
 
 ```bash
-yarn infra:up       # Start PostgreSQL, Redis, RabbitMQ
-yarn infra:down     # Stop infrastructure
-yarn infra:logs     # View logs
+# Shared infrastructure (RabbitMQ)
+cd infrastructure && docker-compose up -d
+
+# Service-specific (PostgreSQL, Redis)
+cd apps/order-service && docker-compose up -d
 ```
 
 ---
 
-## Database Setup
+## Database
 
-### Overview
-
-Each service has its own database:
-- `order_service` → Order Service
-- `api_gateway` → API Gateway  
-- `admin_panel` → Admin Panel
+Each service has its own PostgreSQL database and Redis cache with isolated docker-compose.
 
 ### Environment Variables
 
-Add to `.env`:
+```bash
+# apps/order-service/.env
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/order_service
+REDIS_URL=redis://localhost:6381
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
+```
+
+### Commands
 
 ```bash
-ORDER_SERVICE_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/order_service"
-API_GATEWAY_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/api_gateway"
-ADMIN_PANEL_DATABASE_URL="postgresql://postgres:postgres@localhost:5432/admin_panel"
-```
+# Create migration
+yarn db:migration:create:order
 
-### Common Commands
+# Apply migration
+yarn db:migration:apply:order
 
-```bash
-yarn db:setup           # Create databases + generate clients
-yarn db:generate        # Generate Prisma clients
-yarn db:migrate:all     # Run all migrations
-yarn db:migrate:order   # Migrate order service only
-yarn db:studio:order    # Open Prisma Studio (port 5555)
-yarn db:migrate:deploy  # Production deployment
-```
-
-### Using Prisma in Code
-
-**Order Service:**
-```typescript
-import { PrismaClient } from '.prisma/order-client';
-const prisma = new PrismaClient();
-```
-
-**API Gateway:**
-```typescript
-import { PrismaClient } from '.prisma/gateway-client';
-const prisma = new PrismaClient();
-```
-
-**Admin Panel:**
-```typescript
-import { PrismaClient } from '.prisma/admin-client';
-const prisma = new PrismaClient();
-```
-
-### Creating Migrations
-
-```bash
-# 1. Edit schema
-vim apps/order-service/prisma/schema.prisma
-
-# 2. Create migration
-yarn db:migrate:order
-# Name: "add_payment_status"
+# Open Prisma Studio
+yarn db:studio:order        # Port 5555
+yarn db:studio:gateway      # Port 5556
+yarn db:studio:admin        # Port 5557
 ```
 
 ---
 
-## Hot Module Reload
+## Adding a New Microservice
 
-### How It Works
-
-When you edit any file:
-1. TypeScript recompiles automatically (~200ms)
-2. Service restarts automatically (~1s)
-3. Ready to test immediately
-
-### Usage
+### 1. Generate Service
 
 ```bash
-# Start with HMR
-yarn dev:order:watch
-
-# Edit any file
-vim apps/order-service/src/domain/order.aggregate.ts
-
-# Save → Auto reload!
+npx nx g @nx/nest:application inventory-service
 ```
 
-### Editing Shared Libraries
+### 2. Create Docker Compose
 
-When you edit `libs/core/` or `libs/shared-kernel/`:
-- All services restart automatically
-- Changes apply everywhere
+Create `apps/inventory-service/docker-compose.yml`:
 
-### Tips
+```yaml
+services:
+  postgres-inventory:
+    image: postgres:15-alpine
+    container_name: inventory-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: inventory_service
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_inventory_data:/var/lib/postgresql/data
+    networks:
+      - inventory-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-- First build is slow (~10s), incremental builds are fast (~200ms)
-- Clean build: `rm -rf dist/ && yarn build:all`
-- Stop watch mode: `Ctrl+C`
+  redis-inventory:
+    image: redis:7-alpine
+    container_name: inventory-service-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_inventory_data:/data
+    networks:
+      - inventory-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
----
+volumes:
+  postgres_inventory_data:
+  redis_inventory_data:
 
-## Adding New Service
+networks:
+  inventory-service-network:
+    driver: bridge
+  flexobo-shared-network:
+    external: true
+```
 
-### Step 1: Generate Service
+### 3. Create Environment File
+
+Create `apps/inventory-service/.env`:
 
 ```bash
-npx nx g @nx/nest:application payment-service
+# Server
+INVENTORY_SERVICE_PORT=3003
+NODE_ENV=development
+
+# Database
+DATABASE_URL=postgresql://postgres:postgres@localhost:5435/inventory_service
+
+# Redis
+REDIS_URL=redis://localhost:6382
+
+# RabbitMQ
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
+
+# OpenTelemetry
+OTEL_TRACE_ENDPOINT=http://localhost:4318/v1/traces
+OTEL_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
 ```
 
-### Step 2: Configure Build
+### 4. Setup Prisma
 
-Edit `apps/payment-service/project.json`:
-
-```json
-{
-  "targets": {
-    "build": {
-      "executor": "@nx/js:tsc",
-      "options": {
-        "outputPath": "dist/apps/payment-service",
-        "main": "apps/payment-service/src/main.ts",
-        "tsConfig": "apps/payment-service/tsconfig.app.json"
-      }
-    },
-    "serve": {
-      "executor": "nx:run-commands",
-      "dependsOn": ["build"],
-      "options": {
-        "command": "node dist/apps/payment-service/src/main.js"
-      }
-    }
-  }
-}
-```
-
-### Step 3: Add Database
-
-Create `apps/payment-service/prisma/schema.prisma`:
+Create `apps/inventory-service/prisma/schema.prisma`:
 
 ```prisma
 generator client {
   provider = "prisma-client-js"
-  output   = "../../../node_modules/.prisma/payment-client"
+  output   = "../../../node_modules/.prisma/inventory-client"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("PAYMENT_SERVICE_DATABASE_URL")
+  url      = env("DATABASE_URL")
+}
+
+model EventStore {
+  id            String   @id @default(uuid())
+  aggregateId   String   @map("aggregate_id")
+  aggregateType String   @map("aggregate_type")
+  eventType     String   @map("event_type")
+  eventData     Json     @map("event_data")
+  version       Int
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  metadata      Json?
+
+  @@index([aggregateId])
+  @@index([aggregateType])
+  @@map("event_store")
+}
+
+model OutboxMessage {
+  id          String    @id @default(uuid())
+  eventType   String    @map("event_type")
+  payload     Json
+  occurredAt  DateTime  @default(now()) @map("occurred_at")
+  processedAt DateTime? @map("processed_at")
+
+  @@index([processedAt])
+  @@map("outbox_messages")
 }
 ```
 
-### Step 4: Add Scripts
+Create `apps/inventory-service/prisma.config.ts`:
 
-Update `package.json`:
+```typescript
+import path from 'path';
+
+export default {
+  schema: path.join(__dirname, 'prisma/schema.prisma'),
+};
+```
+
+### 5. Add Package Scripts
+
+Update root `package.json`:
 
 ```json
 {
   "scripts": {
-    "watch:payment": "tsc --build apps/payment-service/tsconfig.app.json --watch",
-    "start:payment": "nodemon --watch dist/apps/payment-service --watch dist/libs dist/apps/payment-service/src/main.js",
-    "dev:payment:watch": "concurrently \"yarn watch:libs\" \"yarn watch:payment\" \"yarn start:payment\""
+    "start:inventory": "npx tsx scripts/dev.ts inventory",
+    "db:migration:create:inventory": "npx prisma migrate dev --create-only --config apps/inventory-service/prisma.config.ts",
+    "db:migration:apply:inventory": "npx prisma migrate deploy --config apps/inventory-service/prisma.config.ts",
+    "db:studio:inventory": "npx prisma studio --config apps/inventory-service/prisma.config.ts --port 5558"
   }
 }
 ```
 
-### Step 5: Test
+### 6. Create Service Structure
 
-```bash
-yarn db:generate
-yarn db:migrate:payment
-yarn dev:payment:watch
+```
+apps/inventory-service/src/
+├── main.ts
+├── inventory.module.ts
+├── prisma.module.ts
+├── domain/
+│   ├── inventory.aggregate.ts
+│   └── events/
+│       └── inventory.events.ts
+├── application/
+│   ├── commands/
+│   │   └── inventory.handlers.ts
+│   └── queries/
+│       └── inventory.handlers.ts
+├── adapters/
+│   ├── http/v1/
+│   │   └── inventory.controller.ts
+│   ├── persistence/
+│   │   └── inventory-aggregate.store.ts
+│   └── eventbus/
+│       └── projection/
+│           └── inventory.projection.ts
+└── ports/
+    └── inventory-store.port.ts
 ```
 
----
+### 7. Create Module
 
-## API Documentation
+Create `apps/inventory-service/src/inventory.module.ts`:
 
-### Unified Swagger UI
+```typescript
+import { Module } from '@nestjs/common';
+import {
+  CqrsModule,
+  EventStoreModule,
+  OutboxModule,
+  CacheModule,
+  MessagingModule,
+  MESSAGE_PUBLISHER,
+  VersioningModule,
+  VersioningStrategy,
+  VersionStatus,
+  HealthModule,
+  ObservabilityModule,
+} from '@flexobo/core';
+import { PrismaModule } from './prisma.module';
 
-Access the unified Swagger UI at: **`http://localhost:3001/api/docs`**
-
-All microservices are automatically aggregated into a single Swagger interface with a **service selector dropdown** in the top-right corner.
-
-### How It Works
-
-1. **Each Service** exposes its own Swagger spec at `/api/docs-json`
-2. **API Gateway** fetches and aggregates all specs dynamically
-3. **Unified UI** displays all endpoints with per-operation service selection
-4. **Server Dropdown** allows switching context between services
-
-### Service Selection
-
-In Swagger UI:
-1. Click the **"Servers"** dropdown in the top-right
-2. Select target service:
-   - `http://localhost:3000` - Order Service
-   - `http://localhost:3002` - Admin Panel
-3. View and test endpoints for that service
-4. Each endpoint shows which service it belongs to
-
-### Individual Service Docs
-
-You can also access individual Swagger UIs:
-- Order Service: `http://localhost:3000/api/docs`
-- Admin Panel: `http://localhost:3002/api/docs`
-
-### Example API Call
-
-**Create Order:**
-```bash
-curl -X POST http://localhost:3000/api/v1/orders \
-  -H "Content-Type: application/json" \
-  -d '{"userId": "user-123"}'
+@Module({
+  imports: [
+    PrismaModule,
+    EventStoreModule.forRoot({ enableUpcasting: false }),
+    MessagingModule.forRoot({
+      config: {
+        url: process.env['RABBITMQ_URL'],
+        exchanges: [
+          { name: 'flexobo.events', type: 'topic', durable: true },
+          { name: 'flexobo.dlx', type: 'topic', durable: true },
+        ],
+        deadLetter: {
+          exchange: 'flexobo.dlx',
+          queue: 'flexobo.dead-letter',
+          ttl: 86400000 * 7,
+        },
+        logging: { enabled: true, level: 'info' },
+      },
+      enablePublisher: true,
+      enableConsumer: true,
+    }),
+    CqrsModule.forRoot({
+      commandHandlers: [],
+      queryHandlers: [],
+    }),
+    OutboxModule.forRoot({
+      workerConfig: { pollingIntervalMs: 5000, batchSize: 100, enabled: true },
+      messagePublisher: { provide: 'IMessagePublisher', useExisting: MESSAGE_PUBLISHER },
+    }),
+    VersioningModule.forRoot({
+      strategy: VersioningStrategy.URI,
+      defaultVersion: '1.0.0',
+      versions: [{ version: { major: 1, minor: 0, patch: 0 }, status: VersionStatus.STABLE, description: 'Initial release' }],
+      global: true,
+    }),
+    HealthModule.forRoot({
+      version: '1.0.0',
+      enableEndpoints: true,
+      indicators: [],
+      dependencies: [],
+      global: true,
+    }),
+    ObservabilityModule.forRoot({
+      serviceName: 'inventory-service',
+      serviceVersion: '1.0.0',
+      environment: process.env['NODE_ENV'],
+      traceExporterUrl: process.env['OTEL_TRACE_ENDPOINT'],
+      metricsExporterUrl: process.env['OTEL_METRICS_ENDPOINT'],
+      autoInstrumentation: true,
+      global: true,
+    }),
+    CacheModule.forRoot({
+      redis: { url: process.env['REDIS_URL'] },
+      cache: { prefix: 'inventory-service:', defaultTtl: 86400 * 7 },
+    }),
+  ],
+  controllers: [],
+  providers: [],
+})
+export class InventoryModule {}
 ```
 
-**Get Order:**
-```bash
-curl http://localhost:3000/api/v1/orders/{orderId}
-```
-
----
-
-## Testing
-
-### Unit Tests
+### 8. Start Service
 
 ```bash
-yarn test:all              # All services
-npx nx test order-service  # Specific service
-```
+# Start infrastructure
+cd infrastructure && docker-compose up -d && cd ..
+cd apps/inventory-service && docker-compose up -d && cd ../..
 
-### E2E Tests
+# Generate Prisma client
+npx prisma generate --config apps/inventory-service/prisma.config.ts
 
-```bash
-npx nx e2e order-service-e2e
-```
+# Run migrations
+yarn db:migration:apply:inventory
 
-### Test Coverage
-
-```bash
-npx nx test order-service --coverage
+# Start service
+yarn start:inventory
 ```
 
 ---
@@ -372,135 +428,33 @@ npx nx test order-service --coverage
 ### Service Won't Start
 
 ```bash
-# Check ports
-lsof -i :3000  # Order service
-lsof -i :3001  # Gateway
-
-# Kill process
-kill -9 <PID>
+lsof -i :3000           # Check port
+kill -9 <PID>           # Kill process
 ```
 
 ### Database Issues
 
 ```bash
-# Reset database (WARNING: deletes data)
-npx prisma migrate reset --schema=apps/order-service/prisma/schema.prisma
+# Reset database
+npx prisma migrate reset --config apps/order-service/prisma.config.ts
 
-# Regenerate clients
-rm -rf node_modules/.prisma && yarn db:generate
+# Regenerate client
+rm -rf node_modules/.prisma && npx prisma generate --config apps/order-service/prisma.config.ts
 ```
 
 ### Build Errors
 
 ```bash
-# Clean build
 rm -rf dist/
-yarn build:all
-```
-
-### HMR Not Working
-
-```bash
-# Check if watch mode running
-# Should see "Watching for file changes..."
-
-# Clean and restart
-rm -rf dist/
-yarn build:all
-yarn dev:order:watch
+yarn build
 ```
 
 ### Infrastructure Issues
 
 ```bash
 # Restart containers
-yarn infra:down
-yarn infra:up
+docker-compose down && docker-compose up -d
 
 # View logs
-yarn infra:logs
+docker-compose logs -f
 ```
-
----
-
-## Best Practices
-
-### Code Organization
-
-- Domain layer: Pure business logic, no framework dependencies
-- Application layer: Use cases (commands/queries)
-- Presentation layer: Controllers, API endpoints
-
-### Database
-
-- Each service owns its data
-- No shared tables between services
-- Use migrations for schema changes
-- Test migrations on staging first
-
-### Event Sourcing
-
-- Store all state changes as events
-- Events are immutable
-- Replay events to rebuild state
-
-### API Design
-
-- Use versioning: `/api/v1/orders`
-- Return proper HTTP status codes
-- Include error details in responses
-- Document with Swagger decorators
-
-### Performance
-
-- Use connection pooling
-- Cache frequently accessed data (Redis)
-- Index database queries properly
-- Monitor with OpenTelemetry
-
----
-
-## Useful Commands
-
-```bash
-# Development
-yarn dev                  # All services with HMR
-yarn dev:order:watch      # Single service with HMR
-yarn build:all            # Build everything
-
-# Database
-yarn db:setup             # Setup databases
-yarn db:migrate:all       # Run migrations
-yarn db:studio:order      # Open Prisma Studio
-
-# Infrastructure
-yarn infra:up             # Start containers
-yarn infra:down           # Stop containers
-yarn infra:logs           # View logs
-
-# Testing
-yarn test:all             # Run all tests
-yarn lint:all             # Lint code
-
-# Utilities
-rm -rf dist/              # Clean build
-rm -rf node_modules/.prisma  # Clean Prisma clients
-```
-
----
-
-## Architecture Patterns
-
-- ✅ Event Sourcing - Complete audit trail
-- ✅ CQRS - Separate read/write models
-- ✅ Hexagonal Architecture - Clean separation
-- ✅ Saga Pattern - Distributed transactions
-- ✅ Outbox Pattern - Reliable events
-- ✅ Circuit Breaker - Fault tolerance
-- ✅ API Versioning - Backward compatibility
-
----
-
-## License
-
-MIT

@@ -1,12 +1,3 @@
-/**
- * Payment Projection
- *
- * Pure read model updater - receives payment events and updates the denormalized view.
- * This component has a single responsibility: keeping the read model in sync with events.
- *
- * NO command execution or side effects - that belongs in workflow handlers.
- */
-
 import {
   Injectable,
   Inject,
@@ -60,7 +51,7 @@ export class PaymentProjection implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.PAYMENT.PROJECTIONS);
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.PAYMENT.PROJECTION);
     }
   }
 
@@ -72,7 +63,7 @@ export class PaymentProjection implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.PAYMENT.PROJECTIONS,
+      QUEUES.PAYMENT.PROJECTION,
       [ROUTING_KEYS.PAYMENT.ALL],
       async (message: IncomingMessage) => {
         await this.handleEvent(message);
@@ -84,7 +75,7 @@ export class PaymentProjection implements OnModuleInit, OnModuleDestroy {
     );
 
     this.isSubscribed = true;
-    this.logger.log(`Payment projection subscribed to queue: ${QUEUES.PAYMENT.PROJECTIONS}`);
+    this.logger.log(`Payment projection subscribed to queue: ${QUEUES.PAYMENT.PROJECTION}`);
   }
 
   private async handleEvent(message: IncomingMessage): Promise<void> {

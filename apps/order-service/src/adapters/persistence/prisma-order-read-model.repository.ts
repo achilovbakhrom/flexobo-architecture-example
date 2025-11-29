@@ -15,6 +15,7 @@ import {
   OrderWithItemsReadModelDto,
   OrderItemReadModelDto,
 } from '../../application/dto/order.dto';
+import { noop } from 'rxjs';
 
 interface OrderReadModelUpdate {
   status?: string;
@@ -80,7 +81,9 @@ interface OrderItemRecord {
 }
 
 @Injectable()
-export class PrismaOrderReadModelRepository implements IOrderReadModelRepository {
+export class PrismaOrderReadModelRepository
+  implements IOrderReadModelRepository
+{
   private readonly logger = new Logger(PrismaOrderReadModelRepository.name);
 
   constructor(
@@ -154,7 +157,10 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
   ): Promise<boolean> {
     // Check for idempotency - skip if event already processed
     if (options?.eventId) {
-      const alreadyProcessed = await this.isEventProcessed(order.id, options.eventId);
+      const alreadyProcessed = await this.isEventProcessed(
+        order.id,
+        options.eventId
+      );
       if (alreadyProcessed) {
         this.logger.debug(
           `Event ${options.eventId} already processed for order ${order.id}, skipping`
@@ -177,9 +183,8 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
     // Use provided version (synchronized with event store) or default to 1 for create
     const createVersion = options?.version ?? 1;
     // For update: use provided version or increment by 1
-    const updateVersion = options?.version !== undefined
-      ? options.version
-      : { increment: 1 };
+    const updateVersion =
+      options?.version !== undefined ? options.version : { increment: 1 };
 
     await this.prisma.orderReadModel.upsert({
       where: { id: order.id },
@@ -242,10 +247,14 @@ export class PrismaOrderReadModelRepository implements IOrderReadModelRepository
   }
 
   async delete(orderId: string): Promise<void> {
-    await this.prisma.orderReadModel.delete({ where: { id: orderId } }).catch(() => {});
+    await this.prisma.orderReadModel
+      .delete({ where: { id: orderId } })
+      .catch(noop);
   }
 
-  private mapToDto(order: OrderRecord & { items: OrderItemRecord[] }): OrderWithItemsReadModelDto {
+  private mapToDto(
+    order: OrderRecord & { items: OrderItemRecord[] }
+  ): OrderWithItemsReadModelDto {
     return {
       id: order.id,
       userId: order.userId,

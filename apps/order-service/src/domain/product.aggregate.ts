@@ -1,4 +1,5 @@
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
+import { EVENT_TYPES } from './events/event.constants';
 
 export interface ProductPrice {
   amount: number;
@@ -32,7 +33,7 @@ export class Product extends AggregateRoot {
   ): Product {
     const product = new Product(productId);
 
-    const event = product.createEvent('ProductCreated', {
+    const event = product.createEvent(EVENT_TYPES.PRODUCT.CREATED, {
       sku,
       name,
       description: options?.description,
@@ -65,7 +66,7 @@ export class Product extends AggregateRoot {
     imageUrl?: string;
     metadata?: Record<string, unknown>;
   }): void {
-    const event = this.createEvent('ProductUpdated', {
+    const event = this.createEvent(EVENT_TYPES.PRODUCT.UPDATED, {
       name: data.name,
       description: data.description,
       category: data.category,
@@ -85,7 +86,7 @@ export class Product extends AggregateRoot {
     }
 
     const previousLevel = this.stockLevel;
-    const event = this.createEvent('ProductStockUpdated', {
+    const event = this.createEvent(EVENT_TYPES.PRODUCT.STOCK_UPDATED, {
       previousLevel,
       newLevel: quantity,
       difference: quantity - previousLevel,
@@ -101,7 +102,7 @@ export class Product extends AggregateRoot {
       return; // Already active
     }
 
-    const event = this.createEvent('ProductActivated', {});
+    const event = this.createEvent(EVENT_TYPES.PRODUCT.ACTIVATED, {});
     this.addEvent(event);
     this.apply(event);
   }
@@ -111,13 +112,13 @@ export class Product extends AggregateRoot {
       return; // Already inactive
     }
 
-    const event = this.createEvent('ProductDeactivated', {});
+    const event = this.createEvent(EVENT_TYPES.PRODUCT.DEACTIVATED, {});
     this.addEvent(event);
     this.apply(event);
   }
 
   delete(): void {
-    const event = this.createEvent('ProductDeleted', {});
+    const event = this.createEvent(EVENT_TYPES.PRODUCT.DELETED, {});
     this.addEvent(event);
     this.apply(event);
   }
@@ -156,7 +157,7 @@ export class Product extends AggregateRoot {
 
   protected apply(event: DomainEvent): void {
     switch (event.type) {
-      case 'ProductCreated':
+      case EVENT_TYPES.PRODUCT.CREATED:
         this.sku = event.data['sku'] as string;
         this.name = event.data['name'] as string;
         this.description = event.data['description'] as string | undefined;
@@ -173,7 +174,7 @@ export class Product extends AggregateRoot {
           | undefined;
         break;
 
-      case 'ProductUpdated':
+      case EVENT_TYPES.PRODUCT.UPDATED:
         if (event.data['name'] !== undefined) {
           this.name = event.data['name'] as string;
         }
@@ -200,19 +201,19 @@ export class Product extends AggregateRoot {
         }
         break;
 
-      case 'ProductStockUpdated':
+      case EVENT_TYPES.PRODUCT.STOCK_UPDATED:
         this.stockLevel = event.data['newLevel'] as number;
         break;
 
-      case 'ProductActivated':
+      case EVENT_TYPES.PRODUCT.ACTIVATED:
         this.isActive = true;
         break;
 
-      case 'ProductDeactivated':
+      case EVENT_TYPES.PRODUCT.DEACTIVATED:
         this.isActive = false;
         break;
 
-      case 'ProductDeleted':
+      case EVENT_TYPES.PRODUCT.DELETED:
         this.isActive = false;
         break;
 

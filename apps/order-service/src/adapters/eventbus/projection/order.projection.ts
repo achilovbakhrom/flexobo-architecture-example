@@ -1,12 +1,3 @@
-/**
- * Order Projection
- *
- * Pure read model updater - receives order events and updates the denormalized view.
- * This component has a single responsibility: keeping the read model in sync with events.
- *
- * NO command execution or side effects - that belongs in workflow handlers.
- */
-
 import {
   Injectable,
   Inject,
@@ -59,7 +50,7 @@ export class OrderProjection implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.ORDER.PROJECTIONS);
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.ORDER.PROJECTION);
     }
   }
 
@@ -71,7 +62,7 @@ export class OrderProjection implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.ORDER.PROJECTIONS,
+      QUEUES.ORDER.PROJECTION,
       [ROUTING_KEYS.ORDER.ALL],
       async (message: IncomingMessage) => {
         await this.handleEvent(message);
@@ -83,7 +74,7 @@ export class OrderProjection implements OnModuleInit, OnModuleDestroy {
     );
 
     this.isSubscribed = true;
-    this.logger.log(`Order projection subscribed to queue: ${QUEUES.ORDER.PROJECTIONS}`);
+    this.logger.log(`Subscribed to queue: ${QUEUES.ORDER.PROJECTION}`);
   }
 
   private async handleEvent(message: IncomingMessage): Promise<void> {

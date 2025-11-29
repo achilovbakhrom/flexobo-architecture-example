@@ -1,31 +1,27 @@
-// ============================================================
-// Exchange Names
-// ============================================================
 export const EXCHANGES = {
   EVENTS: 'flexobo.events',
   DEAD_LETTER: 'flexobo.dlx',
 } as const;
 
-// ============================================================
-// Queue Names
-// ============================================================
 export const QUEUES = {
   ORDER: {
-    PROJECTIONS: 'order-service.order-projections',
+    PROJECTION: 'order-service.order-projection',
     HISTORY: 'order-service.order-history',
+    HANDLER: 'order-service.on-order-events',
   },
   PRODUCT: {
-    PROJECTIONS: 'order-service.product-projections',
+    PROJECTION: 'order-service.product-projection',
   },
   PAYMENT: {
-    PROJECTIONS: 'order-service.payment-projections',
+    PROJECTION: 'order-service.payment-projection',
+    HANDLER: 'order-service.on-payment-events',
+  },
+  INVENTORY: {
+    HANDLER: 'order-service.on-inventory-events',
   },
   DEAD_LETTER: 'order-service.dead-letter',
 } as const;
 
-// ============================================================
-// Routing Keys
-// ============================================================
 export const ROUTING_KEYS = {
   ORDER: {
     CREATED: 'order.created',
@@ -63,9 +59,6 @@ export const ROUTING_KEYS = {
   },
 } as const;
 
-// ============================================================
-// Event Types (Domain Events - PascalCase)
-// ============================================================
 export const ORDER_EVENTS = {
   CREATED: 'order.created',
   ITEM_ADDED: 'order.item_added',

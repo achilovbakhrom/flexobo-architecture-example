@@ -19,7 +19,8 @@ import { TestController } from './adapters/http/v1/test.controller';
 import { ORDER_AGGREGATE_STORE } from './ports/order-store.port';
 import { ORDER_READ_MODEL_REPOSITORY } from './ports/order-read-model.port';
 import { PRODUCT_EVENT_REPOSITORY, PRODUCT_READ_MODEL_REPOSITORY } from './ports/product.repository.port';
-import { PAYMENT_EVENT_REPOSITORY, PAYMENT_READ_MODEL_REPOSITORY } from './ports/payment.repository.port';
+import { PAYMENT_AGGREGATE_STORE } from './ports/payment-store.port';
+import { PAYMENT_READ_MODEL_REPOSITORY } from './ports/payment.repository.port';
 import { ORDER_HISTORY_REPOSITORY } from './ports/order-history.repository.port';
 import { DEAD_LETTER_REPOSITORY } from './ports/dead-letter.repository.port';
 
@@ -27,22 +28,21 @@ import { OrderAggregateStore } from './adapters/persistence/order-aggregate.stor
 import { PrismaOrderReadModelRepository } from './adapters/persistence/prisma-order-read-model.repository';
 import { EventSourcedProductRepository } from './adapters/persistence/event-sourced-product.repository';
 import { PrismaProductReadModelRepository } from './adapters/persistence/prisma-product-read-model.repository';
-import { EventSourcedPaymentRepository } from './adapters/persistence/event-sourced-payment.repository';
+import { PaymentAggregateStore } from './adapters/persistence/payment-aggregate.store';
 import { PrismaPaymentReadModelRepository } from './adapters/persistence/prisma-payment-read-model.repository';
 import { PrismaOrderHistoryRepository } from './adapters/persistence/prisma-order-history.repository';
 import { PrismaDeadLetterRepository } from './adapters/persistence/prisma-dead-letter.repository';
 
 import {
+  OnOrderEventsHandler,
+  OnPaymentEventsHandler,
+  OnInventoryEventsHandler,
+  DeadLetterHandler,
   OrderProjection,
   PaymentProjection,
   ProductProjection,
-  OnPaymentEventsHandler,
-  OnOrderEventsHandler,
-  OrderHistoryEventConsumer,
-  DeadLetterConsumer,
+  OrderHistoryProjection,
 } from './adapters/eventbus';
-
-import { InventoryEventHandler } from './adapters/messaging/inventory-event.handler';
 
 import {
   CreateOrderHandler,
@@ -209,7 +209,7 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
     { provide: ORDER_READ_MODEL_REPOSITORY, useClass: PrismaOrderReadModelRepository },
     { provide: PRODUCT_EVENT_REPOSITORY, useClass: EventSourcedProductRepository },
     { provide: PRODUCT_READ_MODEL_REPOSITORY, useClass: PrismaProductReadModelRepository },
-    { provide: PAYMENT_EVENT_REPOSITORY, useClass: EventSourcedPaymentRepository },
+    { provide: PAYMENT_AGGREGATE_STORE, useClass: PaymentAggregateStore },
     { provide: PAYMENT_READ_MODEL_REPOSITORY, useClass: PrismaPaymentReadModelRepository },
     { provide: ORDER_HISTORY_REPOSITORY, useClass: PrismaOrderHistoryRepository },
     { provide: DEAD_LETTER_REPOSITORY, useClass: PrismaDeadLetterRepository },
@@ -217,13 +217,12 @@ import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
     OrderProjection,
     PaymentProjection,
     ProductProjection,
-    OrderHistoryEventConsumer,
-    DeadLetterConsumer,
+    OrderHistoryProjection,
 
-    OnPaymentEventsHandler,
     OnOrderEventsHandler,
-
-    InventoryEventHandler,
+    OnPaymentEventsHandler,
+    OnInventoryEventsHandler,
+    DeadLetterHandler,
 
     CheckoutUseCase,
 

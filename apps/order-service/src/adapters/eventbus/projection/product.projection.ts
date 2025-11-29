@@ -1,12 +1,3 @@
-/**
- * Product Projection
- *
- * Pure read model updater - receives product events and updates the denormalized view.
- * This component has a single responsibility: keeping the read model in sync with events.
- *
- * NO command execution or side effects.
- */
-
 import {
   Injectable,
   Inject,
@@ -57,7 +48,7 @@ export class ProductProjection implements OnModuleInit, OnModuleDestroy {
 
   async onModuleDestroy() {
     if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.PRODUCT.PROJECTIONS);
+      await this.rabbitMQConsumer.unsubscribe(QUEUES.PRODUCT.PROJECTION);
     }
   }
 
@@ -69,7 +60,7 @@ export class ProductProjection implements OnModuleInit, OnModuleDestroy {
     }
 
     await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.PRODUCT.PROJECTIONS,
+      QUEUES.PRODUCT.PROJECTION,
       [ROUTING_KEYS.PRODUCT.ALL],
       async (message: IncomingMessage) => {
         await this.handleEvent(message);
@@ -81,7 +72,7 @@ export class ProductProjection implements OnModuleInit, OnModuleDestroy {
     );
 
     this.isSubscribed = true;
-    this.logger.log(`Product projection subscribed to queue: ${QUEUES.PRODUCT.PROJECTIONS}`);
+    this.logger.log(`Product projection subscribed to queue: ${QUEUES.PRODUCT.PROJECTION}`);
   }
 
   private async handleEvent(message: IncomingMessage): Promise<void> {
