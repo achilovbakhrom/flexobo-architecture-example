@@ -65,7 +65,7 @@ apps/
 
 libs/
 ├── core/                    # CQRS, event sourcing, messaging
-└── shared-kernel/           # Common utilities
+└── shared-kernel/           # Event contracts, value objects
 
 infrastructure/
 └── docker-compose.yml       # Shared RabbitMQ, Infisical
@@ -78,6 +78,50 @@ infrastructure/
 - **Hexagonal Architecture** - Ports and adapters
 - **Outbox Pattern** - Reliable event publishing
 - **Projections** - Event handlers that update read models
+- **Shared Kernel** - Cross-service event contracts
+
+---
+
+## Shared Kernel
+
+The `@flexobo/shared-kernel` library contains contracts shared across microservices.
+
+### Event Contracts
+
+```typescript
+import { EVENT_TYPES, ROUTING_KEYS, EXCHANGES } from '@flexobo/shared-kernel';
+
+// Domain event types (for event sourcing)
+EVENT_TYPES.ORDER.CREATED    // 'OrderCreated'
+EVENT_TYPES.PAYMENT.COMPLETED // 'PaymentCompleted'
+
+// Routing keys (for RabbitMQ subscriptions)
+ROUTING_KEYS.ORDER.CREATED   // 'order.created'
+ROUTING_KEYS.ORDER.ALL       // 'order.*'
+
+// Exchange names
+EXCHANGES.EVENTS             // 'flexobo.events'
+```
+
+### When to Use
+
+- **Listening to events from another service** - Import `ROUTING_KEYS` and `EVENT_TYPES`
+- **Publishing events** - Events are published automatically via outbox, use `EVENT_TYPES` in aggregates
+
+### Service-Specific Queues
+
+Each service defines its own queue names locally (not shared):
+
+```typescript
+// apps/order-service/src/domain/events/event.constants.ts
+export const QUEUES = {
+  ORDER: {
+    PROJECTION: 'order-service.order-projection',
+    HANDLER: 'order-service.on-order-events',
+  },
+  // ...
+} as const;
+```
 
 ---
 
