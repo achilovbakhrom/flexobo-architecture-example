@@ -1,5 +1,8 @@
 # Flexobo Microservices Architecture
 
+[![CI](https://github.com/achilovbakhrom/flexobo-architecture-example/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/achilovbakhrom/flexobo-architecture-example/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/achilovbakhrom/flexobo-architecture-example/branch/dev/graph/badge.svg)](https://codecov.io/gh/achilovbakhrom/flexobo-architecture-example)
+
 Enterprise-grade microservices example with event sourcing, CQRS, and domain-driven design.
 
 ## Quick Start
