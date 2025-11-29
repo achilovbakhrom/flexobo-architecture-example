@@ -1,14 +1,10 @@
 /**
- * Order Event Consumer (Projection)
+ * Order Projection
  *
- * Subscribes to order events from RabbitMQ and updates the read model.
- * This is a projection in the CQRS pattern - it listens to events published
- * by the outbox worker and updates the denormalized read model for queries.
+ * Pure read model updater - receives order events and updates the denormalized view.
+ * This component has a single responsibility: keeping the read model in sync with events.
  *
- * Flow:
- * 1. Command handler saves aggregate -> events go to outbox
- * 2. OutboxWorker publishes events to RabbitMQ
- * 3. This consumer receives events and updates read model
+ * NO command execution or side effects - that belongs in workflow handlers.
  */
 
 import {
@@ -22,20 +18,18 @@ import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
-  CommandBus,
 } from '@flexobo/core';
 import {
   IOrderReadModelRepository,
   ORDER_READ_MODEL_REPOSITORY,
-} from '../../ports/order-read-model.port';
-import { OrderItemDto } from '../../application/dto/order.dto';
+} from '../../../ports/order-read-model.port';
+import { OrderItemDto } from '../../../application/dto/order.dto';
 import {
   ROUTING_KEYS,
   EVENT_TYPES,
   QUEUES,
-} from '../../domain/events/event.constants';
+} from '../../../domain/events/event.constants';
 import { randomUUID } from 'crypto';
-import { RefundPaymentCommand } from '../../application/commands/payment.commands';
 
 interface OrderEventPayload {
   aggregateId: string;
@@ -48,20 +42,19 @@ interface OrderEventPayload {
 }
 
 @Injectable()
-export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(OrderEventConsumer.name);
+export class OrderProjection implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(OrderProjection.name);
   private isSubscribed = false;
 
   constructor(
     @Inject(ORDER_READ_MODEL_REPOSITORY)
     private readonly readModelRepository: IOrderReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer,
-    private readonly commandBus: CommandBus
+    private readonly rabbitMQConsumer: RabbitMQConsumer
   ) {}
 
   async onModuleInit() {
-    await this.subscribeToOrderEvents();
+    await this.subscribe();
   }
 
   async onModuleDestroy() {
@@ -70,14 +63,10 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /**
-   * Subscribe to order events from RabbitMQ
-   * Fails fast if RabbitMQ is not connected
-   */
-  private async subscribeToOrderEvents(): Promise<void> {
+  private async subscribe(): Promise<void> {
     if (!this.rabbitMQConsumer.isConnected()) {
       throw new Error(
-        'RabbitMQ is not connected. Cannot start order event consumer.'
+        'RabbitMQ is not connected. Cannot start order projection.'
       );
     }
 
@@ -85,7 +74,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
       QUEUES.ORDER.PROJECTIONS,
       [ROUTING_KEYS.ORDER.ALL],
       async (message: IncomingMessage) => {
-        await this.handleOrderEvent(message);
+        await this.handleEvent(message);
       },
       {
         durable: true,
@@ -94,53 +83,47 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     );
 
     this.isSubscribed = true;
-    this.logger.log(
-      `Order projection subscribed to queue: ${QUEUES.ORDER.PROJECTIONS}`
-    );
+    this.logger.log(`Order projection subscribed to queue: ${QUEUES.ORDER.PROJECTIONS}`);
   }
 
-  /**
-   * Route incoming order event to appropriate handler
-   */
-  private async handleOrderEvent(message: IncomingMessage): Promise<void> {
+  private async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as OrderEventPayload;
 
     this.logger.debug(
-      `Received order event: ${payload.type} for aggregate ${payload.aggregateId} (version: ${payload.version})`
+      `[Projection] Order event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
     );
 
-    // Framework auto-acks on success, auto-nacks on error
     switch (payload.type) {
       case EVENT_TYPES.ORDER.CREATED:
-        await this.handleOrderCreated(payload);
+        await this.onOrderCreated(payload);
         break;
 
       case EVENT_TYPES.ORDER.ITEM_ADDED:
-        await this.handleOrderItemAdded(payload);
+        await this.onOrderItemAdded(payload);
         break;
 
       case EVENT_TYPES.ORDER.CONFIRMED:
-        await this.handleOrderConfirmed(payload);
+        await this.onOrderConfirmed(payload);
         break;
 
       case EVENT_TYPES.ORDER.CANCELLED:
-        await this.handleOrderCancelled(payload);
+        await this.onOrderCancelled(payload);
         break;
 
       case EVENT_TYPES.ORDER.SHIPPED:
-        await this.handleOrderShipped(payload);
+        await this.onOrderShipped(payload);
         break;
 
       case EVENT_TYPES.ORDER.INVENTORY_RESERVED:
-        await this.handleOrderInventoryReserved(payload);
+        await this.onOrderInventoryReserved(payload);
         break;
 
       case EVENT_TYPES.ORDER.INVENTORY_FAILED:
-        await this.handleOrderInventoryFailed(payload);
+        await this.onOrderInventoryFailed(payload);
         break;
 
       case EVENT_TYPES.ORDER.PAID:
-        await this.handleOrderPaid(payload);
+        await this.onOrderPaid(payload);
         break;
 
       default:
@@ -148,11 +131,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderCreated(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderCreated: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderCreated(event: OrderEventPayload): Promise<void> {
     await this.readModelRepository.upsert(
       {
         id: event.aggregateId,
@@ -168,11 +147,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async handleOrderItemAdded(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderItemAdded: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderItemAdded(event: OrderEventPayload): Promise<void> {
     const item = event.data['item'] as OrderItemDto;
 
     await this.readModelRepository.saveItem({
@@ -208,11 +183,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderConfirmed(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderConfirmed: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderConfirmed(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(
@@ -231,37 +202,9 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderCancelled(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderCancelled: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderCancelled(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
-      // Check if there was a payment that needs to be refunded
-      const paymentId = event.data['paymentId'] as string | undefined;
-      const reason = (event.data['reason'] as string) || 'Order cancelled';
-
-      if (paymentId) {
-        // Initiate refund for the payment
-        this.logger.log(
-          `Order ${event.aggregateId} cancelled with payment ${paymentId}, initiating refund`
-        );
-        try {
-          const refundCommand = new RefundPaymentCommand(paymentId, 0, reason);
-          const result = await this.commandBus.execute(refundCommand);
-          if (result.isSuccess) {
-            this.logger.log(`Payment ${paymentId} refund initiated`);
-          } else {
-            this.logger.error(
-              `Failed to refund payment ${paymentId}: ${result.error?.message}`
-            );
-          }
-        } catch (error) {
-          this.logger.error(`Error refunding payment ${paymentId}`, error);
-        }
-      }
-
       await this.readModelRepository.upsert(
         {
           id: order.id,
@@ -278,11 +221,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderShipped(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderShipped: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderShipped(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(
@@ -301,13 +240,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderInventoryReserved(
-    event: OrderEventPayload
-  ): Promise<void> {
-    this.logger.debug(
-      `Processing OrderInventoryReserved: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderInventoryReserved(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(
@@ -326,13 +259,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderInventoryFailed(
-    event: OrderEventPayload
-  ): Promise<void> {
-    this.logger.debug(
-      `Processing OrderInventoryFailed: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderInventoryFailed(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(
@@ -351,11 +278,7 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleOrderPaid(event: OrderEventPayload): Promise<void> {
-    this.logger.debug(
-      `Processing OrderPaid: ${event.aggregateId} (version: ${event.version})`
-    );
-
+  private async onOrderPaid(event: OrderEventPayload): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(

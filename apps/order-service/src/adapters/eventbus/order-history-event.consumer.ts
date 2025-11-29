@@ -39,9 +39,7 @@ interface OrderEventPayload {
 }
 
 @Injectable()
-export class OrderHistoryEventConsumer
-  implements OnModuleInit, OnModuleDestroy
-{
+export class OrderHistoryEventConsumer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OrderHistoryEventConsumer.name);
   private isSubscribed = false;
 
@@ -125,9 +123,7 @@ export class OrderHistoryEventConsumer
         break;
 
       default:
-        this.logger.warn(
-          `Unknown order event type for history: ${payload.type}`
-        );
+        this.logger.warn(`Unknown order event type for history: ${payload.type}`);
     }
   }
 

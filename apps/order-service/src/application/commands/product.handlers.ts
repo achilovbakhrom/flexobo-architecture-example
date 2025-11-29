@@ -6,7 +6,6 @@
  */
 
 import { CommandHandler, ICommandHandler, Result, Success } from '@flexobo/core';
-import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
   IProductEventRepository,
   IProductReadModelRepository,
@@ -31,8 +30,7 @@ export class CreateProductHandler
     @Inject(PRODUCT_EVENT_REPOSITORY)
     private readonly eventRepository: IProductEventRepository,
     @Inject(PRODUCT_READ_MODEL_REPOSITORY)
-    private readonly readModelRepository: IProductReadModelRepository,
-    private readonly eventEmitter: EventEmitter2
+    private readonly readModelRepository: IProductReadModelRepository
   ) {}
 
   async execute(
@@ -76,19 +74,6 @@ export class CreateProductHandler
         0 // New aggregate starts at version 0
       );
 
-      // Emit events for projections
-      for (const event of events) {
-        await this.eventEmitter.emitAsync(
-          `product.${this.toSnakeCase(event.type)}`,
-          {
-            aggregateId: command.productId,
-            eventType: event.type,
-            data: event.data,
-            version: event.version,
-          }
-        );
-      }
-
       // Return current state
       const details = product.getDetails();
       return new Success({
@@ -110,10 +95,6 @@ export class CreateProductHandler
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
-
-  private toSnakeCase(str: string): string {
-    return str.replace(/([A-Z])/g, '_$1').toLowerCase().slice(1);
-  }
 }
 
 @CommandHandler(UpdateProductCommand)
@@ -122,8 +103,7 @@ export class UpdateProductHandler
 {
   constructor(
     @Inject(PRODUCT_EVENT_REPOSITORY)
-    private readonly eventRepository: IProductEventRepository,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventRepository: IProductEventRepository
   ) {}
 
   async execute(
@@ -189,19 +169,6 @@ export class UpdateProductHandler
           })),
           currentVersion
         );
-
-        // Emit events for projections
-        for (const event of newEvents) {
-          await this.eventEmitter.emitAsync(
-            `product.${this.toSnakeCase(event.type)}`,
-            {
-              aggregateId: command.productId,
-              eventType: event.type,
-              data: event.data,
-              version: event.version,
-            }
-          );
-        }
       }
 
       // Return current state
@@ -225,10 +192,6 @@ export class UpdateProductHandler
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
   }
-
-  private toSnakeCase(str: string): string {
-    return str.replace(/([A-Z])/g, '_$1').toLowerCase().slice(1);
-  }
 }
 
 @CommandHandler(DeleteProductCommand)
@@ -237,8 +200,7 @@ export class DeleteProductHandler
 {
   constructor(
     @Inject(PRODUCT_EVENT_REPOSITORY)
-    private readonly eventRepository: IProductEventRepository,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventRepository: IProductEventRepository
   ) {}
 
   async execute(
@@ -283,29 +245,12 @@ export class DeleteProductHandler
           })),
           currentVersion
         );
-
-        // Emit events for projections
-        for (const event of newEvents) {
-          await this.eventEmitter.emitAsync(
-            `product.${this.toSnakeCase(event.type)}`,
-            {
-              aggregateId: command.productId,
-              eventType: event.type,
-              data: event.data,
-              version: event.version,
-            }
-          );
-        }
       }
 
       return new Success(true);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
-  }
-
-  private toSnakeCase(str: string): string {
-    return str.replace(/([A-Z])/g, '_$1').toLowerCase().slice(1);
   }
 }
 
@@ -315,8 +260,7 @@ export class UpdateProductStockHandler
 {
   constructor(
     @Inject(PRODUCT_EVENT_REPOSITORY)
-    private readonly eventRepository: IProductEventRepository,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventRepository: IProductEventRepository
   ) {}
 
   async execute(
@@ -361,28 +305,11 @@ export class UpdateProductStockHandler
           })),
           currentVersion
         );
-
-        // Emit events for projections
-        for (const event of newEvents) {
-          await this.eventEmitter.emitAsync(
-            `product.${this.toSnakeCase(event.type)}`,
-            {
-              aggregateId: command.productId,
-              eventType: event.type,
-              data: event.data,
-              version: event.version,
-            }
-          );
-        }
       }
 
       return new Success(undefined);
     } catch (error) {
       return { isSuccess: false, isFailure: true, error: error as Error };
     }
-  }
-
-  private toSnakeCase(str: string): string {
-    return str.replace(/([A-Z])/g, '_$1').toLowerCase().slice(1);
   }
 }

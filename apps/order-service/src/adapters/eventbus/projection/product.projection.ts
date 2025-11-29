@@ -1,9 +1,10 @@
 /**
- * Product Event Consumer (Projection)
+ * Product Projection
  *
- * Subscribes to product events from RabbitMQ and updates the read model.
- * This is a projection in the CQRS pattern - it listens to events published
- * by the outbox worker and updates the denormalized read model for queries.
+ * Pure read model updater - receives product events and updates the denormalized view.
+ * This component has a single responsibility: keeping the read model in sync with events.
+ *
+ * NO command execution or side effects.
  */
 
 import {
@@ -21,12 +22,12 @@ import {
 import {
   IProductReadModelRepository,
   PRODUCT_READ_MODEL_REPOSITORY,
-} from '../../ports/product.repository.port';
+} from '../../../ports/product.repository.port';
 import {
   ROUTING_KEYS,
   EVENT_TYPES,
   QUEUES,
-} from '../../domain/events/event.constants';
+} from '../../../domain/events/event.constants';
 
 interface ProductEventPayload {
   aggregateId: string;
@@ -39,8 +40,8 @@ interface ProductEventPayload {
 }
 
 @Injectable()
-export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ProductEventConsumer.name);
+export class ProductProjection implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(ProductProjection.name);
   private isSubscribed = false;
 
   constructor(
@@ -51,7 +52,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   async onModuleInit() {
-    await this.subscribeToProductEvents();
+    await this.subscribe();
   }
 
   async onModuleDestroy() {
@@ -60,10 +61,10 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async subscribeToProductEvents(): Promise<void> {
+  private async subscribe(): Promise<void> {
     if (!this.rabbitMQConsumer.isConnected()) {
       throw new Error(
-        'RabbitMQ is not connected. Cannot start product event consumer.'
+        'RabbitMQ is not connected. Cannot start product projection.'
       );
     }
 
@@ -71,7 +72,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
       QUEUES.PRODUCT.PROJECTIONS,
       [ROUTING_KEYS.PRODUCT.ALL],
       async (message: IncomingMessage) => {
-        await this.handleProductEvent(message);
+        await this.handleEvent(message);
       },
       {
         durable: true,
@@ -80,42 +81,39 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     );
 
     this.isSubscribed = true;
-    this.logger.log(
-      `Product projection subscribed to queue: ${QUEUES.PRODUCT.PROJECTIONS}`
-    );
+    this.logger.log(`Product projection subscribed to queue: ${QUEUES.PRODUCT.PROJECTIONS}`);
   }
 
-  private async handleProductEvent(message: IncomingMessage): Promise<void> {
+  private async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as ProductEventPayload;
 
     this.logger.debug(
-      `Received product event: ${payload.type} for aggregate ${payload.aggregateId}`
+      `[Projection] Product event: ${payload.type} for ${payload.aggregateId}`
     );
 
-    // Framework auto-acks on success, auto-nacks on error
     switch (payload.type) {
       case EVENT_TYPES.PRODUCT.CREATED:
-        await this.handleProductCreated(payload);
+        await this.onProductCreated(payload);
         break;
 
       case EVENT_TYPES.PRODUCT.UPDATED:
-        await this.handleProductUpdated(payload);
+        await this.onProductUpdated(payload);
         break;
 
       case EVENT_TYPES.PRODUCT.STOCK_UPDATED:
-        await this.handleProductStockUpdated(payload);
+        await this.onProductStockUpdated(payload);
         break;
 
       case EVENT_TYPES.PRODUCT.ACTIVATED:
-        await this.handleProductActivated(payload);
+        await this.onProductActivated(payload);
         break;
 
       case EVENT_TYPES.PRODUCT.DEACTIVATED:
-        await this.handleProductDeactivated(payload);
+        await this.onProductDeactivated(payload);
         break;
 
       case EVENT_TYPES.PRODUCT.DELETED:
-        await this.handleProductDeleted(payload);
+        await this.onProductDeleted(payload);
         break;
 
       default:
@@ -123,11 +121,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductCreated(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductCreated: ${event.aggregateId}`);
-
+  private async onProductCreated(event: ProductEventPayload): Promise<void> {
     await this.readModelRepository.upsert({
       id: event.aggregateId,
       sku: event.data['sku'] as string,
@@ -144,11 +138,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async handleProductUpdated(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductUpdated: ${event.aggregateId}`);
-
+  private async onProductUpdated(event: ProductEventPayload): Promise<void> {
     const product = await this.readModelRepository.findById(event.aggregateId);
     if (product) {
       await this.readModelRepository.upsert({
@@ -181,11 +171,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductStockUpdated(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductStockUpdated: ${event.aggregateId}`);
-
+  private async onProductStockUpdated(event: ProductEventPayload): Promise<void> {
     const product = await this.readModelRepository.findById(event.aggregateId);
     if (product) {
       await this.readModelRepository.upsert({
@@ -205,11 +191,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductActivated(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductActivated: ${event.aggregateId}`);
-
+  private async onProductActivated(event: ProductEventPayload): Promise<void> {
     const product = await this.readModelRepository.findById(event.aggregateId);
     if (product) {
       await this.readModelRepository.upsert({
@@ -229,11 +211,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductDeactivated(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductDeactivated: ${event.aggregateId}`);
-
+  private async onProductDeactivated(event: ProductEventPayload): Promise<void> {
     const product = await this.readModelRepository.findById(event.aggregateId);
     if (product) {
       await this.readModelRepository.upsert({
@@ -253,12 +231,7 @@ export class ProductEventConsumer implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async handleProductDeleted(
-    event: ProductEventPayload
-  ): Promise<void> {
-    this.logger.debug(`Processing ProductDeleted: ${event.aggregateId}`);
-
-    // Soft delete - mark as inactive instead of removing
+  private async onProductDeleted(event: ProductEventPayload): Promise<void> {
     const product = await this.readModelRepository.findById(event.aggregateId);
     if (product) {
       await this.readModelRepository.upsert({

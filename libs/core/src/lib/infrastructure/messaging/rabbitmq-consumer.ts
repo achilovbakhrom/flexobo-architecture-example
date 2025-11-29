@@ -91,11 +91,10 @@ export class RabbitMQConsumer
    */
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.logger.log(
-        `Connecting consumer to RabbitMQ: ${this.sanitizeUrl(this.config.url)}`
-      );
+      const url = this.config.url || DEFAULT_RABBITMQ_CONFIG.url!;
+      this.logger.log(`Connecting consumer to RabbitMQ: ${this.sanitizeUrl(url)}`);
 
-      amqp.connect(this.config.url, (err, connection) => {
+      amqp.connect(url, (err, connection) => {
         if (err) {
           this.logger.error(`Failed to connect to RabbitMQ: ${err.message}`);
           return reject(err);
