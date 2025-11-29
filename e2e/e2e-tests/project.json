@@ -12,6 +12,9 @@
         "jestConfig": "e2e/e2e-tests/jest.config.ts",
         "passWithNoTests": false
       }
+    },
+    "test": {
+      "command": "echo 'E2E tests require running services. Use nx run e2e-tests:e2e instead.'"
     }
   }
 }

@@ -15,6 +15,11 @@
         "main": "libs/shared-kernel/src/index.ts",
         "assets": ["libs/shared-kernel/*.md"]
       }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
     }
   }
 }

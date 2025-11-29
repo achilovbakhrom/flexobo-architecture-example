@@ -19,6 +19,7 @@
     "db:studio:admin": "npx prisma studio --config apps/admin-panel/prisma.config.ts --port 5557",
     "db:studio:gateway": "npx prisma studio --config apps/api-gateway/prisma.config.ts --port 5556",
     "test": "npx nx run-many --target=test --all",
+    "test:ci": "npx nx run-many --target=test --all --coverage --coverageReporters=lcov --coverageReporters=text-summary",
     "lint": "npx nx run-many --target=lint --all",
     "build": "npx nx run-many --target=build --all",
     "docker:build:order": "docker build -f apps/order-service/Dockerfile -t flexobo/order-service:latest .",

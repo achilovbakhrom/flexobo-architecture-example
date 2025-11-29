@@ -1,5 +1,6 @@
 import { RedisCache } from '../redis-cache';
 import { CacheConfig } from '../cache.interface';
+// @ts-expect-error ioredis-mock has no type declarations
 import Redis from 'ioredis-mock';
 
 describe('RedisCache', () => {

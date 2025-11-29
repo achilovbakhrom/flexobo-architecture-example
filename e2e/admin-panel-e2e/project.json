@@ -12,6 +12,9 @@
         "passWithNoTests": true
       },
       "dependsOn": ["admin-panel:build", "admin-panel:serve"]
+    },
+    "test": {
+      "command": "echo 'E2E tests require running services. Use nx run admin-panel-e2e:e2e instead.'"
     }
   }
 }
