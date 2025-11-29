@@ -44,13 +44,16 @@ jobs:
         run: npx nx affected -t lint --parallel=3
 
       - name: Test with coverage
-        run: npx nx affected -t test --parallel=3 --coverage --coverageReporters=lcov --coverageReporters=text-summary
+        run: npx nx run-many -t test --all --parallel=3 --coverage --coverageReporters=lcov
+
+      - name: List coverage files
+        run: find coverage -name "lcov.info" -type f 2>/dev/null || echo "No coverage files found"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage/**/lcov.info
+          directory: ./coverage
           fail_ci_if_error: false
           verbose: true
 
