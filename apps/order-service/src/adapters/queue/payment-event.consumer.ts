@@ -17,6 +17,7 @@ import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  CommandBus,
 } from '@flexobo/core';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
@@ -29,6 +30,10 @@ import {
   QUEUES,
   PAYMENT_EVENTS,
 } from '../../domain/events/event.constants';
+import {
+  MarkOrderPaidCommand,
+  RecordPaymentFailedCommand,
+} from '../../application/commands/order.commands';
 
 // Test event type for simulating consumer failures (goes to DLQ after max retries)
 const TEST_POISON_EVENT = 'PaymentPoisonTest';
@@ -53,7 +58,8 @@ export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
     private readonly readModelRepository: IPaymentReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
     private readonly rabbitMQConsumer: RabbitMQConsumer,
-    private readonly eventEmitter: EventEmitter2
+    private readonly eventEmitter: EventEmitter2,
+    private readonly commandBus: CommandBus
   ) {}
 
   async onModuleInit() {
@@ -194,7 +200,29 @@ export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
         updatedAt: new Date(),
       });
 
-      // Emit local event for saga to handle
+      // Mark the order as paid via command (replaces saga)
+      try {
+        const command = new MarkOrderPaidCommand(
+          payment.orderId,
+          event.aggregateId,
+          (event.data['transactionId'] as string) || 'unknown'
+        );
+        const result = await this.commandBus.execute(command);
+        if (result.isSuccess) {
+          this.logger.log(`Order ${payment.orderId} marked as PAID`);
+        } else {
+          this.logger.error(
+            `Failed to mark order ${payment.orderId} as paid: ${result.error?.message}`
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error marking order ${payment.orderId} as paid`,
+          error
+        );
+      }
+
+      // Emit local event for any listeners
       this.eventEmitter.emit(PAYMENT_EVENTS.COMPLETED, {
         aggregateId: event.aggregateId,
         eventType: event.type,
@@ -204,10 +232,6 @@ export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
         },
         version: event.version,
       });
-
-      this.logger.debug(
-        `Emitted local PAYMENT_EVENTS.COMPLETED for saga (orderId: ${payment.orderId})`
-      );
     }
   }
 
@@ -232,7 +256,32 @@ export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
         updatedAt: new Date(),
       });
 
-      // Emit local event for saga to handle
+      // Record payment failure on the order aggregate (replaces saga)
+      // This handles auto-cancellation after max failures
+      try {
+        const command = new RecordPaymentFailedCommand(
+          payment.orderId,
+          event.aggregateId,
+          (event.data['reason'] as string) || 'Payment failed'
+        );
+        const result = await this.commandBus.execute(command);
+        if (result.isSuccess) {
+          this.logger.log(
+            `Recorded payment failure for order ${payment.orderId}`
+          );
+        } else {
+          this.logger.error(
+            `Failed to record payment failure for order ${payment.orderId}: ${result.error?.message}`
+          );
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error recording payment failure for order ${payment.orderId}`,
+          error
+        );
+      }
+
+      // Emit local event for any listeners
       this.eventEmitter.emit(PAYMENT_EVENTS.FAILED, {
         aggregateId: event.aggregateId,
         eventType: event.type,
@@ -242,10 +291,6 @@ export class PaymentEventConsumer implements OnModuleInit, OnModuleDestroy {
         },
         version: event.version,
       });
-
-      this.logger.debug(
-        `Emitted local PAYMENT_EVENTS.FAILED for saga (orderId: ${payment.orderId})`
-      );
     }
   }
 

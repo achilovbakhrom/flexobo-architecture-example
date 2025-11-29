@@ -2,14 +2,17 @@
  * Order Service Module
  *
  * Hexagonal Architecture:
- * - Domain Layer: Pure business logic (aggregates)
+ * - Domain Layer: Pure business logic (aggregates, event sourcing)
  * - Application Layer: Use cases, commands, queries, DTOs
  * - Ports: Interfaces defining boundaries
  * - Adapters (by technology):
  *   - http/v1: REST controllers (API v1)
  *   - persistence: Repositories
- *   - queue: Event consumers (projections/read model updates)
- *   - cache: Redis cache (future)
+ *   - queue: Event consumers (projections/read model updates + workflow orchestration)
+ *   - messaging: RabbitMQ cross-service handlers
+ *
+ * Note: Workflow orchestration (payment failures, refunds) is handled via
+ * event sourcing in the Order aggregate + event consumers, not sagas.
  */
 
 import { Module } from '@nestjs/common';
@@ -17,6 +20,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { CqrsModule } from '@flexobo/core';
 import { EventStoreModule } from '@flexobo/core';
 import { OutboxModule } from '@flexobo/core';
+import { CacheModule } from '@flexobo/core';
 import { PrismaModule } from './prisma.module';
 import {
   MessagingModule,
@@ -94,6 +98,7 @@ import {
   MarkInventoryReservedHandler,
   MarkInventoryFailedHandler,
   MarkOrderPaidHandler,
+  RecordPaymentFailedHandler,
 } from './application/commands/order.handlers';
 
 // ============================================================
@@ -153,10 +158,6 @@ import {
 // ============================================================
 import { CheckoutUseCase } from './application/use-cases/checkout.use-case';
 
-// ============================================================
-// Sagas
-// ============================================================
-import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga';
 
 @Module({
   imports: [
@@ -207,6 +208,7 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
         MarkInventoryReservedHandler,
         MarkInventoryFailedHandler,
         MarkOrderPaidHandler,
+        RecordPaymentFailedHandler,
         CreateProductHandler,
         UpdateProductHandler,
         DeleteProductHandler,
@@ -288,6 +290,21 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
       autoInstrumentation: true,
       global: true,
     }),
+
+    // Redis Cache for saga state persistence
+    CacheModule.forRoot({
+      redis: {
+        host: process.env['REDIS_HOST'] || 'localhost',
+        port: parseInt(process.env['REDIS_PORT'] || '6379', 10),
+        password: process.env['REDIS_PASSWORD'],
+        db: parseInt(process.env['REDIS_DB'] || '0', 10),
+      },
+      cache: {
+        prefix: 'order-service:',
+        defaultTtl: 86400 * 7, // 7 days
+      },
+    }),
+
   ],
   controllers: [
     OrderController,
@@ -369,11 +386,6 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     CheckoutUseCase,
 
     // ============================================================
-    // Sagas - coordinate long-running processes
-    // ============================================================
-    OrderFulfillmentSaga,
-
-    // ============================================================
     // Command Handlers
     // ============================================================
     CreateOrderHandler,
@@ -384,6 +396,7 @@ import { OrderFulfillmentSaga } from './application/sagas/order-fulfillment.saga
     MarkInventoryReservedHandler,
     MarkInventoryFailedHandler,
     MarkOrderPaidHandler,
+    RecordPaymentFailedHandler,
     CreateProductHandler,
     UpdateProductHandler,
     DeleteProductHandler,

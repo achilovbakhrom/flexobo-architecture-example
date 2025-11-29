@@ -22,6 +22,7 @@ import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  CommandBus,
 } from '@flexobo/core';
 import {
   IOrderReadModelRepository,
@@ -34,6 +35,7 @@ import {
   QUEUES,
 } from '../../domain/events/event.constants';
 import { randomUUID } from 'crypto';
+import { RefundPaymentCommand } from '../../application/commands/payment.commands';
 
 interface OrderEventPayload {
   aggregateId: string;
@@ -54,7 +56,8 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
     @Inject(ORDER_READ_MODEL_REPOSITORY)
     private readonly readModelRepository: IOrderReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
+    private readonly rabbitMQConsumer: RabbitMQConsumer,
+    private readonly commandBus: CommandBus
   ) {}
 
   async onModuleInit() {
@@ -235,6 +238,30 @@ export class OrderEventConsumer implements OnModuleInit, OnModuleDestroy {
 
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
+      // Check if there was a payment that needs to be refunded
+      const paymentId = event.data['paymentId'] as string | undefined;
+      const reason = (event.data['reason'] as string) || 'Order cancelled';
+
+      if (paymentId) {
+        // Initiate refund for the payment
+        this.logger.log(
+          `Order ${event.aggregateId} cancelled with payment ${paymentId}, initiating refund`
+        );
+        try {
+          const refundCommand = new RefundPaymentCommand(paymentId, 0, reason);
+          const result = await this.commandBus.execute(refundCommand);
+          if (result.isSuccess) {
+            this.logger.log(`Payment ${paymentId} refund initiated`);
+          } else {
+            this.logger.error(
+              `Failed to refund payment ${paymentId}: ${result.error?.message}`
+            );
+          }
+        } catch (error) {
+          this.logger.error(`Error refunding payment ${paymentId}`, error);
+        }
+      }
+
       await this.readModelRepository.upsert(
         {
           id: order.id,

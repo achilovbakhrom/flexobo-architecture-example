@@ -58,3 +58,11 @@ export class MarkOrderPaidCommand implements ICommand {
     public readonly transactionId: string
   ) {}
 }
+
+export class RecordPaymentFailedCommand implements ICommand {
+  constructor(
+    public readonly orderId: string,
+    public readonly paymentId: string,
+    public readonly reason: string
+  ) {}
+}

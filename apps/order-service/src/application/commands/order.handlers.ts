@@ -19,6 +19,7 @@ import {
   MarkInventoryReservedCommand,
   MarkInventoryFailedCommand,
   MarkOrderPaidCommand,
+  RecordPaymentFailedCommand,
 } from './order.commands';
 
 /**
@@ -285,6 +286,40 @@ export class MarkOrderPaidHandler
       }
 
       order.markPaid(command.paymentId, command.transactionId);
+      await this.store.save(order);
+
+      return new Success(undefined);
+    } catch (error) {
+      return { isSuccess: false, isFailure: true, error: error as Error };
+    }
+  }
+}
+
+@CommandHandler(RecordPaymentFailedCommand)
+export class RecordPaymentFailedHandler
+  implements ICommandHandler<RecordPaymentFailedCommand, void>
+{
+  constructor(
+    @Inject(ORDER_AGGREGATE_STORE)
+    private readonly store: IOrderAggregateStore
+  ) {}
+
+  async execute(
+    command: RecordPaymentFailedCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const order = await this.store.load(command.orderId);
+
+      if (!order) {
+        return {
+          isSuccess: false,
+          isFailure: true,
+          error: new Error(`Order ${command.orderId} not found`),
+        };
+      }
+
+      // recordPaymentFailed handles auto-cancellation after max failures
+      order.recordPaymentFailed(command.paymentId, command.reason);
       await this.store.save(order);
 
       return new Success(undefined);

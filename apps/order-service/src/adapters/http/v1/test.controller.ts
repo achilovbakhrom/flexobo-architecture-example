@@ -4,8 +4,8 @@
  * This controller is for demonstration/testing purposes only.
  * It simulates various error scenarios to show how the system handles failures.
  *
- * Two types of tests:
- * 1. Saga errors (simulate/*) - errors after message ACK, only logged
+ * Test types:
+ * 1. Event simulation (simulate/*) - emit local events for testing handlers
  * 2. Consumer errors (dlq/*) - errors in consumer, go to DLQ after retries
  */
 
@@ -31,7 +31,6 @@ import {
   EXCHANGES,
   ROUTING_KEYS,
 } from '../../../domain/events/event.constants';
-import { OrderFulfillmentSaga } from '../../../application/sagas/order-fulfillment.saga';
 import { MESSAGE_PUBLISHER, IMessagePublisher } from '@flexobo/core';
 
 class SimulatePaymentFailedDto {
@@ -123,7 +122,6 @@ export class TestController {
 
   constructor(
     private readonly eventEmitter: EventEmitter2,
-    private readonly saga: OrderFulfillmentSaga,
     @Inject(MESSAGE_PUBLISHER)
     private readonly messagePublisher: IMessagePublisher
   ) {}
@@ -133,8 +131,8 @@ export class TestController {
    *
    * This bypasses RabbitMQ entirely and directly emits to EventEmitter2.
    * Use this to test:
-   * - Saga handling of payment failures
-   * - What happens when saga tries to cancel a non-existent order
+   * - Event handler processing of payment failures
+   * - What happens when handler tries to update a non-existent order
    * - Error logging behavior
    */
   @Post('simulate/payment-failed')
@@ -142,12 +140,12 @@ export class TestController {
   @ApiOperation({
     summary: 'Simulate PaymentFailed event',
     description: `
-      Directly emits a PAYMENT_EVENTS.FAILED event to test saga error handling.
+      Directly emits a PAYMENT_EVENTS.FAILED event to test event handling.
 
       Test scenarios:
       1. Use a real orderId to test normal flow
-      2. Use a fake orderId (e.g., "non-existent-order") to see saga error handling
-      3. Check logs to see how errors are handled after message would be ACKed
+      2. Use a fake orderId (e.g., "non-existent-order") to see error handling
+      3. Check logs to see how errors are handled
     `,
   })
   @ApiBody({ type: SimulatePaymentFailedDto })
@@ -172,7 +170,7 @@ export class TestController {
 
     return {
       message: 'PaymentFailed event emitted',
-      note: 'Check server logs to see saga handling. If orderId does not exist, you will see error logged but no retry.',
+      note: 'Check server logs to see event handling. Order aggregate tracks payment failures and auto-cancels after 3 failures.',
       emittedEvent: {
         type: PAYMENT_EVENTS.FAILED,
         paymentId,
@@ -186,7 +184,7 @@ export class TestController {
    * Simulates a PaymentCompleted event being emitted locally.
    *
    * Use this to test:
-   * - Saga marking order as paid
+   * - Handler marking order as paid
    * - What happens when trying to mark a non-existent order as paid
    */
   @Post('simulate/payment-completed')
@@ -198,7 +196,7 @@ export class TestController {
 
       Test scenarios:
       1. Use a real orderId with INVENTORY_RESERVED status to test normal flow
-      2. Use a fake orderId to see saga error handling
+      2. Use a fake orderId to see error handling
       3. Use an orderId with wrong status to see domain validation errors
     `,
   })
@@ -225,7 +223,7 @@ export class TestController {
 
     return {
       message: 'PaymentCompleted event emitted',
-      note: 'Check server logs to see saga handling.',
+      note: 'Check server logs to see event handling.',
       emittedEvent: {
         type: PAYMENT_EVENTS.COMPLETED,
         paymentId,
@@ -266,7 +264,7 @@ export class TestController {
 
     return {
       message: 'PaymentRefunded event emitted',
-      note: 'Check server logs to see saga handling.',
+      note: 'Check server logs to see event handling.',
       emittedEvent: {
         type: PAYMENT_EVENTS.REFUNDED,
         paymentId,
@@ -274,26 +272,6 @@ export class TestController {
         amount: dto.amount || 100,
         reason: dto.reason || 'Simulated refund',
       },
-    };
-  }
-
-  /**
-   * Get current saga states for debugging
-   */
-  @Post('saga/states')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({
-    summary: 'Get active saga states',
-    description: 'Returns all active saga states in memory (for debugging)',
-  })
-  @ApiResponse({ status: 200, description: 'Saga states retrieved' })
-  async getSagaStates() {
-    const activeSagas = this.saga.getActiveSagas();
-
-    return {
-      count: activeSagas.length,
-      sagas: activeSagas,
-      note: 'These are in-memory states. Lost on service restart.',
     };
   }
 

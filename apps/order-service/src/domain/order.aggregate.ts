@@ -27,6 +27,10 @@ export class Order extends AggregateRoot {
   private totalAmount = 0;
   private currency = 'USD';
   private trackingNumber?: string;
+  private paymentId?: string;
+  private failedPaymentCount = 0;
+
+  static readonly MAX_PAYMENT_FAILURES = 3;
 
   static create(orderId: string, userId: string): Order {
     const order = new Order(orderId);
@@ -65,6 +69,8 @@ export class Order extends AggregateRoot {
       totalAmount: number;
       currency: string;
       trackingNumber?: string;
+      paymentId?: string;
+      failedPaymentCount?: number;
     },
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
@@ -78,6 +84,8 @@ export class Order extends AggregateRoot {
     order.totalAmount = snapshotData.totalAmount;
     order.currency = snapshotData.currency;
     order.trackingNumber = snapshotData.trackingNumber;
+    order.paymentId = snapshotData.paymentId;
+    order.failedPaymentCount = snapshotData.failedPaymentCount ?? 0;
     order._version = snapshotVersion;
 
     // Apply any events that occurred after the snapshot
@@ -176,7 +184,10 @@ export class Order extends AggregateRoot {
       throw new Error('Cannot cancel shipped or delivered order');
     }
 
-    const event = this.createEvent('OrderCancelled', { reason });
+    const event = this.createEvent('OrderCancelled', {
+      reason,
+      paymentId: this.paymentId, // Include for refund processing
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -205,6 +216,37 @@ export class Order extends AggregateRoot {
     this.apply(event);
   }
 
+  /**
+   * Record a failed payment attempt. Auto-cancels after MAX_PAYMENT_FAILURES.
+   * Returns true if order was auto-cancelled.
+   */
+  recordPaymentFailed(paymentId: string, reason: string): boolean {
+    if (this.status !== OrderStatus.INVENTORY_RESERVED) {
+      throw new Error('Can only record payment failure for orders with reserved inventory');
+    }
+
+    const newCount = this.failedPaymentCount + 1;
+    const shouldCancel = newCount >= Order.MAX_PAYMENT_FAILURES;
+
+    const event = this.createEvent('OrderPaymentFailed', {
+      paymentId,
+      reason,
+      failureCount: newCount,
+      maxFailures: Order.MAX_PAYMENT_FAILURES,
+      autoCancelled: shouldCancel,
+      failedAt: new Date().toISOString(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+
+    // Auto-cancel if max failures reached
+    if (shouldCancel) {
+      this.cancel(`Payment failed ${Order.MAX_PAYMENT_FAILURES} times: ${reason}`);
+    }
+
+    return shouldCancel;
+  }
+
   getDetails() {
     return {
       id: this.id,
@@ -214,6 +256,8 @@ export class Order extends AggregateRoot {
       totalAmount: this.totalAmount,
       currency: this.currency,
       trackingNumber: this.trackingNumber,
+      paymentId: this.paymentId,
+      failedPaymentCount: this.failedPaymentCount,
       version: this.version,
     };
   }
@@ -254,6 +298,11 @@ export class Order extends AggregateRoot {
 
       case 'OrderPaid':
         this.status = OrderStatus.PAID;
+        this.paymentId = event.data['paymentId'] as string;
+        break;
+
+      case 'OrderPaymentFailed':
+        this.failedPaymentCount = event.data['failureCount'] as number;
         break;
 
       case 'OrderCancelled':

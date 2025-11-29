@@ -75,6 +75,7 @@ export const ORDER_EVENTS = {
   INVENTORY_RESERVED: 'order.inventory_reserved',
   INVENTORY_FAILED: 'order.inventory_failed',
   PAID: 'order.paid',
+  PAYMENT_FAILED: 'order.payment_failed',
 } as const;
 
 export const PAYMENT_EVENTS = {
@@ -109,6 +110,7 @@ export const EVENT_TYPES = {
     INVENTORY_RESERVED: 'OrderInventoryReserved',
     INVENTORY_FAILED: 'OrderInventoryFailed',
     PAID: 'OrderPaid',
+    PAYMENT_FAILED: 'OrderPaymentFailed',
   },
   PAYMENT: {
     CREATED: 'PaymentCreated',
