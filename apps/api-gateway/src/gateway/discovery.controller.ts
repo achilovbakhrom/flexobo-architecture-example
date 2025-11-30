@@ -1,24 +1,48 @@
 /**
  * Service Discovery Controller
- * Provides service endpoints to clients for direct access
- * Also proxies Swagger JSON for cross-service documentation
+ *
+ * Provides service endpoints to clients for direct access.
+ * Uses the Service Registry for dynamic service discovery.
+ * Also proxies Swagger JSON for cross-service documentation.
  */
 
-import { Controller, Get, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiExcludeEndpoint } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Param,
+  HttpException,
+  HttpStatus,
+  Logger,
+  Inject,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiExcludeEndpoint,
+  ApiParam,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import {
+  IServiceRegistry,
+  IHealthChecker,
+  SERVICE_REGISTRY,
+  HEALTH_CHECKER,
+} from './interfaces';
 
 export interface ServiceEndpoint {
   http: string;
   ws?: string;
   docs: string;
   description: string;
+  status?: string;
 }
 
 export interface ServiceDiscoveryResponse {
   gateway: {
     version: string;
     docs: string;
+    ws: string;
   };
   services: {
     [key: string]: ServiceEndpoint;
@@ -30,21 +54,19 @@ export interface ServiceDiscoveryResponse {
 export class DiscoveryController {
   private readonly logger = new Logger(DiscoveryController.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private readonly configService: ConfigService,
+    @Inject(SERVICE_REGISTRY)
+    private readonly serviceRegistry: IServiceRegistry,
+    @Inject(HEALTH_CHECKER)
+    private readonly healthChecker: IHealthChecker
+  ) {}
 
-  private get orderServiceUrl(): string {
+  private get gatewayUrl(): string {
+    const port = this.configService.get<number>('gateway.port', 3001);
     return (
-      this.configService.get<string>('gateway.orderServiceUrl') ||
-      this.configService.get<string>('ORDER_SERVICE_URL') ||
-      'http://localhost:3002'
-    );
-  }
-
-  private get adminPanelUrl(): string {
-    return (
-      this.configService.get<string>('gateway.adminPanelUrl') ||
-      this.configService.get<string>('ADMIN_PANEL_URL') ||
-      'http://localhost:3000'
+      this.configService.get<string>('gateway.gatewayUrl') ||
+      `http://localhost:${port}`
     );
   }
 
@@ -52,7 +74,7 @@ export class DiscoveryController {
   @ApiOperation({
     summary: 'Get all available service endpoints',
     description:
-      'Returns URLs for all microservices. Clients should connect directly to services using these URLs for best performance.',
+      'Returns URLs for all registered microservices with their health status. Services are dynamically discovered from the service registry.',
   })
   @ApiResponse({
     status: 200,
@@ -65,6 +87,7 @@ export class DiscoveryController {
           properties: {
             version: { type: 'string' },
             docs: { type: 'string' },
+            ws: { type: 'string' },
           },
         },
         services: {
@@ -76,6 +99,7 @@ export class DiscoveryController {
               ws: { type: 'string' },
               docs: { type: 'string' },
               description: { type: 'string' },
+              status: { type: 'string' },
             },
           },
         },
@@ -83,50 +107,74 @@ export class DiscoveryController {
     },
   })
   getServices(): ServiceDiscoveryResponse {
-    const gatewayUrl =
-      this.configService.get<string>('API_GATEWAY_URL') ||
-      'http://localhost:3001';
+    const services = this.serviceRegistry.getAllServices();
+    const healthStatuses = this.healthChecker.getAllHealthStatuses();
+
+    const serviceEndpoints: { [key: string]: ServiceEndpoint } = {};
+
+    for (const service of services) {
+      const healthStatus = healthStatuses.get(service.name);
+      const description =
+        (service.metadata?.description as string) ||
+        `${service.name} microservice`;
+
+      serviceEndpoints[service.name] = {
+        http: `${service.baseUrl}/api`,
+        docs: `${service.baseUrl}/api/docs`,
+        description,
+        status: healthStatus?.status || 'unknown',
+      };
+
+      // Add WebSocket URL if service supports it
+      if (service.wsPath) {
+        serviceEndpoints[service.name].ws =
+          service.baseUrl.replace('http', 'ws') + service.wsPath;
+      }
+    }
 
     return {
       gateway: {
         version: '1.0.0',
-        docs: `${gatewayUrl}/api/docs`,
+        docs: `${this.gatewayUrl}/api/docs`,
+        ws: this.gatewayUrl.replace('http', 'ws') + '/ws',
       },
-      services: {
-        'order-service': {
-          http: `${this.orderServiceUrl}/api`,
-          ws: this.orderServiceUrl.replace('http', 'ws') + '/ws',
-          docs: `${this.orderServiceUrl}/api/docs`,
-          description:
-            'Order management service with event sourcing and CQRS',
-        },
-        'admin-panel': {
-          http: `${this.adminPanelUrl}/api`,
-          docs: `${this.adminPanelUrl}/api/docs`,
-          description: 'Administrative operations and system monitoring',
-        },
-      },
+      services: serviceEndpoints,
     };
   }
 
   /**
-   * Proxy swagger-json from Order Service
-   * This allows the Swagger UI dropdown to work from the browser
+   * Proxy swagger-json from any registered service
    */
-  @Get('swagger/order-service')
-  @ApiExcludeEndpoint()
-  async getOrderServiceSwagger(): Promise<object> {
-    return this.fetchSwaggerJson(this.orderServiceUrl, 'order-service');
-  }
+  @Get('swagger/:serviceName')
+  @ApiOperation({
+    summary: 'Get Swagger JSON for a service',
+    description: 'Proxies Swagger JSON from a registered service',
+  })
+  @ApiParam({
+    name: 'serviceName',
+    description: 'Name of the service (e.g., order-service, admin-panel)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Swagger JSON document',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Service not found',
+  })
+  async getServiceSwagger(
+    @Param('serviceName') serviceName: string
+  ): Promise<object> {
+    const service = this.serviceRegistry.getService(serviceName);
 
-  /**
-   * Proxy swagger-json from Admin Panel
-   * This allows the Swagger UI dropdown to work from the browser
-   */
-  @Get('swagger/admin-panel')
-  @ApiExcludeEndpoint()
-  async getAdminPanelSwagger(): Promise<object> {
-    return this.fetchSwaggerJson(this.adminPanelUrl, 'admin-panel');
+    if (!service) {
+      throw new HttpException(
+        `Service '${serviceName}' not found`,
+        HttpStatus.NOT_FOUND
+      );
+    }
+
+    return this.fetchSwaggerJson(service.baseUrl, serviceName);
   }
 
   /**
@@ -172,13 +220,24 @@ export class DiscoveryController {
     description: 'Health check results',
   })
   async getServicesHealth() {
-    // TODO: Implement actual health checks to each service
+    const healthStatuses = this.healthChecker.getAllHealthStatuses();
+    const services: Record<string, unknown> = {};
+
+    healthStatuses.forEach((status, name) => {
+      services[name] = {
+        status: status.status,
+        latency: status.latency,
+        lastChecked: status.lastChecked.toISOString(),
+        error: status.error,
+      };
+    });
+
+    const summary = this.healthChecker.getHealthSummary();
+
     return {
-      status: 'ok',
-      services: {
-        'order-service': { status: 'unknown' },
-        'admin-panel': { status: 'unknown' },
-      },
+      status: summary.unhealthy > 0 ? 'degraded' : 'ok',
+      summary,
+      services,
       timestamp: new Date().toISOString(),
     };
   }
