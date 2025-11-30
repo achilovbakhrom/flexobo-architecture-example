@@ -66,11 +66,11 @@ async function bootstrap() {
         },
         {
           name: 'Order Service',
-          url: `${orderServiceUrl}/api/docs-json`,
+          url: '/api/discovery/swagger/order-service',
         },
         {
           name: 'Admin Panel',
-          url: `${adminPanelUrl}/api/docs-json`,
+          url: '/api/discovery/swagger/admin-panel',
         },
       ],
     },

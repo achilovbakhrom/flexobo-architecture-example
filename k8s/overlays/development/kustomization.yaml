@@ -3,19 +3,49 @@ kind: Kustomization
 
 namespace: flexobo-dev
 
-bases:
+resources:
   - ../../base
 
 nameSuffix: -dev
 
-commonLabels:
-  environment: development
+labels:
+  - pairs:
+      environment: development
+    includeSelectors: true
 
 patches:
+  # Disable HPAs for local development (we want fixed replica counts)
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata:
+        name: not-used
+  # Scale down replicas to 1, use local images, and reduce resources for development
   - patch: |-
       - op: replace
         path: /spec/replicas
         value: 1
+      - op: replace
+        path: /spec/template/spec/initContainers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "250m"
     target:
       kind: Deployment
       name: order-service
@@ -23,6 +53,21 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "250m"
     target:
       kind: Deployment
       name: api-gateway
@@ -30,13 +75,64 @@ patches:
       - op: replace
         path: /spec/replicas
         value: 1
+      - op: replace
+        path: /spec/template/spec/initContainers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Never
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "100m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "250m"
     target:
       kind: Deployment
       name: admin-panel
-
-configMapGenerator:
-  - name: flexobo-config
-    behavior: merge
-    literals:
-      - LOG_LEVEL=debug
-      - NODE_ENV=development
+  # Update ConfigMap for development (includes service names with -dev suffix)
+  - patch: |-
+      - op: replace
+        path: /data/LOG_LEVEL
+        value: debug
+      - op: replace
+        path: /data/NODE_ENV
+        value: development
+      - op: replace
+        path: /data/RABBITMQ_HOST
+        value: rabbitmq-service-dev
+      - op: replace
+        path: /data/REDIS_HOST
+        value: redis-service-dev
+      - op: replace
+        path: /data/REDIS_URL
+        value: redis://redis-service-dev:6379
+      - op: replace
+        path: /data/ORDER_SERVICE_URL
+        value: http://order-service-dev:3002
+      - op: replace
+        path: /data/ADMIN_PANEL_URL
+        value: http://admin-panel-dev:3000
+    target:
+      kind: ConfigMap
+      name: flexobo-config
+  # Update Secret for development (includes service names with -dev suffix, separate DBs per service)
+  - patch: |-
+      - op: replace
+        path: /stringData/DATABASE_URL
+        value: postgresql://postgres:postgres@postgres-order-service-dev:5432/order_db
+      - op: replace
+        path: /stringData/ADMIN_DATABASE_URL
+        value: postgresql://postgres:postgres@postgres-admin-service-dev:5432/admin_db
+      - op: replace
+        path: /stringData/RABBITMQ_URL
+        value: amqp://guest:guest@rabbitmq-service-dev:5672
+    target:
+      kind: Secret
+      name: flexobo-secrets

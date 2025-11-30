@@ -7,7 +7,8 @@ resources:
   - namespace.yaml
   - configmap.yaml
   - secrets.yaml
-  - postgres.yaml
+  - postgres-order.yaml
+  - postgres-admin.yaml
   - rabbitmq.yaml
   - redis.yaml
   - order-service.yaml
@@ -17,6 +18,8 @@ resources:
   - pdb.yaml
   - hpa.yaml
 
-commonLabels:
-  app.kubernetes.io/name: flexobo
-  app.kubernetes.io/managed-by: kustomize
+labels:
+  - pairs:
+      app.kubernetes.io/name: flexobo
+      app.kubernetes.io/managed-by: kustomize
+    includeSelectors: true

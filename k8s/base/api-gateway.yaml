@@ -23,7 +23,7 @@ spec:
             - containerPort: 3001
               name: http
           env:
-            - name: PORT
+            - name: API_GATEWAY_PORT
               value: "3001"
             - name: NODE_ENV
               valueFrom:
@@ -79,7 +79,7 @@ spec:
               cpu: "500m"
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 3001
             initialDelaySeconds: 60
             periodSeconds: 30
@@ -87,7 +87,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: 3001
             initialDelaySeconds: 30
             periodSeconds: 10
@@ -104,6 +104,6 @@ spec:
   selector:
     app: api-gateway
   ports:
-    - port: 80
+    - port: 3001
       targetPort: 3001
       name: http

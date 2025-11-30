@@ -15,16 +15,27 @@ spec:
         app: order-service
         version: v1
     spec:
+      initContainers:
+        - name: run-migrations
+          image: flexobo/order-service:latest
+          imagePullPolicy: Always
+          command: ["npx", "prisma", "db", "push", "--accept-data-loss"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: flexobo-secrets
+                  key: DATABASE_URL
       containers:
         - name: order-service
           image: flexobo/order-service:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 3000
+            - containerPort: 3002
               name: http
           env:
-            - name: PORT
-              value: "3000"
+            - name: ORDER_SERVICE_PORT
+              value: "3002"
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:
@@ -55,6 +66,11 @@ spec:
                 configMapKeyRef:
                   name: flexobo-config
                   key: REDIS_PORT
+            - name: REDIS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: flexobo-config
+                  key: REDIS_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
@@ -69,16 +85,16 @@ spec:
               cpu: "1000m"
           livenessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /api/health
+              port: 3002
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3000
+              path: /api/health
+              port: 3002
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -90,10 +106,10 @@ metadata:
   name: order-service
   namespace: flexobo
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: order-service
   ports:
-    - port: 3000
-      targetPort: 3000
+    - port: 3002
+      targetPort: 3002
       name: http

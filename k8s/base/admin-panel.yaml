@@ -15,16 +15,27 @@ spec:
         app: admin-panel
         version: v1
     spec:
+      initContainers:
+        - name: run-migrations
+          image: flexobo/admin-panel:latest
+          imagePullPolicy: Always
+          command: ["npx", "prisma", "db", "push", "--accept-data-loss"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: flexobo-secrets
+                  key: ADMIN_DATABASE_URL
       containers:
         - name: admin-panel
           image: flexobo/admin-panel:latest
           imagePullPolicy: Always
           ports:
-            - containerPort: 3002
+            - containerPort: 3000
               name: http
           env:
-            - name: PORT
-              value: "3002"
+            - name: ADMIN_PANEL_PORT
+              value: "3000"
             - name: NODE_ENV
               valueFrom:
                 configMapKeyRef:
@@ -69,16 +80,16 @@ spec:
               cpu: "1000m"
           livenessProbe:
             httpGet:
-              path: /health
-              port: 3002
+              path: /api/health
+              port: 3000
             initialDelaySeconds: 60
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /health
-              port: 3002
+              path: /api/health
+              port: 3000
             initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
@@ -90,10 +101,10 @@ metadata:
   name: admin-panel
   namespace: flexobo
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   selector:
     app: admin-panel
   ports:
-    - port: 3002
-      targetPort: 3002
+    - port: 3000
+      targetPort: 3000
       name: http

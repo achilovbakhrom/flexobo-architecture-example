@@ -18,6 +18,9 @@ export class RabbitMQPublisher implements IMessagePublisher, OnModuleDestroy {
   private channel: amqp.Channel | null = null;
   private connected = false;
   private isShuttingDown = false;
+  private reconnectAttempts = 0;
+  private readonly maxReconnectAttempts = 10;
+  private readonly reconnectDelay = 5000;
 
   constructor(private readonly config: RabbitMQConfig) {
     this.config = { ...DEFAULT_RABBITMQ_CONFIG, ...config };
@@ -46,6 +49,7 @@ export class RabbitMQPublisher implements IMessagePublisher, OnModuleDestroy {
         connection.on('close', () => {
           this.logger.warn('RabbitMQ connection closed');
           this.connected = false;
+          this.scheduleReconnect();
         });
 
         connection.createChannel((channelErr, channel) => {
@@ -261,6 +265,49 @@ export class RabbitMQPublisher implements IMessagePublisher, OnModuleDestroy {
         resolve();
       }
     });
+  }
+
+  /**
+   * Schedule a reconnection attempt
+   */
+  private scheduleReconnect(): void {
+    if (this.isShuttingDown) {
+      return;
+    }
+
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      this.logger.error(
+        `Max reconnection attempts (${this.maxReconnectAttempts}) reached. Giving up.`
+      );
+      return;
+    }
+
+    this.reconnectAttempts++;
+    this.logger.log(
+      `Scheduling reconnection in ${this.reconnectDelay / 1000} seconds... (attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts})`
+    );
+
+    setTimeout(() => {
+      this.reconnect();
+    }, this.reconnectDelay);
+  }
+
+  /**
+   * Attempt to reconnect to RabbitMQ
+   */
+  private async reconnect(): Promise<void> {
+    if (this.isShuttingDown || this.connected) {
+      return;
+    }
+
+    try {
+      await this.connect();
+      this.reconnectAttempts = 0;
+      this.logger.log('Publisher successfully reconnected to RabbitMQ');
+    } catch (error) {
+      this.logger.error(`Reconnection failed: ${(error as Error).message}`);
+      this.scheduleReconnect();
+    }
   }
 
   /**

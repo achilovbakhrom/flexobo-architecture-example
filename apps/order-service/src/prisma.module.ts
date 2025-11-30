@@ -15,8 +15,17 @@ const { PrismaClient } = require(path.join(
     {
       provide: 'PG_POOL',
       useFactory: () => {
+        // Extract schema from DATABASE_URL (Prisma uses ?schema=xxx which pg doesn't understand)
+        const dbUrl = process.env['DATABASE_URL'] || '';
+        const schemaMatch = dbUrl.match(/[?&]schema=([^&]+)/);
+        const schema = schemaMatch ? schemaMatch[1] : 'public';
+        // Remove the schema parameter from the connection string for pg
+        const connectionString = dbUrl.replace(/[?&]schema=[^&]+/, '');
+
         return new Pool({
-          connectionString: process.env['DATABASE_URL'],
+          connectionString,
+          // Set the search_path to use the correct schema
+          options: `-c search_path=${schema}`,
         });
       },
     },

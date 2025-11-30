@@ -12,14 +12,15 @@ data:
   RABBITMQ_PORT: "5672"
   REDIS_HOST: redis-service
   REDIS_PORT: "6379"
+  REDIS_URL: redis://redis-service:6379
   
   # Application
   NODE_ENV: production
   LOG_LEVEL: info
   
   # Services
-  ORDER_SERVICE_URL: http://order-service:3000
-  ADMIN_PANEL_URL: http://admin-panel:3002
+  ORDER_SERVICE_URL: http://order-service:3002
+  ADMIN_PANEL_URL: http://admin-panel:3000
   
   # Rate Limiting
   RATE_LIMIT_TTL: "60"

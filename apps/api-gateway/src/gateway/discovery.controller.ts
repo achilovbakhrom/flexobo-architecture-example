@@ -1,10 +1,11 @@
 /**
  * Service Discovery Controller
  * Provides service endpoints to clients for direct access
+ * Also proxies Swagger JSON for cross-service documentation
  */
 
-import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiExcludeEndpoint } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 
 export interface ServiceEndpoint {
@@ -27,7 +28,25 @@ export interface ServiceDiscoveryResponse {
 @ApiTags('Service Discovery')
 @Controller('api/discovery')
 export class DiscoveryController {
+  private readonly logger = new Logger(DiscoveryController.name);
+
   constructor(private configService: ConfigService) {}
+
+  private get orderServiceUrl(): string {
+    return (
+      this.configService.get<string>('gateway.orderServiceUrl') ||
+      this.configService.get<string>('ORDER_SERVICE_URL') ||
+      'http://localhost:3002'
+    );
+  }
+
+  private get adminPanelUrl(): string {
+    return (
+      this.configService.get<string>('gateway.adminPanelUrl') ||
+      this.configService.get<string>('ADMIN_PANEL_URL') ||
+      'http://localhost:3000'
+    );
+  }
 
   @Get()
   @ApiOperation({
@@ -64,12 +83,6 @@ export class DiscoveryController {
     },
   })
   getServices(): ServiceDiscoveryResponse {
-    const orderServiceUrl =
-      this.configService.get<string>('ORDER_SERVICE_URL') ||
-      'http://localhost:3000';
-    const adminPanelUrl =
-      this.configService.get<string>('ADMIN_PANEL_URL') ||
-      'http://localhost:3002';
     const gatewayUrl =
       this.configService.get<string>('API_GATEWAY_URL') ||
       'http://localhost:3001';
@@ -81,19 +94,72 @@ export class DiscoveryController {
       },
       services: {
         'order-service': {
-          http: `${orderServiceUrl}/api`,
-          ws: orderServiceUrl.replace('http', 'ws') + '/ws',
-          docs: `${orderServiceUrl}/api/docs`,
+          http: `${this.orderServiceUrl}/api`,
+          ws: this.orderServiceUrl.replace('http', 'ws') + '/ws',
+          docs: `${this.orderServiceUrl}/api/docs`,
           description:
             'Order management service with event sourcing and CQRS',
         },
         'admin-panel': {
-          http: `${adminPanelUrl}/api`,
-          docs: `${adminPanelUrl}/api/docs`,
+          http: `${this.adminPanelUrl}/api`,
+          docs: `${this.adminPanelUrl}/api/docs`,
           description: 'Administrative operations and system monitoring',
         },
       },
     };
+  }
+
+  /**
+   * Proxy swagger-json from Order Service
+   * This allows the Swagger UI dropdown to work from the browser
+   */
+  @Get('swagger/order-service')
+  @ApiExcludeEndpoint()
+  async getOrderServiceSwagger(): Promise<object> {
+    return this.fetchSwaggerJson(this.orderServiceUrl, 'order-service');
+  }
+
+  /**
+   * Proxy swagger-json from Admin Panel
+   * This allows the Swagger UI dropdown to work from the browser
+   */
+  @Get('swagger/admin-panel')
+  @ApiExcludeEndpoint()
+  async getAdminPanelSwagger(): Promise<object> {
+    return this.fetchSwaggerJson(this.adminPanelUrl, 'admin-panel');
+  }
+
+  /**
+   * Fetch Swagger JSON from a service
+   */
+  private async fetchSwaggerJson(
+    serviceUrl: string,
+    serviceName: string
+  ): Promise<object> {
+    try {
+      this.logger.debug(`Fetching swagger from ${serviceUrl}/api/docs-json`);
+      const response = await fetch(`${serviceUrl}/api/docs-json`, {
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new HttpException(
+          `Failed to fetch swagger from ${serviceName}: ${response.status}`,
+          HttpStatus.BAD_GATEWAY
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      this.logger.error(`Error fetching swagger from ${serviceName}: ${error}`);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `${serviceName} swagger unavailable`,
+        HttpStatus.SERVICE_UNAVAILABLE
+      );
+    }
   }
 
   @Get('health')
