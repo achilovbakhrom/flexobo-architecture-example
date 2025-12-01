@@ -14,11 +14,11 @@ RUN yarn install --frozen-lockfile
 FROM dependencies AS build
 COPY . .
 
-# Generate Prisma client for admin-panel
-RUN npx prisma generate --schema=apps/admin-panel/prisma/schema.prisma
+# Generate Prisma client for users-service
+RUN npx prisma generate --schema=apps/users-service/prisma/schema.prisma
 
 # Build the application with NX
-RUN npx nx build admin-panel --configuration=production
+RUN npx nx build users-service --configuration=production
 
 # Production stage
 FROM base AS production
@@ -29,15 +29,15 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
 # Copy built application
-COPY --from=build --chown=nodejs:nodejs /app/dist/apps/admin-panel ./
+COPY --from=build --chown=nodejs:nodejs /app/dist/apps/users-service ./
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/package.json ./
 
 # Copy Prisma client (custom output path)
-COPY --from=build --chown=nodejs:nodejs /app/apps/admin-panel/node_modules/.prisma ./node_modules/.prisma
+COPY --from=build --chown=nodejs:nodejs /app/apps/users-service/node_modules/.prisma ./node_modules/.prisma
 
 USER nodejs
 
-EXPOSE 3002
+EXPOSE 3005 50052
 
 CMD ["node", "main.js"]

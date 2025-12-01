@@ -3,8 +3,11 @@ import { AuthPlatform, UserRole, UserStatus, UserType } from '../ports';
 import {
   UserEvent,
   UserEventType,
-  UserLoggedInEvent,
   UserRegisteredEvent,
+  UserProfileUpdatedEvent,
+  UserPasswordChangedEvent,
+  UserPasswordResetEvent,
+  UserTelegramLinkedEvent,
 } from '../ports/user.events';
 import { v4 as uuid } from 'uuid';
 
@@ -12,7 +15,7 @@ export class User extends AggregateRoot {
   uniqueId?: string;
   email?: string;
   phoneNumber?: string;
-  private telegramId?: string;
+  telegramId?: string;
   private passwordHash?: string;
   private fio?: string;
   private avatar?: string;
@@ -41,6 +44,10 @@ export class User extends AggregateRoot {
 
   get isActive(): boolean {
     return this.status === UserStatus.ACTIVE;
+  }
+
+  get telegramIdSafe(): string | undefined {
+    return this.telegramId;
   }
 
   static create(): User {
@@ -74,10 +81,62 @@ export class User extends AggregateRoot {
     this.apply(event);
   }
 
-  logout() {
+  logout(): void {
     const event = this.createEvent(UserEventType.LoggedOut, {
-      userId: this.id,
       logoutAt: new Date(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  updateProfile(data: Omit<UserProfileUpdatedEvent['data'], 'updatedAt'>): void {
+    const event = this.createEvent(UserEventType.ProfileUpdated, {
+      ...data,
+      updatedAt: new Date(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  changePassword(passwordHash: string): void {
+    const event = this.createEvent(UserEventType.PasswordChanged, {
+      passwordHash,
+      changedAt: new Date(),
+    } as UserPasswordChangedEvent['data']);
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  resetPassword(passwordHash: string): void {
+    const event = this.createEvent(UserEventType.PasswordReset, {
+      passwordHash,
+      resetAt: new Date(),
+    } as UserPasswordResetEvent['data']);
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  linkTelegram(telegramId: string): void {
+    const event = this.createEvent(UserEventType.TelegramLinked, {
+      telegramId,
+      linkedAt: new Date(),
+    } as UserTelegramLinkedEvent['data']);
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  activate(): void {
+    const event = this.createEvent(UserEventType.Activated, {
+      activatedAt: new Date(),
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  deactivate(reason?: string): void {
+    const event = this.createEvent(UserEventType.Deactivated, {
+      deactivatedAt: new Date(),
+      reason,
     });
     this.addEvent(event);
     this.apply(event);
@@ -97,9 +156,9 @@ export class User extends AggregateRoot {
         this.userType = event.data.userType;
         this.uniqueId = event.data.uniqueId;
         this.passwordHash = event.data.passwordHash;
-        this.status = UserStatus.INACTIVE;
+        this.status = UserStatus.ACTIVE;
         this.isVerified = false;
-
+        this.role = UserRole.USER;
         break;
       case UserEventType.LoggedIn:
         this.lastLoginAt = event.data.loginAt;
@@ -109,6 +168,23 @@ export class User extends AggregateRoot {
         this.isLoggedIn = false;
         break;
       case UserEventType.ProfileUpdated:
+        if (event.data.fio !== undefined) this.fio = event.data.fio;
+        if (event.data.phoneNumber !== undefined) this.phoneNumber = event.data.phoneNumber;
+        if (event.data.language !== undefined) this.language = event.data.language;
+        if (event.data.avatar !== undefined) this.avatar = event.data.avatar;
+        break;
+      case UserEventType.PasswordChanged:
+      case UserEventType.PasswordReset:
+        this.passwordHash = event.data.passwordHash;
+        break;
+      case UserEventType.TelegramLinked:
+        this.telegramId = event.data.telegramId;
+        break;
+      case UserEventType.Activated:
+        this.status = UserStatus.ACTIVE;
+        break;
+      case UserEventType.Deactivated:
+        this.status = UserStatus.INACTIVE;
         break;
       default:
         // No default action

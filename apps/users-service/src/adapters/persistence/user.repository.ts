@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma.service';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   IUserRepository,
   CreateUserData,
@@ -11,9 +10,18 @@ import {
 } from '../../ports';
 import { IUser } from '../../ports/user.interface';
 
+interface UserPrismaClient {
+  user: {
+    findUnique: (args: any) => Promise<any>;
+    findMany: (args: any) => Promise<any[]>;
+    create: (args: any) => Promise<any>;
+    update: (args: any) => Promise<any>;
+  };
+}
+
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: UserPrismaClient) {}
 
   async findById(id: string): Promise<IUser | null> {
     const user = await this.prisma.user.findUnique({

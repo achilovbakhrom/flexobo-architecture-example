@@ -17,8 +17,10 @@ export interface CreateUserData {
 export interface UpdateUserData {
   fio?: string;
   phoneNumber?: string;
+  telegramId?: string;
   language?: string;
   avatar?: string;
+  passwordHash?: string;
 }
 
 export interface IUserRepository {

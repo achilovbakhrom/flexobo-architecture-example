@@ -60,3 +60,17 @@ export interface IValidateTokenResult {
   jti?: string;
   error?: string;
 }
+
+export type AuthMethod = 'PHONE_NUMBER' | 'EMAIL';
+
+export interface IOTP {
+  id: string;
+  code: number;
+  codeHash: string;
+  authMethod: AuthMethod;
+  phoneNumber?: string | null;
+  email?: string | null;
+  expiresAt: Date;
+  verified: boolean;
+  createdAt: Date;
+}

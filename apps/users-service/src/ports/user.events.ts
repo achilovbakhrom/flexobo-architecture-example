@@ -6,6 +6,10 @@ export enum UserEventType {
   LoggedOut = 'user.logged_out',
   ProfileUpdated = 'user.profile_updated',
   PasswordChanged = 'user.password_changed',
+  PasswordReset = 'user.password_reset',
+  TelegramLinked = 'user.telegram_linked',
+  Activated = 'user.activated',
+  Deactivated = 'user.deactivated',
 }
 
 export interface UserRegisteredEvent {
@@ -41,9 +45,50 @@ export interface UserLoggedOutEvent {
 export interface UserProfileUpdatedEvent {
   type: UserEventType.ProfileUpdated;
   data: {
-    userId: string;
-    changes: Record<string, unknown>;
+    fio?: string;
+    phoneNumber?: string;
+    language?: string;
+    avatar?: string;
     updatedAt: Date;
+  };
+}
+
+export interface UserPasswordChangedEvent {
+  type: UserEventType.PasswordChanged;
+  data: {
+    passwordHash: string;
+    changedAt: Date;
+  };
+}
+
+export interface UserPasswordResetEvent {
+  type: UserEventType.PasswordReset;
+  data: {
+    passwordHash: string;
+    resetAt: Date;
+  };
+}
+
+export interface UserTelegramLinkedEvent {
+  type: UserEventType.TelegramLinked;
+  data: {
+    telegramId: string;
+    linkedAt: Date;
+  };
+}
+
+export interface UserActivatedEvent {
+  type: UserEventType.Activated;
+  data: {
+    activatedAt: Date;
+  };
+}
+
+export interface UserDeactivatedEvent {
+  type: UserEventType.Deactivated;
+  data: {
+    deactivatedAt: Date;
+    reason?: string;
   };
 }
 
@@ -51,4 +96,9 @@ export type UserEvent =
   | UserRegisteredEvent
   | UserLoggedInEvent
   | UserLoggedOutEvent
-  | UserProfileUpdatedEvent;
+  | UserProfileUpdatedEvent
+  | UserPasswordChangedEvent
+  | UserPasswordResetEvent
+  | UserTelegramLinkedEvent
+  | UserActivatedEvent
+  | UserDeactivatedEvent;

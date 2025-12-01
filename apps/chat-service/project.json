@@ -5,59 +5,37 @@
   "projectType": "application",
   "targets": {
     "build": {
-      "executor": "nx:run-commands",
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
       "options": {
-        "command": "webpack-cli build",
-        "args": ["--node-env=production"],
-        "cwd": "apps/chat-service"
+        "outputPath": "dist/apps/chat-service",
+        "main": "apps/chat-service/src/main.ts",
+        "tsConfig": "apps/chat-service/tsconfig.app.json",
+        "assets": ["apps/chat-service/src/assets"]
       },
       "configurations": {
-        "development": {
-          "args": ["--node-env=development"]
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
         }
       }
     },
-    "prune-lockfile": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "executor": "@nx/js:prune-lockfile",
-      "outputs": [
-        "{workspaceRoot}/dist/apps/chat-service/package.json",
-        "{workspaceRoot}/dist/apps/chat-service/yarn.lock"
-      ],
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "copy-workspace-modules": {
-      "dependsOn": ["build"],
-      "cache": true,
-      "outputs": ["{workspaceRoot}/dist/apps/chat-service/workspace_modules"],
-      "executor": "@nx/js:copy-workspace-modules",
-      "options": {
-        "buildTarget": "build"
-      }
-    },
-    "prune": {
-      "dependsOn": ["prune-lockfile", "copy-workspace-modules"],
-      "executor": "nx:noop"
-    },
     "serve": {
-      "continuous": true,
       "executor": "@nx/js:node",
-      "defaultConfiguration": "development",
       "dependsOn": ["build"],
       "options": {
         "buildTarget": "chat-service:build",
-        "runBuildTargetDependencies": false
-      },
-      "configurations": {
-        "development": {
-          "buildTarget": "chat-service:build:development"
-        },
-        "production": {
-          "buildTarget": "chat-service:build:production"
-        }
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9231,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
       }
     }
   },

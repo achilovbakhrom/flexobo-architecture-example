@@ -190,3 +190,179 @@ export class UpdateUserDto {
   @IsString()
   avatar?: string;
 }
+
+export enum AuthMethod {
+  PHONE_NUMBER = 'PHONE_NUMBER',
+  EMAIL = 'EMAIL',
+}
+
+export class SendOTPDto {
+  @ApiProperty({ enum: AuthMethod, example: 'PHONE_NUMBER' })
+  @IsEnum(AuthMethod)
+  authMethod!: AuthMethod;
+
+  @ApiPropertyOptional({ example: '+998901234567' })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiPropertyOptional({ description: 'Set to true when sending OTP for registration' })
+  @IsOptional()
+  @IsBoolean()
+  forRegistration?: boolean;
+}
+
+export class VerifyOTPDto {
+  @ApiProperty({ example: 123456 })
+  @IsNotEmpty()
+  code!: number;
+
+  @ApiProperty({ example: 'abc123hash' })
+  @IsString()
+  @IsNotEmpty()
+  codeHash!: string;
+
+  @ApiPropertyOptional({ example: '+998901234567' })
+  @IsOptional()
+  @IsString()
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+}
+
+export class OTPResponseDto {
+  @ApiProperty()
+  codeHash!: string;
+
+  @ApiPropertyOptional({ description: 'Only returned in dev/test environment' })
+  code?: number;
+}
+
+export class VerifyOTPResponseDto {
+  @ApiProperty()
+  verified!: boolean;
+}
+
+export class ForgotPasswordDto {
+  @ApiProperty({ enum: AuthMethod, example: 'EMAIL' })
+  @IsEnum(AuthMethod)
+  authMethod!: AuthMethod;
+
+  @ApiPropertyOptional({ example: '+998901234567' })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ enum: AuthMethod, example: 'EMAIL' })
+  @IsEnum(AuthMethod)
+  authMethod!: AuthMethod;
+
+  @ApiPropertyOptional({ example: '+998901234567' })
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
+  phoneNumber?: string;
+
+  @ApiPropertyOptional({ example: 'user@example.com' })
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @ApiProperty({ example: 'newPassword123' })
+  @IsString()
+  @MinLength(6)
+  @IsNotEmpty()
+  newPassword!: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty({ example: 'oldPassword123' })
+  @IsString()
+  @IsNotEmpty()
+  oldPassword!: string;
+
+  @ApiProperty({ example: 'newPassword123' })
+  @IsString()
+  @MinLength(6)
+  @IsNotEmpty()
+  newPassword!: string;
+}
+
+export class LinkTelegramDto {
+  @ApiProperty({ example: '+998901234567' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
+  phoneNumber!: string;
+
+  @ApiProperty({ example: '121212' })
+  @IsString()
+  @IsNotEmpty()
+  telegramId!: string;
+}
+
+export class RegisterWithTelegramDto {
+  @ApiProperty({ example: '+998901234567' })
+  @IsString()
+  @IsNotEmpty()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
+  phoneNumber!: string;
+
+  @ApiProperty({ example: '121212' })
+  @IsString()
+  @IsNotEmpty()
+  telegramId!: string;
+
+  @ApiProperty({ example: 'John Doe' })
+  @IsString()
+  @IsNotEmpty()
+  fio!: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
+  @IsOptional()
+  isPrivacyPolicyAccepted?: boolean;
+
+  @ApiPropertyOptional({ example: true })
+  @IsBoolean()
+  @IsOptional()
+  isSubscribedNewsletter?: boolean;
+
+  @IsEnum(UserTypeEnumWithoutCompanyDriver)
+  @IsOptional()
+  userType?: UserTypeWithoutCompanyDriver;
+}
+
+export class LoginWithTelegramDto {
+  @ApiProperty({ example: '121212' })
+  @IsString()
+  @IsNotEmpty()
+  telegramId!: string;
+}

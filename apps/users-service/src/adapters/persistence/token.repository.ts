@@ -1,5 +1,4 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma.service';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   ITokenRepository,
   CreateRefreshTokenData,
@@ -7,9 +6,22 @@ import {
   ITokenBlacklist,
 } from '../../ports';
 
+interface TokenPrismaClient {
+  refreshToken: {
+    findUnique: (args: any) => Promise<any>;
+    create: (args: any) => Promise<any>;
+    update: (args: any) => Promise<any>;
+    updateMany: (args: any) => Promise<any>;
+  };
+  tokenBlacklist: {
+    findUnique: (args: any) => Promise<any>;
+    create: (args: any) => Promise<any>;
+  };
+}
+
 @Injectable()
 export class PrismaTokenRepository implements ITokenRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: TokenPrismaClient) {}
 
   async findRefreshToken(
     token: string
