@@ -212,9 +212,13 @@ export class Order extends AggregateRoot {
       throw new Error('Can only ship paid orders');
     }
 
-    const event = this.createEvent(EVENT_TYPES.ORDER.SHIPPED, { trackingNumber });
+    const event = this.createEvent(EVENT_TYPES.ORDER.SHIPPED, {
+      trackingNumber,
+    });
+    this.status = OrderStatus.SHIPPED;
+    this.trackingNumber = event.data['trackingNumber'] as string;
+
     this.addEvent(event);
-    this.apply(event);
   }
 
   /**
@@ -223,7 +227,9 @@ export class Order extends AggregateRoot {
    */
   recordPaymentFailed(paymentId: string, reason: string): boolean {
     if (this.status !== OrderStatus.INVENTORY_RESERVED) {
-      throw new Error('Can only record payment failure for orders with reserved inventory');
+      throw new Error(
+        'Can only record payment failure for orders with reserved inventory'
+      );
     }
 
     const newCount = this.failedPaymentCount + 1;
@@ -242,7 +248,9 @@ export class Order extends AggregateRoot {
 
     // Auto-cancel if max failures reached
     if (shouldCancel) {
-      this.cancel(`Payment failed ${Order.MAX_PAYMENT_FAILURES} times: ${reason}`);
+      this.cancel(
+        `Payment failed ${Order.MAX_PAYMENT_FAILURES} times: ${reason}`
+      );
     }
 
     return shouldCancel;

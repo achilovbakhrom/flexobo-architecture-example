@@ -1,14 +1,14 @@
 # Base stage - common dependencies
-FROM node:20-alpine AS base
+FROM node:22-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache openssl
 
 # Dependencies stage
 FROM base AS dependencies
-COPY package*.json ./
+COPY package.json yarn.lock ./
 COPY nx.json ./
 COPY tsconfig.base.json ./
-RUN npm ci --legacy-peer-deps
+RUN yarn install --frozen-lockfile
 
 # Build stage
 FROM dependencies AS build
@@ -31,7 +31,7 @@ RUN addgroup -g 1001 -S nodejs && \
 # Copy built application
 COPY --from=build --chown=nodejs:nodejs /app/dist/apps/admin-panel ./
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=build --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=build --chown=nodejs:nodejs /app/package.json ./
 
 # Copy Prisma client (custom output path)
 COPY --from=build --chown=nodejs:nodejs /app/apps/admin-panel/node_modules/.prisma ./node_modules/.prisma

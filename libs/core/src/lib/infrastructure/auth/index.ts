@@ -7,3 +7,5 @@ export * from './public.decorator';
 export * from './roles.decorator';
 export * from './current-user.decorator';
 export * from './auth.module';
+export * from './token-validator.interface';
+export * from './grpc-token-validator';

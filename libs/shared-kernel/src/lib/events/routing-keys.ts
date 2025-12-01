@@ -17,6 +17,18 @@ export const ROUTING_KEYS = {
     PAYMENT_FAILED: 'order.payment_failed',
     ALL: 'order.*',
   },
+  USER: {
+    REGISTERED: 'user.registered',
+    LOGGED_IN: 'user.logged_in',
+    LOGGED_OUT: 'user.logged_out',
+    PROFILE_UPDATED: 'user.profile_updated',
+    PASSWORD_CHANGED: 'user.password_changed',
+    PASSWORD_RESET: 'user.password_reset',
+    TELEGRAM_LINKED: 'user.telegram_linked',
+    ACTIVATED: 'user.activated',
+    DEACTIVATED: 'user.deactivated',
+    ALL: 'user.*',
+  },
   PAYMENT: {
     CREATED: 'payment.created',
     PROCESSING: 'payment.processing',
@@ -46,6 +58,8 @@ export const ROUTING_KEYS = {
 
 export type OrderRoutingKey =
   (typeof ROUTING_KEYS.ORDER)[keyof typeof ROUTING_KEYS.ORDER];
+export type UserRoutingKey =
+  (typeof ROUTING_KEYS.USER)[keyof typeof ROUTING_KEYS.USER];
 export type PaymentRoutingKey =
   (typeof ROUTING_KEYS.PAYMENT)[keyof typeof ROUTING_KEYS.PAYMENT];
 export type ProductRoutingKey =

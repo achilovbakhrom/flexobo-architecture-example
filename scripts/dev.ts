@@ -5,13 +5,14 @@
  *   npx tsx scripts/dev.ts order    # Run order-service
  *   npx tsx scripts/dev.ts gateway  # Run api-gateway
  *   npx tsx scripts/dev.ts admin    # Run admin-panel
+ *   npx tsx scripts/dev.ts users    # Run users-service
  *   npx tsx scripts/dev.ts all      # Run all services
  *   npx tsx scripts/dev.ts stop     # Stop all services and containers
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'order' | 'gateway' | 'admin';
+type ServiceName = 'order' | 'gateway' | 'admin' | 'users';
 
 interface ServiceConfig {
   name: string;
@@ -38,6 +39,12 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'admin-panel',
     dockerCompose: 'apps/admin-panel/docker-compose.yml',
     color: '\x1b[35m', // magenta
+  },
+  users: {
+    name: 'users-service',
+    nxProject: 'users-service',
+    dockerCompose: 'apps/users-service/docker-compose.yml',
+    color: '\x1b[32m', // green
   },
 };
 
@@ -171,7 +178,7 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['order', 'gateway', 'admin', 'all', 'stop'].includes(arg)) {
+  if (!arg || !['order', 'gateway', 'admin', 'users', 'all', 'stop'].includes(arg)) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 
@@ -179,6 +186,7 @@ Commands:
   order    - Run order-service (port 3001)
   gateway  - Run api-gateway (port 3000)
   admin    - Run admin-panel (port 3002)
+  users    - Run users-service (port 3005)
   all      - Run all services
   stop     - Stop all services and containers
 `);
