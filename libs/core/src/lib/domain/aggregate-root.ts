@@ -1,4 +1,4 @@
-import { DomainEvent } from './domain-event.interface';
+import { DomainEvent, EventDefinition } from './domain-event.interface';
 
 /**
  * Base class for all Aggregate Roots in the domain
@@ -92,11 +92,11 @@ export abstract class AggregateRoot {
    * @param data The event payload
    * @param metadata Optional metadata
    */
-  protected createEvent(
-    eventType: string,
-    data: Record<string, unknown>,
+  protected createEvent<TType extends string, TData extends Record<string, unknown>>(
+    eventType: TType,
+    data: TData,
     metadata?: Record<string, unknown>
-  ): DomainEvent {
+  ): DomainEvent<EventDefinition<TType, TData>> {
     return {
       type: eventType,
       aggregateId: this._id,
@@ -105,6 +105,6 @@ export abstract class AggregateRoot {
       occurredAt: new Date(),
       data,
       metadata,
-    };
+    } as DomainEvent<EventDefinition<TType, TData>>;
   }
 }

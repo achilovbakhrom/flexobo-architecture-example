@@ -1,0 +1,142 @@
+// Chat Service Database Schema
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/chat-client"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// Chat Room model
+model ChatRoom {
+    id                   String    @id @default(uuid())
+    participants         String[]  // Array of user IDs
+    isGroup              Boolean   @default(false) @map("is_group")
+    groupName            String?   @map("group_name")
+    isSupportChat        Boolean   @default(false) @map("is_support_chat")
+    status               ChatRoomStatus @default(ACTIVE)
+
+    // Unread counts per user as JSON
+    unreadCounts         Json      @default("{}") @map("unread_counts")
+
+    // Translation settings per user as JSON
+    translationSettings  Json      @default("{}") @map("translation_settings")
+
+    // Last message info
+    lastMessageId        String?   @map("last_message_id")
+    lastMessagePreview   String?   @map("last_message_preview")
+    lastMessageAt        DateTime  @default(now()) @map("last_message_at")
+
+    // Soft delete
+    isDeleted            Boolean   @default(false) @map("is_deleted")
+    deletedAt            DateTime? @map("deleted_at")
+
+    // Business context (optional, for linking to other entities)
+    identifierId         String?   @map("identifier_id")
+    identifierType       String?   @map("identifier_type")
+
+    createdAt            DateTime  @default(now()) @map("created_at")
+    updatedAt            DateTime  @updatedAt @map("updated_at")
+
+    messages             ChatMessage[]
+
+    @@index([participants])
+    @@index([status, lastMessageAt])
+    @@index([isDeleted, lastMessageAt])
+    @@index([identifierId])
+    @@index([identifierId, identifierType])
+    @@map("chat_rooms")
+}
+
+enum ChatRoomStatus {
+    ACTIVE
+    ARCHIVED
+    CLOSED
+}
+
+// Chat Message model
+model ChatMessage {
+    id              String        @id @default(uuid())
+    roomId          String        @map("room_id")
+    senderId        String        @map("sender_id")
+    senderType      SenderType    @map("sender_type")
+    type            MessageType   @default(TEXT)
+    content         String?
+
+    // File attachments
+    fileUrls        String[]      @default([]) @map("file_urls")
+    fileName        String?       @map("file_name")
+    fileMetadata    Json?         @map("file_metadata")
+
+    // Voice message
+    voiceDuration   Int?          @map("voice_duration")
+
+    // Message status
+    status          MessageStatus @default(SENT)
+    isRead          Boolean       @default(false) @map("is_read")
+    readAt          DateTime?     @map("read_at")
+
+    // Reply
+    replyToId       String?       @map("reply_to_id")
+
+    // Translations (stored as JSON array)
+    translations    Json          @default("[]")
+
+    // Edit history (stored as JSON array)
+    editHistory     Json          @default("[]") @map("edit_history")
+
+    // Soft delete
+    isDeleted       Boolean       @default(false) @map("is_deleted")
+    deletedAt       DateTime?     @map("deleted_at")
+
+    createdAt       DateTime      @default(now()) @map("created_at")
+    updatedAt       DateTime      @updatedAt @map("updated_at")
+
+    room            ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+    replyTo         ChatMessage?  @relation("MessageReplies", fields: [replyToId], references: [id])
+    replies         ChatMessage[] @relation("MessageReplies")
+
+    @@index([roomId, createdAt])
+    @@index([senderId, senderType])
+    @@index([isDeleted, createdAt])
+    @@map("chat_messages")
+}
+
+enum SenderType {
+    USER
+    ADMIN
+    SUPERADMIN
+}
+
+enum MessageType {
+    TEXT
+    IMAGE
+    FILE
+    VIDEO
+    AUDIO
+    VOICE
+    GIF
+    STATUS
+}
+
+enum MessageStatus {
+    SENT
+    DELIVERED
+    READ
+}
+
+// File metadata for uploaded files
+model FileUpload {
+    id            String   @id @default(uuid())
+    originalName  String   @map("original_name")
+    mimeType      String   @map("mime_type")
+    size          Int
+    storagePath   String   @map("storage_path")
+    uploaderId    String   @map("uploader_id")
+    createdAt     DateTime @default(now()) @map("created_at")
+
+    @@index([uploaderId])
+    @@map("file_uploads")
+}
