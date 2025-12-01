@@ -39,6 +39,8 @@ import {
   ValidateTokenHandler,
   IsTokenBlacklistedHandler,
 } from './application/queries';
+import { USER_AGGREGATE_STORE } from './ports/user-store.port';
+import { UserAggregateStore } from './adapters/persistence/users-aggregate.store';
 
 const CommandHandlers = [
   RegisterUserHandler,
@@ -96,6 +98,7 @@ const QueryHandlers = [
       provide: PASSWORD_SERVICE,
       useClass: BcryptPasswordService,
     },
+    { provide: USER_AGGREGATE_STORE, useClass: UserAggregateStore },
     // Guards
     JwtAuthGuard,
     // Handlers need to be provided for DI
@@ -103,4 +106,4 @@ const QueryHandlers = [
     ...QueryHandlers,
   ],
 })
-export class AuthModule {}
+export class UsersModule {}

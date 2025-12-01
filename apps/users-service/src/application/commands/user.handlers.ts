@@ -34,7 +34,13 @@ import {
   ErrorMessages,
   TokenBlacklistReasons,
   TokenConfig,
+  UserRole,
 } from '../../ports';
+import { User } from '../../domain/user.aggregate';
+import {
+  IUserAggregateStore,
+  USER_AGGREGATE_STORE,
+} from '../../ports/user-store.port';
 
 export interface AuthResult {
   user: IUser;
@@ -48,10 +54,15 @@ export class RegisterUserHandler
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
-    @Inject(PASSWORD_SERVICE) private readonly passwordService: IPasswordService
+    @Inject(PASSWORD_SERVICE)
+    private readonly passwordService: IPasswordService,
+    @Inject(USER_AGGREGATE_STORE)
+    private readonly store: IUserAggregateStore
   ) {}
 
-  async execute(command: RegisterUserCommand): Promise<Result<ITokenPair, Error>> {
+  async execute(
+    command: RegisterUserCommand
+  ): Promise<Result<ITokenPair, Error>> {
     try {
       // Check if phone number exists
       if (command.phoneNumber) {
@@ -74,7 +85,9 @@ export class RegisterUserHandler
 
       // Check if email exists
       if (command.email) {
-        const existingByEmail = await this.userRepository.findByEmail(command.email);
+        const existingByEmail = await this.userRepository.findByEmail(
+          command.email
+        );
         if (existingByEmail) {
           return new Failure(
             new HttpException(
@@ -95,10 +108,11 @@ export class RegisterUserHandler
       // Hash password
       const passwordHash = await this.passwordService.hash(command.password);
 
-      // Create user
-      const user = await this.userRepository.create({
-        uniqueId,
+      const user = User.create();
+
+      user.register({
         fio: command.fio,
+        uniqueId,
         passwordHash,
         phoneNumber: command.phoneNumber,
         telegramId: command.telegramId,
@@ -109,11 +123,13 @@ export class RegisterUserHandler
         userType: command.userType,
       });
 
+      await this.store.save(user);
+
       // Generate tokens
       const tokens = await this.tokenService.generateTokens(
         user.id,
-        user.email || user.phoneNumber || user.uniqueId,
-        user.role
+        user.email || user.phoneNumber || user.uniqueId || '',
+        user.role || UserRole.USER
       );
 
       return new Success(tokens);
@@ -130,47 +146,58 @@ export class LoginUserHandler
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
-    @Inject(PASSWORD_SERVICE) private readonly passwordService: IPasswordService
+    @Inject(PASSWORD_SERVICE)
+    private readonly passwordService: IPasswordService,
+    @Inject(USER_AGGREGATE_STORE)
+    private readonly store: IUserAggregateStore
   ) {}
 
   async execute(command: LoginUserCommand): Promise<Result<AuthResult, Error>> {
     try {
-      const user = await this.userRepository.findByEmail(command.email);
+      const repoUser = await this.userRepository.findByEmail(command.email);
+      const user = await this.store.load(repoUser?.id || '');
 
-      if (!user) {
+      if (!repoUser || !user) {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.INVALID_CREDENTIALS])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.INVALID_CREDENTIALS]
+          )
         );
       }
 
-      if (user.status !== UserStatus.ACTIVE) {
+      if (!user.isActive) {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.ACCOUNT_NOT_ACTIVE])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.ACCOUNT_NOT_ACTIVE]
+          )
         );
       }
 
       const isPasswordValid = await this.passwordService.compare(
         command.password,
-        user.passwordHash
+        user.passwordHashSafe
       );
 
       if (!isPasswordValid) {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.INVALID_CREDENTIALS])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.INVALID_CREDENTIALS]
+          )
         );
       }
 
-      // Update last login
-      await this.userRepository.updateLastLogin(user.id);
+      user.login();
 
       // Generate tokens
       const tokens = await this.tokenService.generateTokens(
         user.id,
-        user.email || user.phoneNumber || user.uniqueId,
-        user.role
+        user.loginSafe,
+        user.roleSafe
       );
 
-      return new Success({ user, tokens });
+      await this.store.save(user);
+
+      return new Success({ user: repoUser, tokens });
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -182,11 +209,14 @@ export class RefreshTokenHandler
   implements ICommandHandler<RefreshTokenCommand, ITokenPair>
 {
   constructor(
-    @Inject(TOKEN_REPOSITORY) private readonly tokenRepository: ITokenRepository,
+    @Inject(TOKEN_REPOSITORY)
+    private readonly tokenRepository: ITokenRepository,
     @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService
   ) {}
 
-  async execute(command: RefreshTokenCommand): Promise<Result<ITokenPair, Error>> {
+  async execute(
+    command: RefreshTokenCommand
+  ): Promise<Result<ITokenPair, Error>> {
     try {
       // 1. Verify refresh token JWT signature and get payload
       let payload;
@@ -194,7 +224,9 @@ export class RefreshTokenHandler
         payload = this.tokenService.verifyRefreshToken(command.refreshToken);
       } catch {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.INVALID_REFRESH_TOKEN])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.INVALID_REFRESH_TOKEN]
+          )
         );
       }
 
@@ -205,13 +237,17 @@ export class RefreshTokenHandler
 
       if (!storedToken) {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.INVALID_REFRESH_TOKEN])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.INVALID_REFRESH_TOKEN]
+          )
         );
       }
 
       if (storedToken.revokedAt) {
         return new Failure(
-          new UnauthorizedException(ErrorMessages[ErrorCodes.REFRESH_TOKEN_REVOKED])
+          new UnauthorizedException(
+            ErrorMessages[ErrorCodes.REFRESH_TOKEN_REVOKED]
+          )
         );
       }
 
@@ -233,7 +269,9 @@ export class RefreshTokenHandler
 }
 
 @CommandHandler(LogoutUserCommand)
-export class LogoutUserHandler implements ICommandHandler<LogoutUserCommand, void> {
+export class LogoutUserHandler
+  implements ICommandHandler<LogoutUserCommand, void>
+{
   constructor(
     @Inject(TOKEN_REPOSITORY) private readonly tokenRepository: ITokenRepository
   ) {}
@@ -242,7 +280,9 @@ export class LogoutUserHandler implements ICommandHandler<LogoutUserCommand, voi
     try {
       // Blacklist the current access token
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + TokenConfig.BLACKLIST_EXPIRY_HOURS);
+      expiresAt.setHours(
+        expiresAt.getHours() + TokenConfig.BLACKLIST_EXPIRY_HOURS
+      );
 
       await this.tokenRepository.blacklistToken(
         command.jti,
@@ -268,7 +308,9 @@ export class UpdateUserProfileHandler
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository
   ) {}
 
-  async execute(command: UpdateUserProfileCommand): Promise<Result<IUser, Error>> {
+  async execute(
+    command: UpdateUserProfileCommand
+  ): Promise<Result<IUser, Error>> {
     try {
       const user = await this.userRepository.findById(command.userId);
 

@@ -4,10 +4,10 @@ import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
 
-import { AuthModule } from './auth.module';
+import { UsersModule } from './users.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AuthModule);
+  const app = await NestFactory.create(UsersModule);
   const logger = new Logger('UsersService');
 
   // Enable CORS

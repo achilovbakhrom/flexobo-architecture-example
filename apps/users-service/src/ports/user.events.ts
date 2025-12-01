@@ -14,7 +14,7 @@ export interface UserRegisteredEvent {
     fio: string;
     phoneNumber?: string;
     telegramId?: string;
-    email: string;
+    email?: string;
     isPrivacyPolicyAccepted?: boolean;
     isSubscribedNewsletter?: boolean;
     platform?: AuthPlatform;
@@ -27,8 +27,6 @@ export interface UserRegisteredEvent {
 export interface UserLoggedInEvent {
   type: UserEventType.LoggedIn;
   data: {
-    userId: string;
-    email: string;
     loginAt?: Date;
   };
 }
@@ -36,8 +34,7 @@ export interface UserLoggedInEvent {
 export interface UserLoggedOutEvent {
   type: UserEventType.LoggedOut;
   data: {
-    userId: string;
-    logoutAt: Date;
+    logoutAt?: Date;
   };
 }
 

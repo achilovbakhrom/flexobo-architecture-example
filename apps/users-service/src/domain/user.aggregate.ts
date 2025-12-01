@@ -9,16 +9,16 @@ import {
 import { v4 as uuid } from 'uuid';
 
 export class User extends AggregateRoot {
-  private uniqueId?: string;
-  private email?: string;
-  private phoneNumber?: string;
+  uniqueId?: string;
+  email?: string;
+  phoneNumber?: string;
   private telegramId?: string;
   private passwordHash?: string;
   private fio?: string;
   private avatar?: string;
-  private role?: UserRole;
+  role?: UserRole;
   private userType?: UserType;
-  private status?: UserStatus;
+  status?: UserStatus = UserStatus.ACTIVE;
   private language?: string;
   private isPrivacyPolicyAccepted?: boolean;
   private isSubscribedNewsletter?: boolean;
@@ -27,10 +27,32 @@ export class User extends AggregateRoot {
   private lastLoginAt?: Date | null;
   private isLoggedIn = false;
 
+  get roleSafe(): UserRole {
+    return this.role || UserRole.USER;
+  }
+
+  get loginSafe(): string {
+    return this.email || this.phoneNumber || this.uniqueId || '';
+  }
+
+  get passwordHashSafe(): string {
+    return this.passwordHash || '';
+  }
+
+  get isActive(): boolean {
+    return this.status === UserStatus.ACTIVE;
+  }
+
   static create(): User {
     const id = uuid();
 
     return new User(id);
+  }
+
+  static fromEvents(events: DomainEvent[]): User {
+    const user = new User(events[0].aggregateId);
+    user.loadFromHistory(events);
+    return user;
   }
 
   private generateUniqueId(): string {
@@ -44,9 +66,8 @@ export class User extends AggregateRoot {
     this.apply(event);
   }
 
-  login(data: UserLoggedInEvent['data']): void {
+  login(): void {
     const event = this.createEvent(UserEventType.LoggedIn, {
-      ...data,
       loginAt: new Date(),
     });
     this.addEvent(event);
