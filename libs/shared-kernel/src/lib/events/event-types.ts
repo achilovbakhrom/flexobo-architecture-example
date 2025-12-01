@@ -16,6 +16,17 @@ export const EVENT_TYPES = {
     PAID: 'OrderPaid',
     PAYMENT_FAILED: 'OrderPaymentFailed',
   },
+  USER: {
+    REGISTERED: 'user.registered',
+    LOGGED_IN: 'user.logged_in',
+    LOGGED_OUT: 'user.logged_out',
+    PROFILE_UPDATED: 'user.profile_updated',
+    PASSWORD_CHANGED: 'user.password_changed',
+    PASSWORD_RESET: 'user.password_reset',
+    TELEGRAM_LINKED: 'user.telegram_linked',
+    ACTIVATED: 'user.activated',
+    DEACTIVATED: 'user.deactivated',
+  },
   PAYMENT: {
     CREATED: 'PaymentCreated',
     PROCESSING: 'PaymentProcessing',
@@ -39,6 +50,8 @@ export const EVENT_TYPES = {
 
 export type OrderEventTypes =
   (typeof EVENT_TYPES.ORDER)[keyof typeof EVENT_TYPES.ORDER];
+export type UserEventTypes =
+  (typeof EVENT_TYPES.USER)[keyof typeof EVENT_TYPES.USER];
 export type PaymentEventTypes =
   (typeof EVENT_TYPES.PAYMENT)[keyof typeof EVENT_TYPES.PAYMENT];
 export type ProductEventTypes =

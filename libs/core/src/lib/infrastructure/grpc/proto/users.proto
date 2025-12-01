@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package users;
+
+// Users Service - handles authentication and user management
+service UsersService {
+  // Validate JWT token and return user info
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResponse);
+
+  // Get user by ID
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+
+  // Get multiple users by IDs
+  rpc GetUsers(GetUsersRequest) returns (GetUsersResponse);
+
+  // Check if token is blacklisted
+  rpc IsTokenBlacklisted(IsTokenBlacklistedRequest) returns (IsTokenBlacklistedResponse);
+}
+
+// Token validation
+message ValidateTokenRequest {
+  string token = 1;
+}
+
+message ValidateTokenResponse {
+  bool valid = 1;
+  string user_id = 2;
+  string role = 3;
+  string jti = 4;  // JWT ID for blacklist checking
+  string error = 5;
+}
+
+// Get single user
+message GetUserRequest {
+  string user_id = 1;
+}
+
+message GetUserResponse {
+  bool found = 1;
+  UserInfo user = 2;
+}
+
+// Get multiple users
+message GetUsersRequest {
+  repeated string user_ids = 1;
+}
+
+message GetUsersResponse {
+  repeated UserInfo users = 1;
+}
+
+// User info returned from gRPC
+message UserInfo {
+  string id = 1;
+  string email = 2;
+  string phone = 3;
+  string first_name = 4;
+  string last_name = 5;
+  string avatar = 6;
+  string role = 7;
+  string language = 8;
+  bool is_active = 9;
+}
+
+// Token blacklist check
+message IsTokenBlacklistedRequest {
+  string jti = 1;
+}
+
+message IsTokenBlacklistedResponse {
+  bool blacklisted = 1;
+}
