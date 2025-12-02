@@ -30,6 +30,8 @@ interface OrderEventPayload {
   occurredAt: string;
   data: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  reservations?: Array<{ productId: string; quantity: number }>;
+  reservedAt?: string;
 }
 
 @Injectable()
@@ -231,7 +233,9 @@ export class OrderProjection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async onOrderInventoryReserved(event: OrderEventPayload): Promise<void> {
+  private async onOrderInventoryReserved(
+    event: OrderEventPayload
+  ): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(
@@ -250,7 +254,9 @@ export class OrderProjection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async onOrderInventoryFailed(event: OrderEventPayload): Promise<void> {
+  private async onOrderInventoryFailed(
+    event: OrderEventPayload
+  ): Promise<void> {
     const order = await this.readModelRepository.findById(event.aggregateId);
     if (order) {
       await this.readModelRepository.upsert(

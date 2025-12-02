@@ -8,16 +8,20 @@
     "start:order": "npx tsx scripts/dev.ts order",
     "start:gateway": "npx tsx scripts/dev.ts gateway",
     "start:admin": "npx tsx scripts/dev.ts admin",
+    "start:users": "npx tsx scripts/dev.ts users",
     "stop": "npx tsx scripts/dev.ts stop",
     "db:migration:create:order": "npx prisma migrate dev --create-only --config apps/order-service/prisma.config.ts",
     "db:migration:create:admin": "npx prisma migrate dev --create-only --config apps/admin-panel/prisma.config.ts",
     "db:migration:create:gateway": "npx prisma migrate dev --create-only --config apps/api-gateway/prisma.config.ts",
+    "db:migration:create:users": "npx prisma migrate dev --create-only --config apps/users-service/prisma.config.ts",
     "db:migration:apply:order": "npx prisma migrate deploy --config apps/order-service/prisma.config.ts",
     "db:migration:apply:admin": "npx prisma migrate deploy --config apps/admin-panel/prisma.config.ts",
     "db:migration:apply:gateway": "npx prisma migrate deploy --config apps/api-gateway/prisma.config.ts",
+    "db:migration:apply:users": "npx prisma migrate deploy --config apps/users-service/prisma.config.ts",
     "db:studio:order": "npx prisma studio --config apps/order-service/prisma.config.ts --port 5555",
     "db:studio:admin": "npx prisma studio --config apps/admin-panel/prisma.config.ts --port 5557",
     "db:studio:gateway": "npx prisma studio --config apps/api-gateway/prisma.config.ts --port 5556",
+    "db:studio:users": "npx prisma studio --config apps/users-service/prisma.config.ts --port 5558",
     "test": "npx nx run-many --target=test --all",
     "test:ci": "npx nx run-many --target=test --all --coverage --coverageReporters=lcov --coverageReporters=text-summary",
     "lint": "npx nx run-many --target=lint --all",
@@ -25,13 +29,16 @@
     "docker:build:order": "docker build -f apps/order-service/Dockerfile -t flexobo/order-service:latest .",
     "docker:build:gateway": "docker build -f apps/api-gateway/Dockerfile -t flexobo/api-gateway:latest .",
     "docker:build:admin": "docker build -f apps/admin-panel/Dockerfile -t flexobo/admin-panel:latest .",
-    "docker:build:all": "npm run docker:build:order && npm run docker:build:gateway && npm run docker:build:admin"
+    "docker:build:users": "docker build -f apps/users-service/Dockerfile -t flexobo/users-service:latest .",
+    "docker:build:all": "npm run docker:build:order && npm run docker:build:gateway && npm run docker:build:admin && npm run docker:build:users"
   },
   "private": true,
   "engines": {
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@grpc/grpc-js": "^1.14.1",
+    "@grpc/proto-loader": "^0.8.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.0",
@@ -41,7 +48,9 @@
     "@nestjs/microservices": "^11.1.9",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.0",
+    "@nestjs/platform-socket.io": "^11.1.9",
     "@nestjs/swagger": "^11.2.3",
+    "@nestjs/websockets": "^11.1.9",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/auto-instrumentations-node": "^0.67.0",
     "@opentelemetry/exporter-metrics-otlp-http": "^0.208.0",
@@ -65,6 +74,7 @@
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
+    "socket.io": "^4.8.1",
     "table": "^6.8.2",
     "tsconfig-paths": "^4.2.0",
     "uuid": "^13.0.0"
@@ -81,6 +91,7 @@
     "@nx/nest": "22.1.1",
     "@nx/node": "22.1.1",
     "@nx/web": "22.1.1",
+    "@nx/webpack": "22.1.1",
     "@nx/workspace": "22.1.1",
     "@prisma/client": "7.0.1",
     "@swc-node/register": "~1.9.1",
@@ -90,6 +101,7 @@
     "@types/bcrypt": "^6.0.0",
     "@types/inquirer": "^8.2.10",
     "@types/jest": "^30.0.0",
+    "@types/multer": "^2.0.0",
     "@types/node": "20.19.9",
     "@types/passport-jwt": "^4.0.1",
     "@types/pg": "^8.15.6",
@@ -114,7 +126,8 @@
     "tslib": "^2.3.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2",
-    "typescript-eslint": "^8.40.0"
+    "typescript-eslint": "^8.40.0",
+    "webpack-cli": "^5.1.4"
   },
   "nx": {
     "includedScripts": []

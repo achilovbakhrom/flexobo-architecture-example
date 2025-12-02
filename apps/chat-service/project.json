@@ -1,0 +1,43 @@
+{
+  "name": "chat-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/chat-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/chat-service",
+        "main": "apps/chat-service/src/main.ts",
+        "tsConfig": "apps/chat-service/tsconfig.app.json",
+        "assets": ["apps/chat-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "chat-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9231,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": ["scope:chat", "type:service"]
+}

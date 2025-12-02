@@ -1,0 +1,626 @@
+// Main Service Prisma Schema
+// Handles: Load, Trip, Transport with Event Sourcing + CQRS
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/main-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==============================================
+// EVENT SOURCING INFRASTRUCTURE
+// ==============================================
+
+model Event {
+  id            String   @id @default(uuid())
+  aggregateId   String
+  aggregateType String
+  type          String
+  data          Json
+  metadata      Json?
+  version       Int
+  timestamp     DateTime @default(now())
+
+  @@unique([aggregateId, version])
+  @@index([aggregateId, aggregateType])
+  @@index([type])
+  @@index([timestamp])
+  @@map("events")
+}
+
+model OutboxMessage {
+  id        String    @id @default(uuid())
+  eventId   String    @unique
+  eventType String
+  payload   Json
+  metadata  Json?
+  status    String    @default("pending")
+  createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  error     String?
+
+  @@index([status, createdAt])
+  @@map("outbox_messages")
+}
+
+model Snapshot {
+  id            String   @id @default(uuid())
+  aggregateId   String
+  aggregateType String
+  version       Int
+  data          Json
+  createdAt     DateTime @default(now())
+
+  @@unique([aggregateId, aggregateType])
+  @@index([aggregateId])
+  @@map("snapshots")
+}
+
+model ProjectionPosition {
+  id            String    @id @default(uuid())
+  projectionId  String    @unique
+  lastEventId   String?
+  lastTimestamp DateTime?
+  updatedAt     DateTime  @updatedAt
+
+  @@map("projection_positions")
+}
+
+// ==============================================
+// ENUMS
+// ==============================================
+
+enum LoadStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  EXPIRED
+
+  @@map("load_status")
+}
+
+enum TruckLoadType {
+  FTL // Full Truck Load
+  LTL // Less Than Truck Load
+
+  @@map("truck_load_type")
+}
+
+enum PriceMode {
+  FIXED
+  NEGOTIABLE
+  PER_KM
+
+  @@map("price_mode")
+}
+
+enum PaymentMethod {
+  CASH
+  CREDIT_CARD
+  NDS
+  BANK_TRANSFER
+
+  @@map("payment_method")
+}
+
+enum WeightUnit {
+  KG
+  TON
+  LB
+
+  @@map("weight_unit")
+}
+
+enum CapacityUnit {
+  M3
+  TON
+  PALLET
+
+  @@map("capacity_unit")
+}
+
+enum TransportTypeFeature {
+  OPEN
+  CLOSED
+  REFRIGERATED
+
+  @@map("transport_type_feature")
+}
+
+enum TransportLoadingFeature {
+  SIDE_LOADING
+  TOP_LOADING
+  REAR_LOADING
+
+  @@map("transport_loading_feature")
+}
+
+enum LoadDocumentType {
+  TTN
+  INVOICE
+  CMR
+
+  @@map("load_document_type")
+}
+
+enum TripDocumentType {
+  PASSPORT
+  INVOICE
+  CMR
+  OTHER
+
+  @@map("trip_document_type")
+}
+
+// ==============================================
+// REFERENCE TABLES (with i18n)
+// ==============================================
+
+model Country {
+  id           String               @id @default(uuid())
+  countryCode  String               @unique @map("country_code")
+  isActive     Boolean              @default(true) @map("is_active")
+  createdAt    DateTime             @default(now()) @map("created_at")
+  updatedAt    DateTime             @updatedAt @map("updated_at")
+  translations CountryTranslation[]
+  locations    Location[]
+
+  @@index([countryCode])
+  @@map("countries")
+}
+
+model CountryTranslation {
+  id          String  @id @default(uuid())
+  countryId   String  @map("country_id")
+  language    String
+  name        String
+  description String?
+  country     Country @relation(fields: [countryId], references: [id], onDelete: Cascade)
+
+  @@unique([countryId, language])
+  @@index([language])
+  @@map("country_translations")
+}
+
+model Currency {
+  id           String                @id @default(uuid())
+  code         String                @unique
+  exchangeRate Float                 @map("exchange_rate")
+  isActive     Boolean               @default(true) @map("is_active")
+  minAmount    Float?                @map("min_amount")
+  maxAmount    Float?                @map("max_amount")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  translations CurrencyTranslation[]
+
+  // Relations
+  loads      Load[]
+  trips      Trip[]
+  transports Transport[]
+
+  @@index([code])
+  @@index([isActive])
+  @@map("currencies")
+}
+
+model CurrencyTranslation {
+  id          String   @id @default(uuid())
+  currencyId  String   @map("currency_id")
+  language    String
+  name        String
+  description String?
+  currency    Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
+
+  @@unique([currencyId, language])
+  @@index([language])
+  @@map("currency_translations")
+}
+
+model Location {
+  id            String                @id @default(uuid())
+  continentCode String?               @map("continent_code")
+  countryCode   String                @map("country_code")
+  lat           Float
+  lon           Float
+  locationId    String?               @map("location_id")
+  parentId      Int?                  @map("parent_id")
+  type          String?
+  createdAt     DateTime              @default(now()) @map("created_at")
+  updatedAt     DateTime              @updatedAt @map("updated_at")
+  translations  LocationTranslation[]
+  country       Country               @relation(fields: [countryCode], references: [countryCode])
+
+  // Relations
+  loadsFrom      Load[] @relation("LoadFromLocation")
+  loadsTo        Load[] @relation("LoadToLocation")
+  tripsLoading   Trip[] @relation("TripLoadingLocation")
+  tripsUnloading Trip[] @relation("TripUnloadingLocation")
+
+  @@index([countryCode])
+  @@index([locationId])
+  @@index([lat, lon])
+  @@map("locations")
+}
+
+model LocationTranslation {
+  id         String   @id @default(uuid())
+  locationId String   @map("location_id")
+  language   String
+  city       String
+  country    String
+  location   Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, language])
+  @@index([language])
+  @@map("location_translations")
+}
+
+model TransportType {
+  id           String                     @id @default(uuid())
+  isActive     Boolean                    @default(true) @map("is_active")
+  createdAt    DateTime                   @default(now()) @map("created_at")
+  updatedAt    DateTime                   @updatedAt @map("updated_at")
+  translations TransportTypeTranslation[]
+
+  // Relations
+  loads      Load[]
+  trips      Trip[]
+  transports Transport[]
+
+  @@map("transport_types")
+}
+
+model TransportTypeTranslation {
+  id              String        @id @default(uuid())
+  transportTypeId String        @map("transport_type_id")
+  language        String
+  name            String
+  description     String?
+  transportType   TransportType @relation(fields: [transportTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([transportTypeId, language])
+  @@index([language])
+  @@map("transport_type_translations")
+}
+
+model TransportLoadingType {
+  id           String                            @id @default(uuid())
+  isActive     Boolean                           @default(true) @map("is_active")
+  createdAt    DateTime                          @default(now()) @map("created_at")
+  updatedAt    DateTime                          @updatedAt @map("updated_at")
+  translations TransportLoadingTypeTranslation[]
+
+  // Relations
+  loadsLoading   Load[]      @relation("LoadLoadingType")
+  loadsUnloading Load[]      @relation("LoadUnloadingType")
+  transports     Transport[] @relation("TransportLoadingTypes")
+
+  @@map("transport_loading_types")
+}
+
+model TransportLoadingTypeTranslation {
+  id                     String               @id @default(uuid())
+  transportLoadingTypeId String               @map("transport_loading_type_id")
+  language               String
+  name                   String
+  description            String?
+  transportLoadingType   TransportLoadingType @relation(fields: [transportLoadingTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([transportLoadingTypeId, language])
+  @@index([language])
+  @@map("transport_loading_type_translations")
+}
+
+model LoadType {
+  id           String                @id @default(uuid())
+  isActive     Boolean               @default(true) @map("is_active")
+  createdAt    DateTime              @default(now()) @map("created_at")
+  updatedAt    DateTime              @updatedAt @map("updated_at")
+  translations LoadTypeTranslation[]
+
+  // Relations
+  cargos Cargo[]
+
+  @@map("load_types")
+}
+
+model LoadTypeTranslation {
+  id          String   @id @default(uuid())
+  loadTypeId  String   @map("load_type_id")
+  language    String
+  name        String
+  description String?
+  loadType    LoadType @relation(fields: [loadTypeId], references: [id], onDelete: Cascade)
+
+  @@unique([loadTypeId, language])
+  @@index([language])
+  @@map("load_type_translations")
+}
+
+model Adr {
+  id           String           @id @default(uuid())
+  isActive     Boolean          @default(true) @map("is_active")
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+  translations AdrTranslation[]
+
+  // Relations
+  features   LoadFeatures[] @relation("LoadAdrClasses")
+  transports Transport[]    @relation("TransportAdrClasses")
+
+  @@map("adrs")
+}
+
+model AdrTranslation {
+  id          String @id @default(uuid())
+  adrId       String @map("adr_id")
+  language    String
+  name        String
+  description String
+  adr         Adr    @relation(fields: [adrId], references: [id], onDelete: Cascade)
+
+  @@unique([adrId, language])
+  @@index([language])
+  @@map("adr_translations")
+}
+
+model Permit {
+  id           String              @id @default(uuid())
+  isActive     Boolean             @default(true) @map("is_active")
+  createdAt    DateTime            @default(now()) @map("created_at")
+  updatedAt    DateTime            @updatedAt @map("updated_at")
+  translations PermitTranslation[]
+
+  // Relations
+  features   LoadFeatures[] @relation("LoadPermits")
+  transports Transport[]    @relation("TransportPermits")
+
+  @@map("permits")
+}
+
+model PermitTranslation {
+  id          String @id @default(uuid())
+  permitId    String @map("permit_id")
+  language    String
+  name        String
+  description String
+  permit      Permit @relation(fields: [permitId], references: [id], onDelete: Cascade)
+
+  @@unique([permitId, language])
+  @@index([language])
+  @@map("permit_translations")
+}
+
+// ==============================================
+// LOAD AGGREGATE (Event Sourcing + Read Models)
+// ==============================================
+
+// Read Model for Load
+model Load {
+  id                 String          @id @default(uuid())
+  ownerId            String          @map("owner_id")
+  companyId          String?         @map("company_id")
+  transportTypeId    String          @map("transport_type_id")
+  fromLocationId     String          @map("from_location_id")
+  toLocationId       String          @map("to_location_id")
+  fromCountryCode    String          @map("from_country_code")
+  toCountryCode      String          @map("to_country_code")
+  distance           Float?
+  tollDistance       Float?          @map("toll_distance")
+  price              Float?
+  basePrice          Float           @default(0) @map("base_price")
+  currencyId         String          @map("currency_id")
+  loadingTypeId      String          @map("loading_type_id")
+  unloadingTypeId    String          @map("unloading_type_id")
+  targetDate         DateTime        @map("target_date")
+  additionalExtraDay DateTime?       @map("additional_extra_day")
+  status             LoadStatus      @default(OPEN)
+  isActive           Boolean         @default(true) @map("is_active")
+  privateDate        DateTime?       @map("private_date")
+  truckLoadType      TruckLoadType   @default(FTL) @map("truck_load_type")
+  negotiable         Boolean         @default(false)
+  paymentMethods     PaymentMethod[] @map("payment_methods")
+  paymentCondition   Boolean         @default(false) @map("payment_condition")
+  paymentDays        Int             @default(0) @map("payment_days")
+  prePayment         Float           @default(0) @map("pre_payment")
+  pricePerKm         Float           @default(0) @map("price_per_km")
+  isPricePerKmExceed Boolean?        @map("is_price_per_km_exceed")
+  priceMode          PriceMode?      @map("price_mode")
+  parentId           String?         @map("parent_id")
+  images             String[]        @default([])
+  certificates       String[]        @default([])
+  otherDocs          String[]        @default([]) @map("other_docs")
+  isSystemLoad       Boolean         @default(false) @map("is_system_load")
+  version            Int             @default(1)
+  lastEventId        String?         @map("last_event_id")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  transportType TransportType        @relation(fields: [transportTypeId], references: [id])
+  currency      Currency             @relation(fields: [currencyId], references: [id])
+  fromLocation  Location             @relation("LoadFromLocation", fields: [fromLocationId], references: [id])
+  toLocation    Location             @relation("LoadToLocation", fields: [toLocationId], references: [id])
+  loadingType   TransportLoadingType @relation("LoadLoadingType", fields: [loadingTypeId], references: [id])
+  unloadingType TransportLoadingType @relation("LoadUnloadingType", fields: [unloadingTypeId], references: [id])
+  cargos        Cargo[]
+  features      LoadFeatures?
+  documents     LoadDocument[]
+
+  @@index([ownerId, status])
+  @@index([ownerId, createdAt])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([status])
+  @@index([isActive, ownerId])
+  @@index([isSystemLoad])
+  @@index([targetDate])
+  @@index([fromLocationId])
+  @@index([toLocationId])
+  @@map("loads")
+}
+
+model Cargo {
+  id              String     @id @default(uuid())
+  loadId          String     @map("load_id")
+  cargoTypeId     String     @map("cargo_type_id")
+  cargoTypeWeight Float      @map("cargo_type_weight")
+  cargoWeightUnit WeightUnit @map("cargo_weight_unit")
+  cargoWeightTons Float?     @map("cargo_weight_tons")
+  load            Load       @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  cargoType       LoadType   @relation(fields: [cargoTypeId], references: [id])
+
+  @@index([loadId])
+  @@index([cargoTypeId])
+  @@map("cargos")
+}
+
+model LoadFeatures {
+  id               String   @id @default(uuid())
+  loadId           String   @unique @map("load_id")
+  straps           Int      @default(0)
+  coupling         String[] @default([])
+  carsCount        Int      @default(0) @map("cars_count")
+  carryingCapacity String?  @map("carrying_capacity")
+  specialNotes     String?  @map("special_notes")
+  load             Load     @relation(fields: [loadId], references: [id], onDelete: Cascade)
+  adrClasses       Adr[]    @relation("LoadAdrClasses")
+  documents        Permit[] @relation("LoadPermits")
+
+  @@map("load_features")
+}
+
+model LoadDocument {
+  id     String           @id @default(uuid())
+  loadId String           @map("load_id")
+  type   LoadDocumentType
+  url    String
+  load   Load             @relation(fields: [loadId], references: [id], onDelete: Cascade)
+
+  @@index([loadId])
+  @@map("load_documents")
+}
+
+// ==============================================
+// TRIP AGGREGATE (Event Sourcing + Read Models)
+// ==============================================
+
+// Read Model for Trip
+model Trip {
+  id                         String                  @id @default(uuid())
+  ownerId                    String                  @map("owner_id")
+  companyId                  String?                 @map("company_id")
+  transportTypeId            String                  @map("transport_type_id")
+  transportTypeFeature       TransportTypeFeature    @map("transport_type_feature")
+  transportLoadingFeature    TransportLoadingFeature @map("transport_loading_feature")
+  loadingCapacity            Float                   @map("loading_capacity")
+  capacity                   Float
+  capacityUnit               CapacityUnit            @map("capacity_unit")
+  transportLength            Float?                  @map("transport_length")
+  transportWidth             Float?                  @map("transport_width")
+  transportHeight            Float?                  @map("transport_height")
+  currencyId                 String                  @map("currency_id")
+  distance                   Float?
+  tollDistance               Float?                  @map("toll_distance")
+  loadingPointId             String                  @map("loading_point_id")
+  unloadingPointId           String                  @map("unloading_point_id")
+  fromLocationId             String                  @map("from_location_id")
+  toLocationId               String                  @map("to_location_id")
+  fromCountryCode            String                  @map("from_country_code")
+  toCountryCode              String                  @map("to_country_code")
+  loadingRadius              Float                   @map("loading_radius")
+  unloadingRadius            Float                   @map("unloading_radius")
+  loadingReadyDate           DateTime                @map("loading_ready_date")
+  additionalLoadingReadyDate DateTime?               @map("additional_loading_ready_date")
+  price                      Float?
+  basePrice                  Float                   @default(0) @map("base_price")
+  paymentMethods             PaymentMethod[]         @map("payment_methods")
+  note                       String?
+  isNegotiable               Boolean                 @default(false) @map("is_negotiable")
+  isActive                   Boolean                 @default(true) @map("is_active")
+  privateDate                DateTime?               @map("private_date")
+  pricePerKm                 Float                   @default(0) @map("price_per_km")
+  isPricePerKmExceed         Boolean?                @map("is_price_per_km_exceed")
+  priceMode                  PriceMode?              @map("price_mode")
+  status                     LoadStatus              @default(OPEN)
+  parentId                   String?                 @map("parent_id")
+  images                     String[]                @default([])
+  isSystemTrip               Boolean                 @default(false) @map("is_system_trip")
+  version                    Int                     @default(1)
+  lastEventId                String?                 @map("last_event_id")
+  createdAt                  DateTime                @default(now()) @map("created_at")
+  updatedAt                  DateTime                @updatedAt @map("updated_at")
+
+  // Relations
+  transportType  TransportType  @relation(fields: [transportTypeId], references: [id])
+  currency       Currency       @relation(fields: [currencyId], references: [id])
+  loadingPoint   Location       @relation("TripLoadingLocation", fields: [loadingPointId], references: [id])
+  unloadingPoint Location       @relation("TripUnloadingLocation", fields: [unloadingPointId], references: [id])
+  documents      TripDocument[]
+
+  @@index([ownerId, status])
+  @@index([ownerId, createdAt])
+  @@index([companyId])
+  @@index([companyId, status])
+  @@index([status])
+  @@index([isActive, ownerId])
+  @@index([isSystemTrip])
+  @@index([loadingReadyDate])
+  @@index([loadingPointId])
+  @@index([unloadingPointId])
+  @@map("trips")
+}
+
+model TripDocument {
+  id     String           @id @default(uuid())
+  tripId String           @map("trip_id")
+  type   TripDocumentType
+  url    String
+  trip   Trip             @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("trip_documents")
+}
+
+// ==============================================
+// TRANSPORT AGGREGATE (Event Sourcing + Read Models)
+// ==============================================
+
+// Read Model for Transport
+model Transport {
+  id                      String                  @id @default(uuid())
+  ownerId                 String                  @map("owner_id")
+  name                    String?
+  transportTypeId         String                  @map("transport_type_id")
+  transportTypeFeature    TransportTypeFeature    @map("transport_type_feature")
+  transportLoadingFeature TransportLoadingFeature @map("transport_loading_feature")
+  loadingCapacity         Float                   @map("loading_capacity")
+  capacity                Float
+  capacityUnit            CapacityUnit            @map("capacity_unit")
+  transportLength         Float?                  @map("transport_length")
+  transportWidth          Float?                  @map("transport_width")
+  transportHeight         Float?                  @map("transport_height")
+  isActive                Boolean                 @default(true) @map("is_active")
+  currencyId              String?                 @map("currency_id")
+  version                 Int                     @default(1)
+  lastEventId             String?                 @map("last_event_id")
+  createdAt               DateTime                @default(now()) @map("created_at")
+  updatedAt               DateTime                @updatedAt @map("updated_at")
+
+  // Relations
+  transportType TransportType          @relation(fields: [transportTypeId], references: [id])
+  currency      Currency?              @relation(fields: [currencyId], references: [id])
+  loadingTypes  TransportLoadingType[] @relation("TransportLoadingTypes")
+  permits       Permit[]               @relation("TransportPermits")
+  adrClasses    Adr[]                  @relation("TransportAdrClasses")
+
+  @@index([ownerId])
+  @@index([isActive])
+  @@index([transportTypeId])
+  @@index([ownerId, isActive])
+  @@map("transports")
+}

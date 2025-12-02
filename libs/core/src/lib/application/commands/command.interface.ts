@@ -2,6 +2,7 @@
  * Marker interface for all commands
  * Commands represent intentions to change state
  */
+// eslint-disable-next-line
 export interface ICommand {}
 
 /**

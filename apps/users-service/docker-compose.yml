@@ -1,0 +1,90 @@
+# ===========================================
+# Users Service - Docker Compose
+# ===========================================
+# Prerequisites: Start shared infrastructure first
+#   cd infrastructure && docker-compose up -d
+#
+# Then run: docker-compose up -d
+
+services:
+  # ===========================================
+  # Users Service Application
+  # ===========================================
+  users-service:
+    build:
+      context: ../..
+      dockerfile: apps/users-service/Dockerfile
+    container_name: users-service
+    ports:
+      - "3005:3005"
+      - "50052:50052"
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres-users:
+        condition: service_healthy
+      redis-users:
+        condition: service_healthy
+    networks:
+      - users-service-network
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ===========================================
+  # PostgreSQL Database (service-specific)
+  # ===========================================
+  postgres-users:
+    image: postgres:15-alpine
+    container_name: users-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: users_service
+    ports:
+      - "5437:5432"
+    volumes:
+      - postgres_users_data:/var/lib/postgresql/data
+    networks:
+      - users-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis Cache (service-specific)
+  # ===========================================
+  redis-users:
+    image: redis:7-alpine
+    container_name: users-service-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6383:6379"
+    volumes:
+      - redis_users_data:/data
+    networks:
+      - users-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_users_data:
+    driver: local
+  redis_users_data:
+    driver: local
+
+networks:
+  users-service-network:
+    driver: bridge
+  flexobo-shared-network:
+    external: true

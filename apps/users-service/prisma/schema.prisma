@@ -1,0 +1,225 @@
+// Users Service Database Schema
+
+generator client {
+    provider = "prisma-client-js"
+    output   = "../node_modules/.prisma/users-client"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+// ============================================================
+// Event Sourcing Infrastructure
+// ============================================================
+
+// Event Store - stores all domain events for Users Service
+model Event {
+    id            String   @id @default(uuid())
+    aggregateId   String   @map("aggregate_id")
+    aggregateType String   @map("aggregate_type")
+    eventType     String   @map("event_type")
+    eventData     Json     @map("event_data")
+    version       Int
+    occurredAt    DateTime @default(now()) @map("occurred_at")
+    metadata      Json?
+
+    @@unique([aggregateId, version])
+    @@index([aggregateId])
+    @@index([aggregateType, occurredAt])
+    @@index([eventType])
+    @@map("events")
+}
+
+// Outbox for reliable event publishing
+model OutboxMessage {
+    id            String    @id @default(uuid())
+    aggregateId   String    @map("aggregate_id")
+    aggregateType String    @map("aggregate_type")
+    eventType     String    @map("event_type")
+    payload       Json
+    status        String    @default("PENDING")
+    retryCount    Int       @default(0) @map("retry_count")
+    maxRetries    Int       @default(5) @map("max_retries")
+    createdAt     DateTime  @default(now()) @map("created_at")
+    processedAt   DateTime? @map("processed_at")
+    publishedAt   DateTime? @map("published_at")
+    error         String?
+    metadata      Json?
+
+    @@index([status, createdAt])
+    @@index([aggregateId])
+    @@map("outbox_messages")
+}
+
+// Snapshots for aggregate optimization
+model Snapshot {
+    id            String    @id @default(uuid())
+    aggregateId   String    @unique @map("aggregate_id")
+    aggregateType String    @map("aggregate_type")
+    snapshotData  Json      @map("snapshot_data")
+    version       Int
+    createdAt     DateTime  @default(now()) @map("created_at")
+    expiresAt     DateTime? @map("expires_at")
+
+    @@index([aggregateType])
+    @@map("snapshots")
+}
+
+// Projection position tracking
+model ProjectionPosition {
+    id              String   @id @default(uuid())
+    projectionName  String   @unique @map("projection_name")
+    lastEventId     String   @map("last_event_id")
+    lastProcessedAt DateTime @default(now()) @map("last_processed_at")
+
+    @@map("projection_positions")
+}
+
+// ============================================================
+// Read Models (Projections) - Optimized for Queries
+// ============================================================
+
+// User Read Model - denormalized view of users for fast queries
+model User {
+    id                        String       @id @default(uuid())
+    uniqueId                  String       @unique @map("unique_id")
+    email                     String?      @unique
+    phoneNumber               String?      @unique @map("phone_number")
+    telegramId                String?      @unique @map("telegram_id")
+    passwordHash              String       @map("password_hash")
+    fio                       String
+    avatar                    String?
+    role                      UserRole     @default(USER)
+    userType                  UserType?    @map("user_type")
+    status                    UserStatus   @default(ACTIVE)
+    language                  String       @default("en") @map("user_lang")
+    isPrivacyPolicyAccepted   Boolean      @default(false) @map("is_privacy_policy_accepted")
+    isSubscribedNewsletter    Boolean      @default(false) @map("is_subscribed_newsletter")
+    platform                  AuthPlatform?
+    isVerified                Boolean      @default(false) @map("is_verified")
+    lastLoginAt               DateTime?    @map("last_login_at")
+    version                   Int          @default(0) // Projection version for idempotency
+    lastEventId               String?      @map("last_event_id") // Last processed event ID
+    createdAt                 DateTime     @default(now()) @map("created_at")
+    updatedAt                 DateTime     @updatedAt @map("updated_at")
+
+    refreshTokens RefreshToken[]
+
+    @@index([email])
+    @@index([phoneNumber])
+    @@index([telegramId])
+    @@index([uniqueId])
+    @@index([role])
+    @@index([status])
+    @@index([userType])
+    @@map("users")
+}
+
+enum UserRole {
+    USER
+    ADMIN
+    SUPERADMIN
+}
+
+enum UserStatus {
+    ACTIVE
+    INACTIVE
+    SUSPENDED
+    BLOCKED
+}
+
+enum UserType {
+    BROKER
+    LOAD_OWNER
+    CARRIER
+    COMPANY_DRIVER
+    OWNER_OPERATOR
+}
+
+enum AuthPlatform {
+    WEB
+    MOBILE
+    TELEGRAM
+}
+
+// Refresh Token for JWT refresh
+model RefreshToken {
+    id          String    @id @default(uuid())
+    userId      String    @map("user_id")
+    token       String    @unique
+    jti         String    @unique // JWT ID for blacklisting
+    expiresAt   DateTime  @map("expires_at")
+    revokedAt   DateTime? @map("revoked_at")
+    createdAt   DateTime  @default(now()) @map("created_at")
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([userId])
+    @@index([token])
+    @@index([jti])
+    @@index([expiresAt])
+    @@map("refresh_tokens")
+}
+
+// Token Blacklist for invalidated JWTs
+model TokenBlacklist {
+    id            String   @id @default(uuid())
+    jti           String   @unique // JWT ID
+    expiresAt     DateTime @map("expires_at")
+    blacklistedAt DateTime @default(now()) @map("blacklisted_at")
+    reason        String?
+
+    @@index([jti])
+    @@index([expiresAt])
+    @@map("token_blacklist")
+}
+
+// OTP for phone/email verification
+model OTP {
+    id          String    @id @default(uuid())
+    code        Int
+    codeHash    String    @map("code_hash")
+    authMethod  AuthMethod @map("auth_method")
+    phoneNumber String?   @map("phone_number")
+    email       String?
+    expiresAt   DateTime  @map("expires_at")
+    verified    Boolean   @default(false)
+    createdAt   DateTime  @default(now()) @map("created_at")
+
+    @@index([codeHash])
+    @@index([phoneNumber])
+    @@index([email])
+    @@index([expiresAt])
+    @@map("otps")
+}
+
+enum AuthMethod {
+    PHONE_NUMBER
+    EMAIL
+}
+
+// ============================================================
+// User History (Audit Log)
+// ============================================================
+
+// User History - audit trail of all user changes
+model UserHistoryReadModel {
+    id            String   @id @default(uuid())
+    userId        String   @map("user_id")
+    eventType     String   @map("event_type") // UserRegistered, UserLoggedIn, ProfileUpdated, etc.
+    eventData     Json     @map("event_data")
+    version       Int      @default(0) // Event/aggregate version for synchronization
+    previousState String?  @map("previous_state") // Status before change
+    newState      String?  @map("new_state") // Status after change
+    changedBy     String?  @map("changed_by") // User/system that made the change
+    ipAddress     String?  @map("ip_address")
+    userAgent     String?  @map("user_agent")
+    occurredAt    DateTime @default(now()) @map("occurred_at")
+
+    @@index([userId])
+    @@index([eventType])
+    @@index([occurredAt])
+    @@index([userId, version])
+    @@map("user_history")
+}
