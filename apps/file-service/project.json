@@ -1,0 +1,45 @@
+{
+  "name": "file-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/file-service/src",
+  "projectType": "application",
+  "tags": [],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "cache": false,
+      "options": {
+        "outputPath": "dist/apps/file-service",
+        "main": "apps/file-service/src/main.ts",
+        "tsConfig": "apps/file-service/tsconfig.app.json",
+        "assets": ["apps/file-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "cache": false,
+      "options": {
+        "buildTarget": "file-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9233,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  }
+}

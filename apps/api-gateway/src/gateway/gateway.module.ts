@@ -4,8 +4,7 @@
 
 import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { HealthModule } from '@flexobo/core';
-import { ObservabilityModule } from '@flexobo/core';
+import { HealthModule, ObservabilityModule } from '@flexobo/shared-kernel';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
 import { GatewayController } from './gateway.controller';

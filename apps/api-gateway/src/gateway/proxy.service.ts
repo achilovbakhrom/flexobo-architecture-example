@@ -4,7 +4,7 @@
  */
 
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { CircuitBreaker } from '@flexobo/core';
+import { CircuitBreaker } from '@flexobo/shared-kernel';
 import { ProxyRequest, ProxyResponse, ServiceRoute } from './gateway.types';
 
 @Injectable()

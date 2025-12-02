@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { Request } from 'express';
-import { IS_PUBLIC_KEY } from '@flexobo/core';
+import { IS_PUBLIC_KEY } from '@flexobo/shared-kernel';
 import {
   ITokenService,
   TOKEN_SERVICE,

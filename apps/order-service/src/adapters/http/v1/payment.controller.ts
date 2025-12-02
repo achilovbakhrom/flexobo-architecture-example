@@ -24,8 +24,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@flexobo/core';
-import { VersionInterceptor, ApiVersion } from '@flexobo/core';
-import { Traced } from '@flexobo/core';
+import { VersionInterceptor, ApiVersion, Traced } from '@flexobo/shared-kernel';
 import { randomUUID } from 'crypto';
 import {
   CreatePaymentCommand,

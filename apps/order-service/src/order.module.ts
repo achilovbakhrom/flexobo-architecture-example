@@ -1,14 +1,15 @@
 import { Module } from '@nestjs/common';
-import { CqrsModule } from '@flexobo/core';
-import { EventStoreModule } from '@flexobo/core';
-import { OutboxModule } from '@flexobo/core';
-import { CacheModule } from '@flexobo/core';
+import { CqrsModule, EventStoreModule, OutboxModule, MessagingModule, MESSAGE_PUBLISHER } from '@flexobo/core';
+import {
+  CacheModule,
+  VersioningModule,
+  VersioningStrategy,
+  VersionStatus,
+  HealthModule,
+  ObservabilityModule,
+  PostgreSQLHealthIndicator,
+} from '@flexobo/shared-kernel';
 import { PrismaModule } from './prisma.module';
-import { MessagingModule, MESSAGE_PUBLISHER } from '@flexobo/core';
-import { VersioningModule, VersioningStrategy, VersionStatus } from '@flexobo/core';
-import { HealthModule } from '@flexobo/core';
-import { ObservabilityModule } from '@flexobo/core';
-import { PostgreSQLHealthIndicator } from '@flexobo/core';
 
 import { OrderController } from './adapters/http/v1/order.controller';
 import { ProductController } from './adapters/http/v1/product.controller';

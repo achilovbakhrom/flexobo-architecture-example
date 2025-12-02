@@ -6,13 +6,15 @@
  *   npx tsx scripts/dev.ts gateway  # Run api-gateway
  *   npx tsx scripts/dev.ts admin    # Run admin-panel
  *   npx tsx scripts/dev.ts users    # Run users-service
+ *   npx tsx scripts/dev.ts chat     # Run chat-service
+ *   npx tsx scripts/dev.ts file     # Run file-service
  *   npx tsx scripts/dev.ts all      # Run all services
  *   npx tsx scripts/dev.ts stop     # Stop all services and containers
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'order' | 'gateway' | 'admin' | 'users';
+type ServiceName = 'order' | 'gateway' | 'admin' | 'users' | 'chat' | 'file';
 
 interface ServiceConfig {
   name: string;
@@ -45,6 +47,18 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'users-service',
     dockerCompose: 'apps/users-service/docker-compose.yml',
     color: '\x1b[32m', // green
+  },
+  chat: {
+    name: 'chat-service',
+    nxProject: 'chat-service',
+    dockerCompose: 'apps/chat-service/docker-compose.yml',
+    color: '\x1b[34m', // blue
+  },
+  file: {
+    name: 'file-service',
+    nxProject: 'file-service',
+    dockerCompose: 'apps/file-service/docker-compose.yml',
+    color: '\x1b[91m', // light red
   },
 };
 
@@ -150,7 +164,7 @@ function killProcesses(): void {
 
   // Kill processes on dev ports
   exec(
-    'lsof -ti:3000,3001,3002,9229,9230,9231 | xargs kill -9 2>/dev/null || true',
+    'lsof -ti:3000,3001,3002,3003,3004,3005,9229,9230,9231 | xargs kill -9 2>/dev/null || true',
     true
   );
 
@@ -178,7 +192,7 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['order', 'gateway', 'admin', 'users', 'all', 'stop'].includes(arg)) {
+  if (!arg || !['order', 'gateway', 'admin', 'users', 'chat', 'file', 'all', 'stop'].includes(arg)) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 
@@ -186,7 +200,9 @@ Commands:
   order    - Run order-service (port 3001)
   gateway  - Run api-gateway (port 3000)
   admin    - Run admin-panel (port 3002)
-  users    - Run users-service (port 3005)
+  users    - Run users-service (port 3003)
+  chat     - Run chat-service (port 3004)
+  file     - Run file-service (port 3005)
   all      - Run all services
   stop     - Stop all services and containers
 `);

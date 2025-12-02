@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package chat;
+
+// Chat Service - handles chat room and message operations
+service ChatService {
+  // Create a new chat room (used by Main Service when bid is created)
+  rpc CreateChatRoom(CreateChatRoomRequest) returns (CreateChatRoomResponse);
+
+  // Get chat room by ID
+  rpc GetChatRoom(GetChatRoomRequest) returns (GetChatRoomResponse);
+
+  // Get chat room by identifier (e.g., bidId, bookingId)
+  rpc GetChatRoomByIdentifier(GetChatRoomByIdentifierRequest) returns (GetChatRoomResponse);
+
+  // Send a system message to a room (e.g., bid status updates)
+  rpc SendSystemMessage(SendSystemMessageRequest) returns (SendSystemMessageResponse);
+
+  // Update room status (e.g., archive when bid is cancelled)
+  rpc UpdateRoomStatus(UpdateRoomStatusRequest) returns (UpdateRoomStatusResponse);
+}
+
+// ============================================================
+// Create Chat Room
+// ============================================================
+
+message CreateChatRoomRequest {
+  repeated string participant_ids = 1;  // User IDs to include in the room
+  string created_by = 2;                // User who triggered room creation
+  bool is_group = 3;                    // Whether this is a group chat
+  string group_name = 4;                // Optional group name
+  bool is_support_chat = 5;             // Whether this is a support chat
+  string identifier_id = 6;             // External identifier (e.g., bidId)
+  string identifier_type = 7;           // Type of identifier (e.g., "BID", "BOOKING")
+}
+
+message CreateChatRoomResponse {
+  bool success = 1;
+  string room_id = 2;
+  string error = 3;
+  bool already_exists = 4;              // True if room already existed for this identifier
+}
+
+// ============================================================
+// Get Chat Room
+// ============================================================
+
+message GetChatRoomRequest {
+  string room_id = 1;
+}
+
+message GetChatRoomByIdentifierRequest {
+  string identifier_id = 1;
+  string identifier_type = 2;
+}
+
+message GetChatRoomResponse {
+  bool found = 1;
+  ChatRoomInfo room = 2;
+}
+
+message ChatRoomInfo {
+  string id = 1;
+  repeated string participants = 2;
+  bool is_group = 3;
+  string group_name = 4;
+  bool is_support_chat = 5;
+  string status = 6;                    // ACTIVE, ARCHIVED, CLOSED
+  string identifier_id = 7;
+  string identifier_type = 8;
+  string created_at = 9;
+  string last_message_at = 10;
+  map<string, int32> unread_counts = 11;
+}
+
+// ============================================================
+// Send System Message
+// ============================================================
+
+message SendSystemMessageRequest {
+  string room_id = 1;
+  string content = 2;                   // Message content (e.g., "#price500,USD" or "accept")
+  string message_type = 3;              // MESSAGE_TYPE: STATUS, TEXT, etc.
+  map<string, string> metadata = 4;     // Additional metadata (bidId, action, etc.)
+}
+
+message SendSystemMessageResponse {
+  bool success = 1;
+  string message_id = 2;
+  string error = 3;
+}
+
+// ============================================================
+// Update Room Status
+// ============================================================
+
+message UpdateRoomStatusRequest {
+  string room_id = 1;
+  string status = 2;                    // ACTIVE, ARCHIVED, CLOSED
+  string updated_by = 3;
+}
+
+message UpdateRoomStatusResponse {
+  bool success = 1;
+  string error = 2;
+}
