@@ -63,6 +63,24 @@
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "Debug main-service with Nx",
+      "runtimeExecutable": "yarn",
+      "runtimeArgs": ["nx", "serve", "main-service"],
+      "env": {
+        "NODE_OPTIONS": "--inspect=9229"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen",
+      "skipFiles": ["<node_internals>/**"],
+      "sourceMaps": true,
+      "outFiles": [
+        "${workspaceFolder}/apps/main-service/dist/**/*.(m|c|)js",
+        "!**/node_modules/**"
+      ]
     }
   ],
   "compounds": [
