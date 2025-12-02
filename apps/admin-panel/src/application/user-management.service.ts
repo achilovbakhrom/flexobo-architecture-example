@@ -8,7 +8,7 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { PasswordService } from '@flexobo/core';
+import { PasswordService, UserRole } from '@flexobo/shared-kernel';
 import {
   User,
   UserDto,
@@ -18,7 +18,6 @@ import {
   PaginatedResult,
   ListQueryParams,
 } from '../domain/admin.types';
-import { UserRole } from '@flexobo/core';
 
 /**
  * In-memory user repository for demo purposes

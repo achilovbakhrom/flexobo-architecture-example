@@ -8,13 +8,13 @@
 import { Module } from '@nestjs/common';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import {
-  AuthModule,
   CqrsModule,
   EventStoreModule,
   OutboxModule,
   MessagingModule,
   MESSAGE_PUBLISHER,
 } from '@flexobo/core';
+import { AuthModule } from '@flexobo/shared-kernel';
 import { PrismaModule } from './prisma.module';
 
 // ============================================================

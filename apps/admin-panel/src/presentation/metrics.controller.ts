@@ -18,7 +18,7 @@ import {
   ApiBearerAuth,
   ApiParam,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, RolesGuard, Roles, UserRole } from '@flexobo/core';
+import { JwtAuthGuard, RolesGuard, Roles, UserRole } from '@flexobo/shared-kernel';
 import { SystemMetricsService } from '../application/system-metrics.service';
 import {
   SystemMetrics,

@@ -17,7 +17,7 @@ import { ApiExcludeEndpoint } from '@nestjs/swagger';
 import { Request, Response, NextFunction } from 'express';
 import { ProxyService } from './proxy.service';
 import { RoutingService } from './routing.service';
-import { Traced } from '@flexobo/core';
+import { Traced } from '@flexobo/shared-kernel';
 
 @Controller()
 export class GatewayController {

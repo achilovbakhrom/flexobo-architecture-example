@@ -16,7 +16,8 @@ import {
   ApiOperation,
   ApiResponse,
 } from '@nestjs/swagger';
-import { CommandBus, Public, QueryBus } from '@flexobo/core';
+import { CommandBus, QueryBus } from '@flexobo/core';
+import { Public } from '@flexobo/shared-kernel';
 import {
   RegisterDto,
   LoginDto,

@@ -1,0 +1,43 @@
+services:
+  postgres-file:
+    image: postgres:15-alpine
+    container_name: file-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: file_service
+    ports:
+      - "5438:5432"
+    volumes:
+      - postgres_file_data:/var/lib/postgresql/data
+    networks:
+      - file-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  localstack:
+    image: localstack/localstack:latest
+    container_name: file-service-localstack
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./init-s3.sh:/etc/localstack/init/ready.d/init-s3.sh
+    networks:
+      - file-service-network
+
+volumes:
+  postgres_file_data:
+  localstack_data:
+
+networks:
+  file-service-network:
+    driver: bridge

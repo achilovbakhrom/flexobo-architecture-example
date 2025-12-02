@@ -2,11 +2,5 @@ export * from './event-store';
 export * from './snapshot';
 export * from './messaging';
 export * from './outbox';
-export * from './resilience';
-export * from './cache';
-export * from './two-phase-commit';
-export * from './observability';
-export * from './versioning';
-export * from './health';
-export * from './auth';
 export * from './aggregate-store';
+// Note: Auth, resilience, observability, cache, two-phase-commit, versioning, and health modules moved to @flexobo/shared-kernel

@@ -19,8 +19,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { VersionInterceptor, ApiVersion } from '@flexobo/core';
-import { Traced } from '@flexobo/core';
+import { VersionInterceptor, ApiVersion, Traced } from '@flexobo/shared-kernel';
 import { Inject } from '@nestjs/common';
 import {
   IOrderHistoryRepository,

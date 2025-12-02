@@ -1,0 +1,89 @@
+# ===========================================
+# Chat Service - Docker Compose
+# ===========================================
+# Prerequisites: Start shared infrastructure first
+#   cd infrastructure && docker-compose up -d
+#
+# Then run: docker-compose up -d
+
+services:
+  # ===========================================
+  # Chat Service Application
+  # ===========================================
+  chat-service:
+    build:
+      context: ../..
+      dockerfile: apps/chat-service/Dockerfile
+    container_name: chat-service
+    ports:
+      - "3006:3006"
+    env_file:
+      - .env.docker
+    depends_on:
+      postgres-chat:
+        condition: service_healthy
+      redis-chat:
+        condition: service_healthy
+    networks:
+      - chat-service-network
+      - flexobo-shared-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # ===========================================
+  # PostgreSQL Database (service-specific)
+  # ===========================================
+  postgres-chat:
+    image: postgres:15-alpine
+    container_name: chat-service-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chat_service
+    ports:
+      - "5436:5432"
+    volumes:
+      - postgres_chat_data:/var/lib/postgresql/data
+    networks:
+      - chat-service-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===========================================
+  # Redis Cache (service-specific)
+  # ===========================================
+  redis-chat:
+    image: redis:7-alpine
+    container_name: chat-service-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis_chat_data:/data
+    networks:
+      - chat-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_chat_data:
+    driver: local
+  redis_chat_data:
+    driver: local
+
+networks:
+  chat-service-network:
+    driver: bridge
+  flexobo-shared-network:
+    external: true

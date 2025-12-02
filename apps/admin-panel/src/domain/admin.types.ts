@@ -2,7 +2,7 @@
  * User Domain Types
  */
 
-import { UserRole } from '@flexobo/core';
+import { UserRole } from '@flexobo/shared-kernel';
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsEmail, IsArray, IsBoolean, IsOptional, MinLength, IsEnum } from 'class-validator';
 

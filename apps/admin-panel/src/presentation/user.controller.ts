@@ -31,7 +31,7 @@ import {
   CurrentUser,
   JwtPayload,
   UserRole,
-} from '@flexobo/core';
+} from '@flexobo/shared-kernel';
 import { UserManagementService } from '../application/user-management.service';
 import { AuditLogService } from '../application/audit-log.service';
 import {

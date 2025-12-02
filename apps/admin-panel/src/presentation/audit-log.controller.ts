@@ -11,7 +11,7 @@ import {
   ApiParam,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, RolesGuard, Roles, UserRole } from '@flexobo/core';
+import { JwtAuthGuard, RolesGuard, Roles, UserRole } from '@flexobo/shared-kernel';
 import { AuditLogService } from '../application/audit-log.service';
 import {
   AuditLogDto,

@@ -8,8 +8,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import request from 'supertest';
 import { AdminPanelModule } from '../admin-panel.module';
-import { UserRole } from '@flexobo/core';
-import { JwtService } from '@flexobo/core';
+import { UserRole, JwtService } from '@flexobo/shared-kernel';
 
 describe('Admin Panel Integration Tests', () => {
   let app: INestApplication;

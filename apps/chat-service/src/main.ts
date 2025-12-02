@@ -1,13 +1,28 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { AppModule } from './app/app.module';
+import { ChatModule } from './chat.module';
 import * as express from 'express';
 import { join } from 'path';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(ChatModule);
   const logger = new Logger('ChatService');
+
+  // Connect gRPC microservice
+  const grpcPort = process.env.CHAT_GRPC_PORT || '50053';
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package: 'chat',
+      protoPath: join(
+        process.cwd(),
+        'libs/shared-kernel/src/lib/grpc/proto/chat.proto'
+      ),
+      url: `0.0.0.0:${grpcPort}`,
+    },
+  });
 
   // Enable CORS
   app.enableCors({
@@ -24,7 +39,7 @@ async function bootstrap() {
     })
   );
 
-  // Serve static files for uploads
+  // Serve static files for uploads (will be removed when file service is fully integrated)
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
 
   // Swagger setup
@@ -38,11 +53,15 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // Start all microservices (gRPC)
+  await app.startAllMicroservices();
+
   // HTTP server
-  const port = process.env.PORT || 3006;
+  const port = process.env.CHAT_SERVICE_PORT || process.env.PORT || 3004;
   await app.listen(port);
   logger.log(`HTTP server running on http://localhost:${port}`);
   logger.log(`WebSocket server running on ws://localhost:${port}/chat`);
+  logger.log(`gRPC server running on 0.0.0.0:${grpcPort}`);
   logger.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 

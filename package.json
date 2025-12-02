@@ -9,6 +9,8 @@
     "start:gateway": "npx tsx scripts/dev.ts gateway",
     "start:admin": "npx tsx scripts/dev.ts admin",
     "start:users": "npx tsx scripts/dev.ts users",
+    "start:chat": "npx tsx scripts/dev.ts chat",
+    "start:file": "npx tsx scripts/dev.ts file",
     "stop": "npx tsx scripts/dev.ts stop",
     "db:migration:create:order": "npx prisma migrate dev --create-only --config apps/order-service/prisma.config.ts",
     "db:migration:create:admin": "npx prisma migrate dev --create-only --config apps/admin-panel/prisma.config.ts",
@@ -37,6 +39,8 @@
     "node": ">=22.0.0"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.943.0",
+    "@aws-sdk/s3-request-presigner": "^3.943.0",
     "@grpc/grpc-js": "^1.14.1",
     "@grpc/proto-loader": "^0.8.0",
     "@nestjs/common": "^11.0.0",
