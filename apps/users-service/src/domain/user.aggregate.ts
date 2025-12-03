@@ -64,6 +64,34 @@ export interface RequestOTPData {
 }
 
 // ============================================================
+// Snapshot Data Interface
+// ============================================================
+
+export interface UserSnapshotData {
+  id: string;
+  uniqueId?: string;
+  email?: string;
+  phoneNumber?: string;
+  telegramId?: string;
+  googleId?: string;
+  passwordHash?: string;
+  fio?: string;
+  avatar?: string;
+  role?: UserRole;
+  userType?: UserType;
+  status?: UserStatus;
+  language?: string;
+  isPrivacyPolicyAccepted?: boolean;
+  isSubscribedNewsletter?: boolean;
+  platform?: AuthPlatform | null;
+  isVerified?: boolean;
+  lastLoginAt?: Date | null;
+  isLoggedIn?: boolean;
+  currentOTP?: UserOTPState;
+  accessTokens?: Array<[string, AccessTokenState]>;
+}
+
+// ============================================================
 // User Aggregate
 // ============================================================
 
@@ -516,81 +544,70 @@ export class User extends AggregateRoot {
   // Snapshot Support
   // ============================================================
 
+  /**
+   * Serialize aggregate state for snapshot storage
+   */
+  toSnapshot(): UserSnapshotData {
+    return {
+      id: this._id,
+      uniqueId: this._uniqueId,
+      email: this._email,
+      phoneNumber: this._phoneNumber,
+      telegramId: this._telegramId,
+      googleId: this._googleId,
+      passwordHash: this._passwordHash,
+      fio: this._fio,
+      avatar: this._avatar,
+      role: this._role,
+      userType: this._userType,
+      status: this._status,
+      language: this._language,
+      isPrivacyPolicyAccepted: this._isPrivacyPolicyAccepted,
+      isSubscribedNewsletter: this._isSubscribedNewsletter,
+      platform: this._platform,
+      isVerified: this._isVerified,
+      lastLoginAt: this._lastLoginAt,
+      isLoggedIn: this._isLoggedIn,
+      currentOTP: this._currentOTP,
+      accessTokens: Array.from(this._accessTokens.entries()),
+    };
+  }
+
   static fromSnapshot(
-    snapshotData: {
-      // Support both underscore-prefixed (from JSON.stringify) and non-prefixed property names
-      _id?: string;
-      id?: string;
-      _uniqueId?: string;
-      uniqueId?: string;
-      _email?: string;
-      email?: string;
-      _phoneNumber?: string;
-      phoneNumber?: string;
-      _telegramId?: string;
-      telegramId?: string;
-      _googleId?: string;
-      googleId?: string;
-      _passwordHash?: string;
-      passwordHash?: string;
-      _fio?: string;
-      fio?: string;
-      _avatar?: string;
-      avatar?: string;
-      _role?: UserRole;
-      role?: UserRole;
-      _userType?: UserType;
-      userType?: UserType;
-      _status?: UserStatus;
-      status?: UserStatus;
-      _language?: string;
-      language?: string;
-      _isPrivacyPolicyAccepted?: boolean;
-      isPrivacyPolicyAccepted?: boolean;
-      _isSubscribedNewsletter?: boolean;
-      isSubscribedNewsletter?: boolean;
-      _platform?: AuthPlatform | null;
-      platform?: AuthPlatform | null;
-      _isVerified?: boolean;
-      isVerified?: boolean;
-      _lastLoginAt?: Date | null;
-      lastLoginAt?: Date | null;
-      _currentOTP?: UserOTPState;
-      currentOTP?: UserOTPState;
-      _accessTokens?: Map<string, AccessTokenState> | Array<[string, AccessTokenState]>;
-      accessTokens?: Array<[string, AccessTokenState]>;
-    },
+    snapshotData: UserSnapshotData,
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
   ): User {
-    // Support both underscore-prefixed and non-prefixed property names
-    const id = snapshotData._id ?? snapshotData.id;
-    if (!id) {
-      throw new Error('Snapshot data must contain an id');
-    }
+    // Handle backwards compatibility: old snapshots have underscore-prefixed properties
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = snapshotData as any;
+    const isOldFormat = '_id' in data;
+
+    const id = isOldFormat ? data._id : snapshotData.id;
     const user = new User(id);
 
-    // Restore basic state from snapshot (prefer underscore-prefixed from JSON.stringify)
-    user._uniqueId = snapshotData._uniqueId ?? snapshotData.uniqueId;
-    user._email = snapshotData._email ?? snapshotData.email;
-    user._phoneNumber = snapshotData._phoneNumber ?? snapshotData.phoneNumber;
-    user._telegramId = snapshotData._telegramId ?? snapshotData.telegramId;
-    user._googleId = snapshotData._googleId ?? snapshotData.googleId;
-    user._passwordHash = snapshotData._passwordHash ?? snapshotData.passwordHash;
-    user._fio = snapshotData._fio ?? snapshotData.fio;
-    user._avatar = snapshotData._avatar ?? snapshotData.avatar;
-    user._role = snapshotData._role ?? snapshotData.role;
-    user._userType = snapshotData._userType ?? snapshotData.userType;
-    user._status = snapshotData._status ?? snapshotData.status;
-    user._language = snapshotData._language ?? snapshotData.language;
-    user._isPrivacyPolicyAccepted = snapshotData._isPrivacyPolicyAccepted ?? snapshotData.isPrivacyPolicyAccepted;
-    user._isSubscribedNewsletter = snapshotData._isSubscribedNewsletter ?? snapshotData.isSubscribedNewsletter;
-    user._platform = snapshotData._platform ?? snapshotData.platform;
-    user._isVerified = snapshotData._isVerified ?? snapshotData.isVerified;
-    user._lastLoginAt = snapshotData._lastLoginAt ?? snapshotData.lastLoginAt;
+    // Restore state from snapshot (supporting both old and new format)
+    user._uniqueId = isOldFormat ? data._uniqueId : snapshotData.uniqueId;
+    user._email = isOldFormat ? data._email : snapshotData.email;
+    user._phoneNumber = isOldFormat ? data._phoneNumber : snapshotData.phoneNumber;
+    user._telegramId = isOldFormat ? data._telegramId : snapshotData.telegramId;
+    user._googleId = isOldFormat ? data._googleId : snapshotData.googleId;
+    user._passwordHash = isOldFormat ? data._passwordHash : snapshotData.passwordHash;
+    user._fio = isOldFormat ? data._fio : snapshotData.fio;
+    user._avatar = isOldFormat ? data._avatar : snapshotData.avatar;
+    user._role = isOldFormat ? data._role : snapshotData.role;
+    user._userType = isOldFormat ? data._userType : snapshotData.userType;
+    user._status = isOldFormat ? data._status : snapshotData.status;
+    user._language = isOldFormat ? data._language : snapshotData.language;
+    user._isPrivacyPolicyAccepted = isOldFormat ? data._isPrivacyPolicyAccepted : snapshotData.isPrivacyPolicyAccepted;
+    user._isSubscribedNewsletter = isOldFormat ? data._isSubscribedNewsletter : snapshotData.isSubscribedNewsletter;
+    user._platform = isOldFormat ? data._platform : snapshotData.platform;
+    user._isVerified = isOldFormat ? data._isVerified : snapshotData.isVerified;
+    user._lastLoginAt = isOldFormat ? data._lastLoginAt : snapshotData.lastLoginAt;
+    user._isLoggedIn = isOldFormat ? (data._isLoggedIn ?? false) : (snapshotData.isLoggedIn ?? false);
 
     // Restore OTP state
-    const otpData = snapshotData._currentOTP ?? snapshotData.currentOTP;
+    const otpData = isOldFormat ? data._currentOTP : snapshotData.currentOTP;
     if (otpData) {
       user._currentOTP = {
         ...otpData,
@@ -600,22 +617,16 @@ export class User extends AggregateRoot {
       };
     }
 
-    // Restore access tokens (handle both Map and Array formats)
-    const tokensData = snapshotData._accessTokens ?? snapshotData.accessTokens;
+    // Restore access tokens
+    const tokensData = isOldFormat ? data._accessTokens : snapshotData.accessTokens;
     if (tokensData) {
-      // If it's a Map (from JSON.stringify, it becomes an object), convert entries
-      let entries: Array<[string, AccessTokenState]>;
-      if (tokensData instanceof Map) {
-        entries = Array.from(tokensData.entries());
-      } else if (Array.isArray(tokensData)) {
-        entries = tokensData;
-      } else {
-        // Object format from JSON.stringify of Map
-        entries = Object.entries(tokensData as Record<string, AccessTokenState>);
-      }
+      // Handle Map serialization from old format (object with entries) vs new format (array)
+      const entries = Array.isArray(tokensData)
+        ? tokensData
+        : Object.entries(tokensData);
 
       user._accessTokens = new Map(
-        entries.map(([jti, token]) => [
+        entries.map(([jti, token]: [string, AccessTokenState]) => [
           jti,
           {
             ...token,

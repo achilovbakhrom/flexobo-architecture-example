@@ -1,3 +1,4 @@
+export * from './prisma-types';
 export * from './user.repository';
 export * from './user-read-model.repository';
 export * from './token.repository';

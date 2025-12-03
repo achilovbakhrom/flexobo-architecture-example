@@ -5,64 +5,18 @@ import {
   IRefreshToken,
   ITokenBlacklist,
 } from '../../ports';
-
-interface RefreshTokenRecord {
-  id: string;
-  userId: string;
-  token: string;
-  jti: string;
-  expiresAt: Date;
-  revokedAt: Date | null;
-  createdAt: Date;
-}
-
-interface TokenBlacklistRecord {
-  id: string;
-  jti: string;
-  reason: string | null;
-  expiresAt: Date;
-  blacklistedAt: Date;
-}
-
-interface UserRecord {
-  id: string;
-  email: string | null;
-  role: string;
-}
-
-interface TokenPrismaClient {
-  refreshToken: {
-    findUnique: (args: { where: { token?: string; id?: string; jti?: string } }) => Promise<RefreshTokenRecord | null>;
-    create: (args: { data: Omit<RefreshTokenRecord, 'id' | 'revokedAt' | 'createdAt'> }) => Promise<RefreshTokenRecord>;
-    update: (args: { where: { id: string }; data: Partial<RefreshTokenRecord> }) => Promise<RefreshTokenRecord>;
-    updateMany: (args: { where: { userId: string; revokedAt: null }; data: Partial<RefreshTokenRecord> }) => Promise<{ count: number }>;
-  };
-  tokenBlacklist: {
-    findUnique: (args: { where: { jti: string } }) => Promise<TokenBlacklistRecord | null>;
-    create: (args: { data: Omit<TokenBlacklistRecord, 'id' | 'blacklistedAt'> }) => Promise<TokenBlacklistRecord>;
-  };
-  user: {
-    findUnique: (args: { where: { id: string } }) => Promise<UserRecord | null>;
-  };
-}
+import { TokenPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaTokenRepository implements ITokenRepository {
   constructor(@Inject('PrismaClient') private readonly prisma: TokenPrismaClient) {}
 
-  async findRefreshToken(
-    token: string
-  ): Promise<(IRefreshToken & { user: { id: string; email: string; role: string } }) | null> {
+  async findRefreshToken(token: string): Promise<IRefreshToken | null> {
     const refreshToken = await this.prisma.refreshToken.findUnique({
       where: { token },
     });
 
     if (!refreshToken) return null;
-
-    // Fetch user separately since there's no FK relation
-    const user = await this.prisma.user.findUnique({
-      where: { id: refreshToken.userId },
-    });
 
     return {
       id: refreshToken.id,
@@ -72,17 +26,6 @@ export class PrismaTokenRepository implements ITokenRepository {
       expiresAt: refreshToken.expiresAt,
       revokedAt: refreshToken.revokedAt,
       createdAt: refreshToken.createdAt,
-      user: user
-        ? {
-            id: user.id,
-            email: user.email || '',
-            role: user.role,
-          }
-        : {
-            id: refreshToken.userId,
-            email: '',
-            role: 'user',
-          },
     };
   }
 

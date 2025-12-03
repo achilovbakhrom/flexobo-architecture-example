@@ -5,48 +5,11 @@ import {
   VersionedUpsertOptions,
   UserStatus,
 } from '../../ports';
-
-interface UserRecord {
-  id: string;
-  uniqueId: string;
-  email: string | null;
-  phoneNumber: string | null;
-  telegramId: string | null;
-  googleId: string | null;
-  passwordHash: string;
-  fio: string;
-  avatar: string | null;
-  role: string;
-  userType: string | null;
-  status: string;
-  language: string;
-  isPrivacyPolicyAccepted: boolean;
-  isSubscribedNewsletter: boolean;
-  platform: string | null;
-  isVerified: boolean;
-  lastLoginAt: Date | null;
-  version: number;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UserReadModelPrismaClient {
-  user: {
-    upsert: (args: {
-      where: { id: string };
-      create: Partial<UserRecord>;
-      update: Partial<UserRecord>;
-    }) => Promise<UserRecord>;
-    update: (args: {
-      where: { id: string };
-      data: Partial<UserRecord>;
-    }) => Promise<UserRecord>;
-  };
-}
+import { UserPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaUserReadModelRepository implements IUserReadModelRepository {
-  constructor(@Inject('PrismaClient') private readonly prisma: UserReadModelPrismaClient) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: UserPrismaClient) {}
 
   async upsert(
     user: Omit<UserReadModelDto, 'createdAt'>,

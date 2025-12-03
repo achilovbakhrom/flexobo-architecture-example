@@ -9,7 +9,7 @@ export interface CreateRefreshTokenData {
 
 export interface ITokenRepository {
   // Refresh tokens
-  findRefreshToken(token: string): Promise<(IRefreshToken & { user: { id: string; email: string; role: string } }) | null>;
+  findRefreshToken(token: string): Promise<IRefreshToken | null>;
   createRefreshToken(data: CreateRefreshTokenData): Promise<IRefreshToken>;
   revokeRefreshToken(id: string): Promise<void>;
   revokeAllUserRefreshTokens(userId: string): Promise<void>;
