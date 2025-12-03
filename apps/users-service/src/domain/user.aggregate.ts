@@ -578,55 +578,44 @@ export class User extends AggregateRoot {
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
   ): User {
-    // Handle backwards compatibility: old snapshots have underscore-prefixed properties
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const data = snapshotData as any;
-    const isOldFormat = '_id' in data;
+    const user = new User(snapshotData.id);
 
-    const id = isOldFormat ? data._id : snapshotData.id;
-    const user = new User(id);
-
-    // Restore state from snapshot (supporting both old and new format)
-    user._uniqueId = isOldFormat ? data._uniqueId : snapshotData.uniqueId;
-    user._email = isOldFormat ? data._email : snapshotData.email;
-    user._phoneNumber = isOldFormat ? data._phoneNumber : snapshotData.phoneNumber;
-    user._telegramId = isOldFormat ? data._telegramId : snapshotData.telegramId;
-    user._googleId = isOldFormat ? data._googleId : snapshotData.googleId;
-    user._passwordHash = isOldFormat ? data._passwordHash : snapshotData.passwordHash;
-    user._fio = isOldFormat ? data._fio : snapshotData.fio;
-    user._avatar = isOldFormat ? data._avatar : snapshotData.avatar;
-    user._role = isOldFormat ? data._role : snapshotData.role;
-    user._userType = isOldFormat ? data._userType : snapshotData.userType;
-    user._status = isOldFormat ? data._status : snapshotData.status;
-    user._language = isOldFormat ? data._language : snapshotData.language;
-    user._isPrivacyPolicyAccepted = isOldFormat ? data._isPrivacyPolicyAccepted : snapshotData.isPrivacyPolicyAccepted;
-    user._isSubscribedNewsletter = isOldFormat ? data._isSubscribedNewsletter : snapshotData.isSubscribedNewsletter;
-    user._platform = isOldFormat ? data._platform : snapshotData.platform;
-    user._isVerified = isOldFormat ? data._isVerified : snapshotData.isVerified;
-    user._lastLoginAt = isOldFormat ? data._lastLoginAt : snapshotData.lastLoginAt;
-    user._isLoggedIn = isOldFormat ? (data._isLoggedIn ?? false) : (snapshotData.isLoggedIn ?? false);
+    // Restore state from snapshot
+    user._uniqueId = snapshotData.uniqueId;
+    user._email = snapshotData.email;
+    user._phoneNumber = snapshotData.phoneNumber;
+    user._telegramId = snapshotData.telegramId;
+    user._googleId = snapshotData.googleId;
+    user._passwordHash = snapshotData.passwordHash;
+    user._fio = snapshotData.fio;
+    user._avatar = snapshotData.avatar;
+    user._role = snapshotData.role;
+    user._userType = snapshotData.userType;
+    user._status = snapshotData.status;
+    user._language = snapshotData.language;
+    user._isPrivacyPolicyAccepted = snapshotData.isPrivacyPolicyAccepted;
+    user._isSubscribedNewsletter = snapshotData.isSubscribedNewsletter;
+    user._platform = snapshotData.platform;
+    user._isVerified = snapshotData.isVerified;
+    user._lastLoginAt = snapshotData.lastLoginAt;
+    user._isLoggedIn = snapshotData.isLoggedIn ?? false;
 
     // Restore OTP state
-    const otpData = isOldFormat ? data._currentOTP : snapshotData.currentOTP;
-    if (otpData) {
+    if (snapshotData.currentOTP) {
       user._currentOTP = {
-        ...otpData,
-        expiresAt: new Date(otpData.expiresAt),
-        requestedAt: new Date(otpData.requestedAt),
-        usedAt: otpData.usedAt ? new Date(otpData.usedAt) : undefined,
+        ...snapshotData.currentOTP,
+        expiresAt: new Date(snapshotData.currentOTP.expiresAt),
+        requestedAt: new Date(snapshotData.currentOTP.requestedAt),
+        usedAt: snapshotData.currentOTP.usedAt
+          ? new Date(snapshotData.currentOTP.usedAt)
+          : undefined,
       };
     }
 
     // Restore access tokens
-    const tokensData = isOldFormat ? data._accessTokens : snapshotData.accessTokens;
-    if (tokensData) {
-      // Handle Map serialization from old format (object with entries) vs new format (array)
-      const entries = Array.isArray(tokensData)
-        ? tokensData
-        : Object.entries(tokensData);
-
+    if (snapshotData.accessTokens) {
       user._accessTokens = new Map(
-        entries.map(([jti, token]: [string, AccessTokenState]) => [
+        snapshotData.accessTokens.map(([jti, token]) => [
           jti,
           {
             ...token,

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { OAuth2Client } from 'google-auth-library';
-import { IGoogleAuthService, GoogleUserInfo } from '../../ports/google-auth-service.port';
+import {
+  IGoogleAuthService,
+  GoogleUserInfo,
+} from '../../ports/google-auth-service.port';
 
 @Injectable()
 export class GoogleAuthService implements IGoogleAuthService {
@@ -9,7 +12,10 @@ export class GoogleAuthService implements IGoogleAuthService {
   private readonly clientId: string;
 
   constructor(private readonly configService: ConfigService) {
-    this.clientId = this.configService.get<string>('GOOGLE_CLIENT_ID', '');
+    this.clientId = this.configService.get<string>('google.clientId', '');
+    if (!this.clientId) {
+      throw new Error('Google Client ID is not configured');
+    }
     this.oAuth2Client = new OAuth2Client(this.clientId);
   }
 
@@ -26,7 +32,6 @@ export class GoogleAuthService implements IGoogleAuthService {
         return null;
       }
 
-      // Extract user information from the token payload
       const googleId = payload.sub;
       const email = payload.email;
       const firstName = payload.given_name || '';
