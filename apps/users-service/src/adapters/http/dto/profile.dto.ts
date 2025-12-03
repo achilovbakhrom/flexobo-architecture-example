@@ -1,5 +1,6 @@
 import { IsString, IsOptional } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class UpdateUserDto {
   @ApiPropertyOptional({
@@ -12,10 +13,13 @@ export class UpdateUserDto {
 
   @ApiPropertyOptional({
     example: '+998901234567',
-    description: 'Phone number to update',
+    description: 'Phone number to update (+ prefix will be stripped)',
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
   phoneNumber?: string;
 
   @ApiPropertyOptional({

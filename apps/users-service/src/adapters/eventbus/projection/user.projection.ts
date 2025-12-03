@@ -110,12 +110,24 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         await this.onUserTelegramLinked(payload);
         break;
 
+      case EVENT_TYPES.USER.GOOGLE_LINKED:
+        await this.onUserGoogleLinked(payload);
+        break;
+
       case EVENT_TYPES.USER.ACTIVATED:
         await this.onUserActivated(payload);
         break;
 
       case EVENT_TYPES.USER.DEACTIVATED:
         await this.onUserDeactivated(payload);
+        break;
+
+      case EVENT_TYPES.USER.OTP_USED:
+        await this.onUserOTPUsed(payload);
+        break;
+
+      case EVENT_TYPES.USER.OTP_REQUESTED:
+        // No read model update needed for OTP request
         break;
 
       default:
@@ -131,6 +143,7 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         email: event.data['email'] as string | null,
         phoneNumber: event.data['phoneNumber'] as string | null,
         telegramId: event.data['telegramId'] as string | null,
+        googleId: event.data['googleId'] as string | null,
         passwordHash: event.data['passwordHash'] as string,
         fio: event.data['fio'] as string,
         avatar: null,
@@ -178,6 +191,13 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
     );
   }
 
+  private async onUserGoogleLinked(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateGoogleId(
+      event.aggregateId,
+      event.data['googleId'] as string
+    );
+  }
+
   private async onUserActivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
@@ -190,5 +210,9 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
       event.aggregateId,
       UserStatus.Inactive
     );
+  }
+
+  private async onUserOTPUsed(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateIsVerified(event.aggregateId, true);
   }
 }

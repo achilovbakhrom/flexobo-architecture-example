@@ -4,7 +4,22 @@ import {
   ValidationArguments,
   isEmail,
 } from 'class-validator';
-import { AuthMethod } from '../../../ports';
+import {
+  AuthMethod,
+  UserStatus as PortUserStatus,
+  UserType as PortUserType,
+  AuthPlatform as PortAuthPlatform,
+} from '../../../ports';
+
+// Re-export enums from ports to ensure consistency
+export const UserStatus = PortUserStatus;
+export type UserStatus = PortUserStatus;
+
+export const UserType = PortUserType;
+export type UserType = PortUserType;
+
+export const AuthPlatform = PortAuthPlatform;
+export type AuthPlatform = PortAuthPlatform;
 
 export const PHONE_NUMBER_REGEX = /^\d{7,15}$/;
 
@@ -96,31 +111,10 @@ export class AuthMethodFieldRequiredValidator
   }
 }
 
-export enum UserStatus {
-  Active = 'active',
-  Inactive = 'inactive',
-  Suspended = 'suspended',
-  Blocked = 'blocked',
-}
-
-export enum UserType {
-  Broker = 'broker',
-  LoadOwner = 'load_owner',
-  Carrier = 'carrier',
-  CompanyDriver = 'company_driver',
-  OwnerOperator = 'owner_operator',
-}
-
 export type UserTypeWithoutCompanyDriver = Exclude<
   UserType,
-  UserType.CompanyDriver
+  typeof UserType.CompanyDriver
 >;
-
-export enum AuthPlatform {
-  Web = 'web',
-  Mobile = 'mobile',
-  Telegram = 'telegram',
-}
 
 export const UserTypeEnumWithoutCompanyDriver = {
   Broker: UserType.Broker,

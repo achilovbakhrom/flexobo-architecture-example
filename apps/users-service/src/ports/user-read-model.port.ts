@@ -6,6 +6,7 @@ export interface UserReadModelDto {
   email?: string | null;
   phoneNumber?: string | null;
   telegramId?: string | null;
+  googleId?: string | null;
   passwordHash: string;
   fio: string;
   avatar?: string | null;
@@ -37,6 +38,8 @@ export interface IUserReadModelRepository {
 
   findByTelegramId(telegramId: string): Promise<UserReadModelDto | null>;
 
+  findByGoogleId(googleId: string): Promise<UserReadModelDto | null>;
+
   upsert(
     user: Omit<UserReadModelDto, 'createdAt'>,
     options?: VersionedUpsertOptions
@@ -56,9 +59,13 @@ export interface IUserReadModelRepository {
 
   updateTelegramId(userId: string, telegramId: string): Promise<void>;
 
+  updateGoogleId(userId: string, googleId: string): Promise<void>;
+
   updateLastLogin(userId: string): Promise<void>;
 
   updateStatus(userId: string, status: UserStatus): Promise<void>;
+
+  updateIsVerified(userId: string, isVerified: boolean): Promise<void>;
 
   delete(userId: string): Promise<void>;
 

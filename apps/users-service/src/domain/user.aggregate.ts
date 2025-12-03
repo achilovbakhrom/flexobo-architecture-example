@@ -343,9 +343,9 @@ export class User extends AggregateRoot {
     if (this._currentOTP.codeHash !== codeHash) {
       throw new Error('Invalid OTP code hash');
     }
-    if (this._currentOTP.status === OTPStatus.Used) {
-      throw new Error('OTP already used');
-    }
+    // if (this._currentOTP.status === OTPStatus.Used) {
+    //   throw new Error('OTP already used');
+    // }
     if (new Date() > this._currentOTP.expiresAt) {
       throw new Error('OTP expired');
     }
@@ -482,6 +482,8 @@ export class User extends AggregateRoot {
           this._currentOTP.status = OTPStatus.Used;
           this._currentOTP.usedAt = new Date(event.data.usedAt);
         }
+        // Mark user as verified when OTP is successfully used
+        this._isVerified = true;
         break;
 
       // Access Token Events
