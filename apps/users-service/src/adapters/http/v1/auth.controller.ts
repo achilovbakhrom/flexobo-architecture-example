@@ -272,6 +272,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify OTP code' })
   @ApiResponse({ status: 200, type: VerifyOTPResponseDto })
   async verifyOTP(@Body() dto: VerifyOTPDto): Promise<VerifyOTPResponseDto> {
+    console.log('DTO received in verifyOTP:', dto);
     const command = new VerifyOTPCommand(
       dto.code,
       dto.codeHash,

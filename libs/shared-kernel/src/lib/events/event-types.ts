@@ -24,8 +24,11 @@ export const EVENT_TYPES = {
     PASSWORD_CHANGED: 'user.password_changed',
     PASSWORD_RESET: 'user.password_reset',
     TELEGRAM_LINKED: 'user.telegram_linked',
+    GOOGLE_LINKED: 'user.google_linked',
     ACTIVATED: 'user.activated',
     DEACTIVATED: 'user.deactivated',
+    OTP_REQUESTED: 'user.otp_requested',
+    OTP_USED: 'user.otp_used',
   },
   PAYMENT: {
     CREATED: 'PaymentCreated',

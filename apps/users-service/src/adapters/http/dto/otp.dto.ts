@@ -74,6 +74,9 @@ export class VerifyOTPDto {
   })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.replace(/^\+/, '') : value
+  )
   phoneNumber?: string;
 
   @ApiPropertyOptional({

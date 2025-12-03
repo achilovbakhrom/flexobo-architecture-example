@@ -25,6 +25,7 @@ export const ROUTING_KEYS = {
     PASSWORD_CHANGED: 'user.password_changed',
     PASSWORD_RESET: 'user.password_reset',
     TELEGRAM_LINKED: 'user.telegram_linked',
+    GOOGLE_LINKED: 'user.google_linked',
     ACTIVATED: 'user.activated',
     DEACTIVATED: 'user.deactivated',
     ALL: 'user.*',

@@ -54,6 +54,14 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     return user ? this.mapToDto(user) : null;
   }
 
+  async findByGoogleId(googleId: string): Promise<UserReadModelDto | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { googleId },
+    });
+
+    return user ? this.mapToDto(user) : null;
+  }
+
   async upsert(
     user: Omit<UserReadModelDto, 'createdAt'>,
     options?: VersionedUpsertOptions
@@ -66,6 +74,7 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         email: user.email,
         phoneNumber: user.phoneNumber,
         telegramId: user.telegramId,
+        googleId: user.googleId,
         passwordHash: user.passwordHash,
         fio: user.fio,
         avatar: user.avatar,
@@ -85,6 +94,7 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         email: user.email,
         phoneNumber: user.phoneNumber,
         telegramId: user.telegramId,
+        googleId: user.googleId,
         passwordHash: user.passwordHash,
         fio: user.fio,
         avatar: user.avatar,
@@ -145,6 +155,16 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
+  async updateGoogleId(userId: string, googleId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        googleId,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
   async updateLastLogin(userId: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -160,6 +180,16 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       where: { id: userId },
       data: {
         status,
+        updatedAt: new Date(),
+      },
+    });
+  }
+
+  async updateIsVerified(userId: string, isVerified: boolean): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        isVerified,
         updatedAt: new Date(),
       },
     });
@@ -190,6 +220,7 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       email: user.email,
       phoneNumber: user.phoneNumber,
       telegramId: user.telegramId,
+      googleId: user.googleId,
       passwordHash: user.passwordHash,
       fio: user.fio,
       avatar: user.avatar,

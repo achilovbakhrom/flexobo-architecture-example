@@ -25,7 +25,10 @@ import {
   ErrorMessages,
   AuthMethod,
 } from '../../ports';
-import { IUserAggregateStore, USER_AGGREGATE_STORE } from '../../ports/user-store.port';
+import {
+  IUserAggregateStore,
+  USER_AGGREGATE_STORE,
+} from '../../ports/user-store.port';
 
 export interface SendOTPResult {
   codeHash: string;
@@ -163,19 +166,16 @@ export class VerifyOTPHandler
       if (!userAggregate) {
         return new Failure(
           new BadRequestException({
-            statusCode: 400,
             error: ErrorCodes.INVALID_OTP,
             message: ErrorMessages[ErrorCodes.INVALID_OTP],
           })
         );
       }
 
-      // Check if OTP exists and matches
       const currentOTP = userAggregate.currentOTP;
       if (!currentOTP) {
         return new Failure(
           new BadRequestException({
-            statusCode: 400,
             error: ErrorCodes.INVALID_OTP,
             message: ErrorMessages[ErrorCodes.INVALID_OTP],
           })
@@ -189,7 +189,6 @@ export class VerifyOTPHandler
       ) {
         return new Failure(
           new BadRequestException({
-            statusCode: 400,
             error: ErrorCodes.INVALID_OTP,
             message: ErrorMessages[ErrorCodes.INVALID_OTP],
           })
@@ -200,7 +199,6 @@ export class VerifyOTPHandler
       if (new Date() > currentOTP.expiresAt) {
         return new Failure(
           new BadRequestException({
-            statusCode: 400,
             error: ErrorCodes.OTP_EXPIRED,
             message: ErrorMessages[ErrorCodes.OTP_EXPIRED],
           })

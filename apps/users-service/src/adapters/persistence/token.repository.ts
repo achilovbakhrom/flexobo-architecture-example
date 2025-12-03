@@ -17,6 +17,9 @@ interface TokenPrismaClient {
     findUnique: (args: any) => Promise<any>;
     create: (args: any) => Promise<any>;
   };
+  user: {
+    findUnique: (args: any) => Promise<any>;
+  };
 }
 
 @Injectable()
@@ -28,10 +31,14 @@ export class PrismaTokenRepository implements ITokenRepository {
   ): Promise<(IRefreshToken & { user: { id: string; email: string; role: string } }) | null> {
     const refreshToken = await this.prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: true },
     });
 
     if (!refreshToken) return null;
+
+    // Fetch user separately since there's no FK relation
+    const user = await this.prisma.user.findUnique({
+      where: { id: refreshToken.userId },
+    });
 
     return {
       id: refreshToken.id,
@@ -41,11 +48,17 @@ export class PrismaTokenRepository implements ITokenRepository {
       expiresAt: refreshToken.expiresAt,
       revokedAt: refreshToken.revokedAt,
       createdAt: refreshToken.createdAt,
-      user: {
-        id: refreshToken.user.id,
-        email: refreshToken.user.email || '',
-        role: refreshToken.user.role,
-      },
+      user: user
+        ? {
+            id: user.id,
+            email: user.email || '',
+            role: user.role,
+          }
+        : {
+            id: refreshToken.userId,
+            email: '',
+            role: 'user',
+          },
     };
   }
 
