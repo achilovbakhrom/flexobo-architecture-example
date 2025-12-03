@@ -70,6 +70,7 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
       {
         durable: true,
         maxRetries: 3,
+        prefetchCount: 1,
       }
     );
 
@@ -94,7 +95,7 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         break;
 
       case EVENT_TYPES.USER.LOGGED_OUT:
-        // No read model update needed for logout
+        await this.onVersionOnlyUpdate(payload);
         break;
 
       case EVENT_TYPES.USER.PROFILE_UPDATED:
@@ -127,7 +128,15 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         break;
 
       case EVENT_TYPES.USER.OTP_REQUESTED:
-        // No read model update needed for OTP request
+        await this.onVersionOnlyUpdate(payload);
+        break;
+
+      case EVENT_TYPES.USER.ACCESS_TOKEN_ISSUED:
+        await this.onVersionOnlyUpdate(payload);
+        break;
+
+      case EVENT_TYPES.USER.ACCESS_TOKEN_REVOKED:
+        await this.onVersionOnlyUpdate(payload);
         break;
 
       default:
@@ -165,54 +174,81 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onUserLoggedIn(event: UserEventPayload): Promise<void> {
-    await this.readModelRepository.updateLastLogin(event.aggregateId);
+    await this.readModelRepository.updateLastLogin(
+      event.aggregateId,
+      event.version
+    );
   }
 
   private async onUserProfileUpdated(event: UserEventPayload): Promise<void> {
-    await this.readModelRepository.updateProfile(event.aggregateId, {
-      fio: event.data['fio'] as string | undefined,
-      phoneNumber: event.data['phoneNumber'] as string | undefined,
-      language: event.data['language'] as string | undefined,
-      avatar: event.data['avatar'] as string | undefined,
-    });
+    await this.readModelRepository.updateProfile(
+      event.aggregateId,
+      {
+        fio: event.data['fio'] as string | undefined,
+        phoneNumber: event.data['phoneNumber'] as string | undefined,
+        language: event.data['language'] as string | undefined,
+        avatar: event.data['avatar'] as string | undefined,
+      },
+      event.version
+    );
   }
 
   private async onUserPasswordChanged(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updatePassword(
       event.aggregateId,
-      event.data['passwordHash'] as string
+      event.data['passwordHash'] as string,
+      event.version
     );
   }
 
   private async onUserTelegramLinked(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateTelegramId(
       event.aggregateId,
-      event.data['telegramId'] as string
+      event.data['telegramId'] as string,
+      event.version
     );
   }
 
   private async onUserGoogleLinked(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateGoogleId(
       event.aggregateId,
-      event.data['googleId'] as string
+      event.data['googleId'] as string,
+      event.version
     );
   }
 
   private async onUserActivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.Active
+      UserStatus.Active,
+      event.version
     );
   }
 
   private async onUserDeactivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.Inactive
+      UserStatus.Inactive,
+      event.version
     );
   }
 
   private async onUserOTPUsed(event: UserEventPayload): Promise<void> {
-    await this.readModelRepository.updateIsVerified(event.aggregateId, true);
+    await this.readModelRepository.updateIsVerified(
+      event.aggregateId,
+      true,
+      event.version
+    );
+  }
+
+  /**
+   * Updates only the version for events that don't change other read model data.
+   * This ensures version tracking stays in sync with the aggregate.
+   */
+  private async onVersionOnlyUpdate(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateVersion(
+      event.aggregateId,
+      event.version
+    );
   }
 }

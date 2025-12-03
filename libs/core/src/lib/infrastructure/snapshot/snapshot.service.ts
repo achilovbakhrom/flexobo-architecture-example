@@ -36,11 +36,16 @@ export class SnapshotService {
     aggregateType: string
   ): Promise<Snapshot<unknown> | null> {
     if (!this.strategy.enabled) {
+      this.logger.debug('Snapshot creation disabled');
       return null;
     }
 
     const version = aggregate.version;
     const aggregateId = (aggregate as { id: string }).id;
+
+    this.logger.debug(
+      `Checking snapshot for ${aggregateType}:${aggregateId} at version ${version} (frequency: ${this.strategy.snapshotFrequency})`
+    );
 
     // Check if we should create a snapshot
     if (!this.shouldCreateSnapshot(version)) {
