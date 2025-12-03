@@ -17,9 +17,16 @@ interface SnapshotRecord {
 
 interface SnapshotPrismaClient {
   snapshot: {
-    create: (args: {
-      data: {
+    upsert: (args: {
+      where: { aggregateId: string };
+      create: {
         aggregateId: string;
+        aggregateType: string;
+        snapshotData: Record<string, never>;
+        version: number;
+        expiresAt: Date;
+      };
+      update: {
         aggregateType: string;
         snapshotData: Record<string, never>;
         version: number;
@@ -60,9 +67,17 @@ export class PrismaSnapshotRepository implements ISnapshotRepository {
   ): Promise<Snapshot<T>> {
     const expiresAt = snapshot.expiresAt || this.calculateExpiration(30);
 
-    const saved = await this.prisma.snapshot.create({
-      data: {
+    // Use upsert since aggregateId is unique - we keep only the latest snapshot per aggregate
+    const saved = await this.prisma.snapshot.upsert({
+      where: { aggregateId: snapshot.aggregateId },
+      create: {
         aggregateId: snapshot.aggregateId,
+        aggregateType: snapshot.aggregateType,
+        snapshotData: snapshot.data as Record<string, never>,
+        version: snapshot.version,
+        expiresAt,
+      },
+      update: {
         aggregateType: snapshot.aggregateType,
         snapshotData: snapshot.data as Record<string, never>,
         version: snapshot.version,

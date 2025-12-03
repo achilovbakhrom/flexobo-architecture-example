@@ -518,67 +518,104 @@ export class User extends AggregateRoot {
 
   static fromSnapshot(
     snapshotData: {
-      id: string;
+      // Support both underscore-prefixed (from JSON.stringify) and non-prefixed property names
+      _id?: string;
+      id?: string;
+      _uniqueId?: string;
       uniqueId?: string;
+      _email?: string;
       email?: string;
+      _phoneNumber?: string;
       phoneNumber?: string;
+      _telegramId?: string;
       telegramId?: string;
+      _googleId?: string;
       googleId?: string;
+      _passwordHash?: string;
       passwordHash?: string;
+      _fio?: string;
       fio?: string;
+      _avatar?: string;
       avatar?: string;
+      _role?: UserRole;
       role?: UserRole;
+      _userType?: UserType;
       userType?: UserType;
+      _status?: UserStatus;
       status?: UserStatus;
+      _language?: string;
       language?: string;
+      _isPrivacyPolicyAccepted?: boolean;
       isPrivacyPolicyAccepted?: boolean;
+      _isSubscribedNewsletter?: boolean;
       isSubscribedNewsletter?: boolean;
+      _platform?: AuthPlatform | null;
       platform?: AuthPlatform | null;
+      _isVerified?: boolean;
       isVerified?: boolean;
+      _lastLoginAt?: Date | null;
       lastLoginAt?: Date | null;
+      _currentOTP?: UserOTPState;
       currentOTP?: UserOTPState;
+      _accessTokens?: Map<string, AccessTokenState> | Array<[string, AccessTokenState]>;
       accessTokens?: Array<[string, AccessTokenState]>;
     },
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
   ): User {
-    const user = new User(snapshotData.id);
+    // Support both underscore-prefixed and non-prefixed property names
+    const id = snapshotData._id ?? snapshotData.id;
+    if (!id) {
+      throw new Error('Snapshot data must contain an id');
+    }
+    const user = new User(id);
 
-    // Restore basic state from snapshot
-    user._uniqueId = snapshotData.uniqueId;
-    user._email = snapshotData.email;
-    user._phoneNumber = snapshotData.phoneNumber;
-    user._telegramId = snapshotData.telegramId;
-    user._googleId = snapshotData.googleId;
-    user._passwordHash = snapshotData.passwordHash;
-    user._fio = snapshotData.fio;
-    user._avatar = snapshotData.avatar;
-    user._role = snapshotData.role;
-    user._userType = snapshotData.userType;
-    user._status = snapshotData.status;
-    user._language = snapshotData.language;
-    user._isPrivacyPolicyAccepted = snapshotData.isPrivacyPolicyAccepted;
-    user._isSubscribedNewsletter = snapshotData.isSubscribedNewsletter;
-    user._platform = snapshotData.platform;
-    user._isVerified = snapshotData.isVerified;
-    user._lastLoginAt = snapshotData.lastLoginAt;
+    // Restore basic state from snapshot (prefer underscore-prefixed from JSON.stringify)
+    user._uniqueId = snapshotData._uniqueId ?? snapshotData.uniqueId;
+    user._email = snapshotData._email ?? snapshotData.email;
+    user._phoneNumber = snapshotData._phoneNumber ?? snapshotData.phoneNumber;
+    user._telegramId = snapshotData._telegramId ?? snapshotData.telegramId;
+    user._googleId = snapshotData._googleId ?? snapshotData.googleId;
+    user._passwordHash = snapshotData._passwordHash ?? snapshotData.passwordHash;
+    user._fio = snapshotData._fio ?? snapshotData.fio;
+    user._avatar = snapshotData._avatar ?? snapshotData.avatar;
+    user._role = snapshotData._role ?? snapshotData.role;
+    user._userType = snapshotData._userType ?? snapshotData.userType;
+    user._status = snapshotData._status ?? snapshotData.status;
+    user._language = snapshotData._language ?? snapshotData.language;
+    user._isPrivacyPolicyAccepted = snapshotData._isPrivacyPolicyAccepted ?? snapshotData.isPrivacyPolicyAccepted;
+    user._isSubscribedNewsletter = snapshotData._isSubscribedNewsletter ?? snapshotData.isSubscribedNewsletter;
+    user._platform = snapshotData._platform ?? snapshotData.platform;
+    user._isVerified = snapshotData._isVerified ?? snapshotData.isVerified;
+    user._lastLoginAt = snapshotData._lastLoginAt ?? snapshotData.lastLoginAt;
 
     // Restore OTP state
-    if (snapshotData.currentOTP) {
+    const otpData = snapshotData._currentOTP ?? snapshotData.currentOTP;
+    if (otpData) {
       user._currentOTP = {
-        ...snapshotData.currentOTP,
-        expiresAt: new Date(snapshotData.currentOTP.expiresAt),
-        requestedAt: new Date(snapshotData.currentOTP.requestedAt),
-        usedAt: snapshotData.currentOTP.usedAt
-          ? new Date(snapshotData.currentOTP.usedAt)
-          : undefined,
+        ...otpData,
+        expiresAt: new Date(otpData.expiresAt),
+        requestedAt: new Date(otpData.requestedAt),
+        usedAt: otpData.usedAt ? new Date(otpData.usedAt) : undefined,
       };
     }
 
-    // Restore access tokens
-    if (snapshotData.accessTokens) {
+    // Restore access tokens (handle both Map and Array formats)
+    const tokensData = snapshotData._accessTokens ?? snapshotData.accessTokens;
+    if (tokensData) {
+      // If it's a Map (from JSON.stringify, it becomes an object), convert entries
+      let entries: Array<[string, AccessTokenState]>;
+      if (tokensData instanceof Map) {
+        entries = Array.from(tokensData.entries());
+      } else if (Array.isArray(tokensData)) {
+        entries = tokensData;
+      } else {
+        // Object format from JSON.stringify of Map
+        entries = Object.entries(tokensData as Record<string, AccessTokenState>);
+      }
+
       user._accessTokens = new Map(
-        snapshotData.accessTokens.map(([jti, token]) => [
+        entries.map(([jti, token]) => [
           jti,
           {
             ...token,

@@ -6,19 +6,43 @@ import {
   ITokenBlacklist,
 } from '../../ports';
 
+interface RefreshTokenRecord {
+  id: string;
+  userId: string;
+  token: string;
+  jti: string;
+  expiresAt: Date;
+  revokedAt: Date | null;
+  createdAt: Date;
+}
+
+interface TokenBlacklistRecord {
+  id: string;
+  jti: string;
+  reason: string | null;
+  expiresAt: Date;
+  blacklistedAt: Date;
+}
+
+interface UserRecord {
+  id: string;
+  email: string | null;
+  role: string;
+}
+
 interface TokenPrismaClient {
   refreshToken: {
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    updateMany: (args: any) => Promise<any>;
+    findUnique: (args: { where: { token?: string; id?: string; jti?: string } }) => Promise<RefreshTokenRecord | null>;
+    create: (args: { data: Omit<RefreshTokenRecord, 'id' | 'revokedAt' | 'createdAt'> }) => Promise<RefreshTokenRecord>;
+    update: (args: { where: { id: string }; data: Partial<RefreshTokenRecord> }) => Promise<RefreshTokenRecord>;
+    updateMany: (args: { where: { userId: string; revokedAt: null }; data: Partial<RefreshTokenRecord> }) => Promise<{ count: number }>;
   };
   tokenBlacklist: {
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
+    findUnique: (args: { where: { jti: string } }) => Promise<TokenBlacklistRecord | null>;
+    create: (args: { data: Omit<TokenBlacklistRecord, 'id' | 'blacklistedAt'> }) => Promise<TokenBlacklistRecord>;
   };
   user: {
-    findUnique: (args: any) => Promise<any>;
+    findUnique: (args: { where: { id: string } }) => Promise<UserRecord | null>;
   };
 }
 

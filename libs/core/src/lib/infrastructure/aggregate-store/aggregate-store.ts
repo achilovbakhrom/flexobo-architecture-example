@@ -153,11 +153,7 @@ export abstract class AggregateStore<
    * This method:
    * 1. Persists events to event store (source of truth)
    * 2. Saves events to outbox for reliable publishing to message broker
-   *
-   * Projections (separate event handlers) will:
-   * - Listen to events from the broker
-   * - Update read models
-   * - Create snapshots when needed
+   * 3. Creates snapshot if needed (based on snapshot strategy)
    *
    * Returns the events that were saved.
    */
@@ -190,6 +186,11 @@ export abstract class AggregateStore<
 
     // 3. Mark events as committed on the aggregate
     aggregate.markEventsAsCommitted();
+
+    // 4. Create snapshot if needed (based on snapshot frequency)
+    if (this.snapshotService) {
+      await this.snapshotService.createSnapshot(aggregate, aggregateType);
+    }
 
     return uncommittedEvents;
   }

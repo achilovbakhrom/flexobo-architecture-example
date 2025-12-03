@@ -3,64 +3,50 @@ import {
   IUserReadModelRepository,
   UserReadModelDto,
   VersionedUpsertOptions,
-  UserRole,
   UserStatus,
-  UserType,
-  AuthPlatform,
 } from '../../ports';
+
+interface UserRecord {
+  id: string;
+  uniqueId: string;
+  email: string | null;
+  phoneNumber: string | null;
+  telegramId: string | null;
+  googleId: string | null;
+  passwordHash: string;
+  fio: string;
+  avatar: string | null;
+  role: string;
+  userType: string | null;
+  status: string;
+  language: string;
+  isPrivacyPolicyAccepted: boolean;
+  isSubscribedNewsletter: boolean;
+  platform: string | null;
+  isVerified: boolean;
+  lastLoginAt: Date | null;
+  version: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface UserReadModelPrismaClient {
   user: {
-    findUnique: (args: any) => Promise<any>;
-    upsert: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    delete: (args: any) => Promise<any>;
+    upsert: (args: {
+      where: { id: string };
+      create: Partial<UserRecord>;
+      update: Partial<UserRecord>;
+    }) => Promise<UserRecord>;
+    update: (args: {
+      where: { id: string };
+      data: Partial<UserRecord>;
+    }) => Promise<UserRecord>;
   };
 }
 
 @Injectable()
 export class PrismaUserReadModelRepository implements IUserReadModelRepository {
   constructor(@Inject('PrismaClient') private readonly prisma: UserReadModelPrismaClient) {}
-
-  async findById(userId: string): Promise<UserReadModelDto | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-    });
-
-    return user ? this.mapToDto(user) : null;
-  }
-
-  async findByEmail(email: string): Promise<UserReadModelDto | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { email },
-    });
-
-    return user ? this.mapToDto(user) : null;
-  }
-
-  async findByPhoneNumber(phoneNumber: string): Promise<UserReadModelDto | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { phoneNumber },
-    });
-
-    return user ? this.mapToDto(user) : null;
-  }
-
-  async findByTelegramId(telegramId: string): Promise<UserReadModelDto | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { telegramId },
-    });
-
-    return user ? this.mapToDto(user) : null;
-  }
-
-  async findByGoogleId(googleId: string): Promise<UserReadModelDto | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { googleId },
-    });
-
-    return user ? this.mapToDto(user) : null;
-  }
 
   async upsert(
     user: Omit<UserReadModelDto, 'createdAt'>,
@@ -88,6 +74,7 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         isVerified: user.isVerified,
         lastLoginAt: user.lastLoginAt,
         updatedAt: user.updatedAt,
+        version: options?.version ?? 1,
       },
       update: {
         uniqueId: user.uniqueId,
@@ -108,6 +95,7 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         isVerified: user.isVerified,
         lastLoginAt: user.lastLoginAt,
         updatedAt: user.updatedAt,
+        version: options?.version,
       },
     });
 
@@ -121,7 +109,8 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       phoneNumber?: string;
       language?: string;
       avatar?: string;
-    }
+    },
+    version?: number
   ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
@@ -130,111 +119,85 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
         ...(data.language !== undefined && { language: data.language }),
         ...(data.avatar !== undefined && { avatar: data.avatar }),
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updatePassword(userId: string, passwordHash: string): Promise<void> {
+  async updatePassword(userId: string, passwordHash: string, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         passwordHash,
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updateTelegramId(userId: string, telegramId: string): Promise<void> {
+  async updateTelegramId(userId: string, telegramId: string, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         telegramId,
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updateGoogleId(userId: string, googleId: string): Promise<void> {
+  async updateGoogleId(userId: string, googleId: string, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         googleId,
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updateLastLogin(userId: string): Promise<void> {
+  async updateLastLogin(userId: string, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         lastLoginAt: new Date(),
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updateStatus(userId: string, status: UserStatus): Promise<void> {
+  async updateStatus(userId: string, status: UserStatus, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         status,
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async updateIsVerified(userId: string, isVerified: boolean): Promise<void> {
+  async updateIsVerified(userId: string, isVerified: boolean, version?: number): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         isVerified,
+        ...(version !== undefined && { version }),
         updatedAt: new Date(),
       },
     });
   }
 
-  async delete(userId: string): Promise<void> {
-    await this.prisma.user.delete({
+  async updateVersion(userId: string, version: number): Promise<void> {
+    await this.prisma.user.update({
       where: { id: userId },
+      data: {
+        version,
+        updatedAt: new Date(),
+      },
     });
-  }
-
-  async getVersion(userId: string): Promise<number> {
-    // For simplicity, we're not tracking versions in the read model
-    // In a production system, you might add a version column
-    return 0;
-  }
-
-  async isEventProcessed(userId: string, eventId: string): Promise<boolean> {
-    // For simplicity, we're not tracking processed events
-    // In a production system, you might maintain an event log table
-    return false;
-  }
-
-  private mapToDto(user: any): UserReadModelDto {
-    return {
-      id: user.id,
-      uniqueId: user.uniqueId,
-      email: user.email,
-      phoneNumber: user.phoneNumber,
-      telegramId: user.telegramId,
-      googleId: user.googleId,
-      passwordHash: user.passwordHash,
-      fio: user.fio,
-      avatar: user.avatar,
-      role: user.role as UserRole,
-      userType: user.userType as UserType | null,
-      status: user.status as UserStatus,
-      language: user.language,
-      isPrivacyPolicyAccepted: user.isPrivacyPolicyAccepted,
-      isSubscribedNewsletter: user.isSubscribedNewsletter,
-      platform: user.platform as AuthPlatform | null,
-      isVerified: user.isVerified,
-      lastLoginAt: user.lastLoginAt,
-      createdAt: user.createdAt,
-      updatedAt: user.updatedAt,
-    };
   }
 }

@@ -29,6 +29,8 @@ export const EVENT_TYPES = {
     DEACTIVATED: 'user.deactivated',
     OTP_REQUESTED: 'user.otp_requested',
     OTP_USED: 'user.otp_used',
+    ACCESS_TOKEN_ISSUED: 'user.access_token_issued',
+    ACCESS_TOKEN_REVOKED: 'user.access_token_revoked',
   },
   PAYMENT: {
     CREATED: 'PaymentCreated',
