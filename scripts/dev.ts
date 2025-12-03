@@ -12,7 +12,7 @@
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'order' | 'gateway' | 'admin' | 'users';
+type ServiceName = 'order' | 'gateway' | 'admin' | 'users' | 'main';
 
 interface ServiceConfig {
   name: string;
@@ -45,6 +45,12 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'users-service',
     dockerCompose: 'apps/users-service/docker-compose.yml',
     color: '\x1b[32m', // green
+  },
+  main: {
+    name: 'main-service',
+    nxProject: 'main-service',
+    dockerCompose: 'apps/main-service/docker-compose.yml',
+    color: '\x1b[34m', // blue
   },
 };
 
@@ -178,7 +184,10 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['order', 'gateway', 'admin', 'users', 'all', 'stop'].includes(arg)) {
+  if (
+    !arg ||
+    !['order', 'gateway', 'admin', 'users', 'all', 'stop'].includes(arg)
+  ) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 

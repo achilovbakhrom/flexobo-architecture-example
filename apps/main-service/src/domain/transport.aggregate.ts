@@ -1,10 +1,21 @@
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-import { EVENT_TYPES } from './event.constants';
 import {
   CapacityUnit,
   TransportTypeFeature,
   TransportLoadingFeature,
 } from './enums';
+import {
+  TransportEvent,
+  TransportEventType,
+  TransportCreatedEvent,
+  TransportUpdatedEvent,
+  TransportLoadingTypeAddedEvent,
+  TransportLoadingTypeRemovedEvent,
+  TransportPermitAddedEvent,
+  TransportPermitRemovedEvent,
+  TransportAdrClassAddedEvent,
+  TransportAdrClassRemovedEvent,
+} from './events/transport.events';
 
 // ==============================================
 // Snapshot Interface
@@ -77,7 +88,7 @@ export class Transport extends AggregateRoot {
     }
   ): Transport {
     const transport = new Transport(transportId);
-    const event = transport.createEvent(EVENT_TYPES.TRANSPORT.CREATED, {
+    const event = transport.createEvent(TransportEventType.Created, {
       ownerId,
       ...data,
     });
@@ -129,7 +140,10 @@ export class Transport extends AggregateRoot {
     transportHeight?: number;
     currencyId?: string;
   }): void {
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.UPDATED, data);
+    const event = this.createEvent(TransportEventType.Updated, {
+      ...data,
+      updatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -137,8 +151,9 @@ export class Transport extends AggregateRoot {
   addLoadingType(loadingTypeId: string): void {
     if (this.loadingTypeIds.includes(loadingTypeId)) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.LOADING_TYPE_ADDED, {
+    const event = this.createEvent(TransportEventType.LoadingTypeAdded, {
       loadingTypeId,
+      addedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -147,10 +162,10 @@ export class Transport extends AggregateRoot {
   removeLoadingType(loadingTypeId: string): void {
     if (!this.loadingTypeIds.includes(loadingTypeId)) return;
 
-    const event = this.createEvent(
-      EVENT_TYPES.TRANSPORT.LOADING_TYPE_REMOVED,
-      { loadingTypeId }
-    );
+    const event = this.createEvent(TransportEventType.LoadingTypeRemoved, {
+      loadingTypeId,
+      removedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -158,8 +173,9 @@ export class Transport extends AggregateRoot {
   addPermit(permitId: string): void {
     if (this.permitIds.includes(permitId)) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.PERMIT_ADDED, {
+    const event = this.createEvent(TransportEventType.PermitAdded, {
       permitId,
+      addedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -168,8 +184,9 @@ export class Transport extends AggregateRoot {
   removePermit(permitId: string): void {
     if (!this.permitIds.includes(permitId)) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.PERMIT_REMOVED, {
+    const event = this.createEvent(TransportEventType.PermitRemoved, {
       permitId,
+      removedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -178,8 +195,9 @@ export class Transport extends AggregateRoot {
   addAdrClass(adrClassId: string): void {
     if (this.adrClassIds.includes(adrClassId)) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.ADR_CLASS_ADDED, {
+    const event = this.createEvent(TransportEventType.AdrClassAdded, {
       adrClassId,
+      addedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -188,8 +206,9 @@ export class Transport extends AggregateRoot {
   removeAdrClass(adrClassId: string): void {
     if (!this.adrClassIds.includes(adrClassId)) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.ADR_CLASS_REMOVED, {
+    const event = this.createEvent(TransportEventType.AdrClassRemoved, {
       adrClassId,
+      removedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -198,7 +217,9 @@ export class Transport extends AggregateRoot {
   activate(): void {
     if (this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.ACTIVATED, {});
+    const event = this.createEvent(TransportEventType.Activated, {
+      activatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -206,13 +227,17 @@ export class Transport extends AggregateRoot {
   deactivate(): void {
     if (!this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.DEACTIVATED, {});
+    const event = this.createEvent(TransportEventType.Deactivated, {
+      deactivatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   delete(): void {
-    const event = this.createEvent(EVENT_TYPES.TRANSPORT.DELETED, {});
+    const event = this.createEvent(TransportEventType.Deleted, {
+      deletedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -221,39 +246,39 @@ export class Transport extends AggregateRoot {
   // Event Handlers (apply)
   // ==============================================
 
-  protected apply(event: DomainEvent): void {
+  protected apply(event: DomainEvent<TransportEvent>): void {
     switch (event.type) {
-      case EVENT_TYPES.TRANSPORT.CREATED:
+      case TransportEventType.Created:
         this.applyTransportCreated(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.UPDATED:
+      case TransportEventType.Updated:
         this.applyTransportUpdated(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.LOADING_TYPE_ADDED:
+      case TransportEventType.LoadingTypeAdded:
         this.applyLoadingTypeAdded(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.LOADING_TYPE_REMOVED:
+      case TransportEventType.LoadingTypeRemoved:
         this.applyLoadingTypeRemoved(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.PERMIT_ADDED:
+      case TransportEventType.PermitAdded:
         this.applyPermitAdded(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.PERMIT_REMOVED:
+      case TransportEventType.PermitRemoved:
         this.applyPermitRemoved(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.ADR_CLASS_ADDED:
+      case TransportEventType.AdrClassAdded:
         this.applyAdrClassAdded(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.ADR_CLASS_REMOVED:
+      case TransportEventType.AdrClassRemoved:
         this.applyAdrClassRemoved(event.data);
         break;
-      case EVENT_TYPES.TRANSPORT.ACTIVATED:
-        this.applyActivated(event.data);
+      case TransportEventType.Activated:
+        this.applyActivated();
         break;
-      case EVENT_TYPES.TRANSPORT.DEACTIVATED:
-        this.applyDeactivated(event.data);
+      case TransportEventType.Deactivated:
+        this.applyDeactivated();
         break;
-      case EVENT_TYPES.TRANSPORT.DELETED:
+      case TransportEventType.Deleted:
         // Handled by projection
         break;
       default:
@@ -262,7 +287,7 @@ export class Transport extends AggregateRoot {
     }
   }
 
-  private applyTransportCreated(data: any): void {
+  private applyTransportCreated(data: TransportCreatedEvent['data']): void {
     this.ownerId = data.ownerId;
     this.name = data.name;
     this.transportTypeId = data.transportTypeId;
@@ -281,7 +306,7 @@ export class Transport extends AggregateRoot {
     this.isActive = true;
   }
 
-  private applyTransportUpdated(data: any): void {
+  private applyTransportUpdated(data: TransportUpdatedEvent['data']): void {
     if (data.name !== undefined) this.name = data.name;
     if (data.transportTypeId) this.transportTypeId = data.transportTypeId;
     if (data.transportTypeFeature)
@@ -301,37 +326,43 @@ export class Transport extends AggregateRoot {
     if (data.currencyId !== undefined) this.currencyId = data.currencyId;
   }
 
-  private applyLoadingTypeAdded(data: any): void {
+  private applyLoadingTypeAdded(
+    data: TransportLoadingTypeAddedEvent['data']
+  ): void {
     this.loadingTypeIds.push(data.loadingTypeId);
   }
 
-  private applyLoadingTypeRemoved(data: any): void {
+  private applyLoadingTypeRemoved(
+    data: TransportLoadingTypeRemovedEvent['data']
+  ): void {
     this.loadingTypeIds = this.loadingTypeIds.filter(
       (id) => id !== data.loadingTypeId
     );
   }
 
-  private applyPermitAdded(data: any): void {
+  private applyPermitAdded(data: TransportPermitAddedEvent['data']): void {
     this.permitIds.push(data.permitId);
   }
 
-  private applyPermitRemoved(data: any): void {
+  private applyPermitRemoved(data: TransportPermitRemovedEvent['data']): void {
     this.permitIds = this.permitIds.filter((id) => id !== data.permitId);
   }
 
-  private applyAdrClassAdded(data: any): void {
+  private applyAdrClassAdded(data: TransportAdrClassAddedEvent['data']): void {
     this.adrClassIds.push(data.adrClassId);
   }
 
-  private applyAdrClassRemoved(data: any): void {
+  private applyAdrClassRemoved(
+    data: TransportAdrClassRemovedEvent['data']
+  ): void {
     this.adrClassIds = this.adrClassIds.filter((id) => id !== data.adrClassId);
   }
 
-  private applyActivated(_data: any): void {
+  private applyActivated(): void {
     this.isActive = true;
   }
 
-  private applyDeactivated(_data: any): void {
+  private applyDeactivated(): void {
     this.isActive = false;
   }
 

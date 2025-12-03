@@ -1,11 +1,15 @@
+[dotenv@17.2.3] injecting env (8) from .env -- tip: ⚙️  specify custom .env file path with { path: '/custom/path/.env' }
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateEnum
-CREATE TYPE "load_status" AS ENUM ('OPEN', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED', 'EXPIRED');
+CREATE TYPE "load_status" AS ENUM ('OPEN', 'IN_CONTRACT', 'IN_TRANSIT', 'CANCELLED', 'EXPIRED', 'DELIVERED');
 
 -- CreateEnum
 CREATE TYPE "truck_load_type" AS ENUM ('FTL', 'LTL');
 
 -- CreateEnum
-CREATE TYPE "price_mode" AS ENUM ('FIXED', 'NEGOTIABLE', 'PER_KM');
+CREATE TYPE "price_mode" AS ENUM ('FIXED', 'NEGOTIABLE', 'ON_REQUEST');
 
 -- CreateEnum
 CREATE TYPE "payment_method" AS ENUM ('CASH', 'CREDIT_CARD', 'NDS', 'BANK_TRANSFER');
@@ -14,7 +18,7 @@ CREATE TYPE "payment_method" AS ENUM ('CASH', 'CREDIT_CARD', 'NDS', 'BANK_TRANSF
 CREATE TYPE "weight_unit" AS ENUM ('KG', 'TON', 'LB');
 
 -- CreateEnum
-CREATE TYPE "capacity_unit" AS ENUM ('M3', 'TON', 'PALLET');
+CREATE TYPE "capacity_unit" AS ENUM ('M3', 'L', 'ML');
 
 -- CreateEnum
 CREATE TYPE "transport_type_feature" AS ENUM ('OPEN', 'CLOSED', 'REFRIGERATED');
@@ -31,13 +35,13 @@ CREATE TYPE "trip_document_type" AS ENUM ('PASSPORT', 'INVOICE', 'CMR', 'OTHER')
 -- CreateTable
 CREATE TABLE "events" (
     "id" TEXT NOT NULL,
-    "aggregateId" TEXT NOT NULL,
-    "aggregateType" TEXT NOT NULL,
-    "type" TEXT NOT NULL,
-    "data" JSONB NOT NULL,
-    "metadata" JSONB,
+    "aggregate_id" TEXT NOT NULL,
+    "aggregate_type" TEXT NOT NULL,
+    "event_type" TEXT NOT NULL,
+    "event_data" JSONB NOT NULL,
     "version" INTEGER NOT NULL,
-    "timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "occurred_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "metadata" JSONB,
 
     CONSTRAINT "events_pkey" PRIMARY KEY ("id")
 );
@@ -45,14 +49,18 @@ CREATE TABLE "events" (
 -- CreateTable
 CREATE TABLE "outbox_messages" (
     "id" TEXT NOT NULL,
-    "eventId" TEXT NOT NULL,
-    "eventType" TEXT NOT NULL,
+    "aggregate_id" TEXT NOT NULL,
+    "aggregate_type" TEXT NOT NULL,
+    "event_type" TEXT NOT NULL,
     "payload" JSONB NOT NULL,
-    "metadata" JSONB,
-    "status" TEXT NOT NULL DEFAULT 'pending',
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "sentAt" TIMESTAMP(3),
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "retry_count" INTEGER NOT NULL DEFAULT 0,
+    "max_retries" INTEGER NOT NULL DEFAULT 5,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "processed_at" TIMESTAMP(3),
+    "published_at" TIMESTAMP(3),
     "error" TEXT,
+    "metadata" JSONB,
 
     CONSTRAINT "outbox_messages_pkey" PRIMARY KEY ("id")
 );
@@ -60,11 +68,12 @@ CREATE TABLE "outbox_messages" (
 -- CreateTable
 CREATE TABLE "snapshots" (
     "id" TEXT NOT NULL,
-    "aggregateId" TEXT NOT NULL,
-    "aggregateType" TEXT NOT NULL,
+    "aggregate_id" TEXT NOT NULL,
+    "aggregate_type" TEXT NOT NULL,
+    "snapshot_data" JSONB NOT NULL,
     "version" INTEGER NOT NULL,
-    "data" JSONB NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(3),
 
     CONSTRAINT "snapshots_pkey" PRIMARY KEY ("id")
 );
@@ -72,10 +81,9 @@ CREATE TABLE "snapshots" (
 -- CreateTable
 CREATE TABLE "projection_positions" (
     "id" TEXT NOT NULL,
-    "projectionId" TEXT NOT NULL,
-    "lastEventId" TEXT,
-    "lastTimestamp" TIMESTAMP(3),
-    "updatedAt" TIMESTAMP(3) NOT NULL,
+    "projection_name" TEXT NOT NULL,
+    "last_event_id" TEXT NOT NULL,
+    "last_processed_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "projection_positions_pkey" PRIMARY KEY ("id")
 );
@@ -343,15 +351,7 @@ CREATE TABLE "trips" (
     "id" TEXT NOT NULL,
     "owner_id" TEXT NOT NULL,
     "company_id" TEXT,
-    "transport_type_id" TEXT NOT NULL,
-    "transport_type_feature" "transport_type_feature" NOT NULL,
-    "transport_loading_feature" "transport_loading_feature" NOT NULL,
-    "loading_capacity" DOUBLE PRECISION NOT NULL,
-    "capacity" DOUBLE PRECISION NOT NULL,
-    "capacity_unit" "capacity_unit" NOT NULL,
-    "transport_length" DOUBLE PRECISION,
-    "transport_width" DOUBLE PRECISION,
-    "transport_height" DOUBLE PRECISION,
+    "transport_id" TEXT,
     "currency_id" TEXT NOT NULL,
     "distance" DOUBLE PRECISION,
     "toll_distance" DOUBLE PRECISION,
@@ -462,31 +462,31 @@ CREATE TABLE "_TransportLoadingTypes" (
 );
 
 -- CreateIndex
-CREATE INDEX "events_aggregateId_aggregateType_idx" ON "events"("aggregateId", "aggregateType");
+CREATE INDEX "events_aggregate_id_idx" ON "events"("aggregate_id");
 
 -- CreateIndex
-CREATE INDEX "events_type_idx" ON "events"("type");
+CREATE INDEX "events_aggregate_type_occurred_at_idx" ON "events"("aggregate_type", "occurred_at");
 
 -- CreateIndex
-CREATE INDEX "events_timestamp_idx" ON "events"("timestamp");
+CREATE INDEX "events_event_type_idx" ON "events"("event_type");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "events_aggregateId_version_key" ON "events"("aggregateId", "version");
+CREATE UNIQUE INDEX "events_aggregate_id_version_key" ON "events"("aggregate_id", "version");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "outbox_messages_eventId_key" ON "outbox_messages"("eventId");
+CREATE INDEX "outbox_messages_status_created_at_idx" ON "outbox_messages"("status", "created_at");
 
 -- CreateIndex
-CREATE INDEX "outbox_messages_status_createdAt_idx" ON "outbox_messages"("status", "createdAt");
+CREATE INDEX "outbox_messages_aggregate_id_idx" ON "outbox_messages"("aggregate_id");
 
 -- CreateIndex
-CREATE INDEX "snapshots_aggregateId_idx" ON "snapshots"("aggregateId");
+CREATE UNIQUE INDEX "snapshots_aggregate_id_key" ON "snapshots"("aggregate_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "snapshots_aggregateId_aggregateType_key" ON "snapshots"("aggregateId", "aggregateType");
+CREATE INDEX "snapshots_aggregate_type_idx" ON "snapshots"("aggregate_type");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "projection_positions_projectionId_key" ON "projection_positions"("projectionId");
+CREATE UNIQUE INDEX "projection_positions_projection_name_key" ON "projection_positions"("projection_name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "countries_country_code_key" ON "countries"("country_code");
@@ -720,7 +720,7 @@ ALTER TABLE "load_features" ADD CONSTRAINT "load_features_load_id_fkey" FOREIGN 
 ALTER TABLE "load_documents" ADD CONSTRAINT "load_documents_load_id_fkey" FOREIGN KEY ("load_id") REFERENCES "loads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "trips" ADD CONSTRAINT "trips_transport_type_id_fkey" FOREIGN KEY ("transport_type_id") REFERENCES "transport_types"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "trips" ADD CONSTRAINT "trips_transport_id_fkey" FOREIGN KEY ("transport_id") REFERENCES "transports"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "trips" ADD CONSTRAINT "trips_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "currencies"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -769,3 +769,4 @@ ALTER TABLE "_TransportLoadingTypes" ADD CONSTRAINT "_TransportLoadingTypes_A_fk
 
 -- AddForeignKey
 ALTER TABLE "_TransportLoadingTypes" ADD CONSTRAINT "_TransportLoadingTypes_B_fkey" FOREIGN KEY ("B") REFERENCES "transport_loading_types"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+

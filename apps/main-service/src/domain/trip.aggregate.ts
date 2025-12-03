@@ -1,5 +1,15 @@
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-import { EVENT_TYPES } from './event.constants';
+import {
+  TripEvent,
+  TripEventType,
+  TripCreatedEvent,
+  TripUpdatedEvent,
+  TripStatusChangedEvent,
+  TripPriceUpdatedEvent,
+  TripTransportUpdatedEvent,
+  TripDocumentAddedEvent,
+  TripDocumentRemovedEvent,
+} from './events/trip.events';
 import {
   LoadStatus,
   PriceMode,
@@ -141,10 +151,11 @@ export class Trip extends AggregateRoot {
       privateDate?: Date;
       parentId?: string;
       isSystemTrip?: boolean;
+      images?: string[];
     }
   ): Trip {
     const trip = new Trip(tripId);
-    const event = trip.createEvent(EVENT_TYPES.TRIP.CREATED, {
+    const event = trip.createEvent(TripEventType.Created, {
       ownerId,
       ...data,
     });
@@ -199,8 +210,12 @@ export class Trip extends AggregateRoot {
     isNegotiable?: boolean;
     distance?: number;
     tollDistance?: number;
+    images?: string[];
   }): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.UPDATED, data);
+    const event = this.createEvent(TripEventType.Updated, {
+      ...data,
+      updatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -212,7 +227,10 @@ export class Trip extends AggregateRoot {
     isPricePerKmExceed?: boolean;
     priceMode?: PriceMode;
   }): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.PRICE_UPDATED, data);
+    const event = this.createEvent(TripEventType.PriceUpdated, {
+      ...data,
+      updatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -220,30 +238,36 @@ export class Trip extends AggregateRoot {
   changeStatus(status: LoadStatus): void {
     if (this.status === status) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRIP.STATUS_CHANGED, { status });
+    const event = this.createEvent(TripEventType.StatusChanged, {
+      status,
+      changedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   updateTransport(transportDetails: Partial<TripTransportDetails>): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.TRANSPORT_UPDATED, {
+    const event = this.createEvent(TripEventType.TransportUpdated, {
       transportDetails,
+      updatedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
   }
 
   addDocument(document: TripDocument): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.DOCUMENT_ADDED, {
+    const event = this.createEvent(TripEventType.DocumentAdded, {
       document,
+      addedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
   }
 
   removeDocument(documentId: string): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.DOCUMENT_REMOVED, {
+    const event = this.createEvent(TripEventType.DocumentRemoved, {
       documentId,
+      removedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -252,7 +276,9 @@ export class Trip extends AggregateRoot {
   activate(): void {
     if (this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRIP.ACTIVATED, {});
+    const event = this.createEvent(TripEventType.Activated, {
+      activatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -260,25 +286,33 @@ export class Trip extends AggregateRoot {
   deactivate(): void {
     if (!this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.TRIP.DEACTIVATED, {});
+    const event = this.createEvent(TripEventType.Deactivated, {
+      deactivatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   cancel(): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.CANCELLED, {});
+    const event = this.createEvent(TripEventType.Cancelled, {
+      cancelledAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   complete(): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.COMPLETED, {});
+    const event = this.createEvent(TripEventType.Completed, {
+      completedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   delete(): void {
-    const event = this.createEvent(EVENT_TYPES.TRIP.DELETED, {});
+    const event = this.createEvent(TripEventType.Deleted, {
+      deletedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -287,42 +321,42 @@ export class Trip extends AggregateRoot {
   // Event Handlers (apply)
   // ==============================================
 
-  protected apply(event: DomainEvent): void {
+  protected apply(event: DomainEvent<TripEvent>): void {
     switch (event.type) {
-      case EVENT_TYPES.TRIP.CREATED:
+      case TripEventType.Created:
         this.applyTripCreated(event.data);
         break;
-      case EVENT_TYPES.TRIP.UPDATED:
+      case TripEventType.Updated:
         this.applyTripUpdated(event.data);
         break;
-      case EVENT_TYPES.TRIP.STATUS_CHANGED:
+      case TripEventType.StatusChanged:
         this.applyStatusChanged(event.data);
         break;
-      case EVENT_TYPES.TRIP.PRICE_UPDATED:
+      case TripEventType.PriceUpdated:
         this.applyPriceUpdated(event.data);
         break;
-      case EVENT_TYPES.TRIP.TRANSPORT_UPDATED:
+      case TripEventType.TransportUpdated:
         this.applyTransportUpdated(event.data);
         break;
-      case EVENT_TYPES.TRIP.DOCUMENT_ADDED:
+      case TripEventType.DocumentAdded:
         this.applyDocumentAdded(event.data);
         break;
-      case EVENT_TYPES.TRIP.DOCUMENT_REMOVED:
+      case TripEventType.DocumentRemoved:
         this.applyDocumentRemoved(event.data);
         break;
-      case EVENT_TYPES.TRIP.ACTIVATED:
-        this.applyActivated(event.data);
+      case TripEventType.Activated:
+        this.applyActivated();
         break;
-      case EVENT_TYPES.TRIP.DEACTIVATED:
-        this.applyDeactivated(event.data);
+      case TripEventType.Deactivated:
+        this.applyDeactivated();
         break;
-      case EVENT_TYPES.TRIP.CANCELLED:
-        this.applyCancelled(event.data);
+      case TripEventType.Cancelled:
+        this.applyCancelled();
         break;
-      case EVENT_TYPES.TRIP.COMPLETED:
-        this.applyCompleted(event.data);
+      case TripEventType.Completed:
+        this.applyCompleted();
         break;
-      case EVENT_TYPES.TRIP.DELETED:
+      case TripEventType.Deleted:
         // Handled by projection
         break;
       default:
@@ -331,7 +365,7 @@ export class Trip extends AggregateRoot {
     }
   }
 
-  private applyTripCreated(data: any): void {
+  private applyTripCreated(data: TripCreatedEvent['data']): void {
     this.ownerId = data.ownerId;
     this.companyId = data.companyId;
     this.transportDetails = data.transportDetails;
@@ -364,9 +398,10 @@ export class Trip extends AggregateRoot {
     this.isSystemTrip = data.isSystemTrip || false;
     this.status = LoadStatus.OPEN;
     this.isActive = true;
+    this.images = data.images || [];
   }
 
-  private applyTripUpdated(data: any): void {
+  private applyTripUpdated(data: TripUpdatedEvent['data']): void {
     if (data.loadingPointId) this.loadingPointId = data.loadingPointId;
     if (data.unloadingPointId) this.unloadingPointId = data.unloadingPointId;
     if (data.fromLocationId) this.fromLocationId = data.fromLocationId;
@@ -388,13 +423,14 @@ export class Trip extends AggregateRoot {
     if (data.isNegotiable !== undefined) this.isNegotiable = data.isNegotiable;
     if (data.distance !== undefined) this.distance = data.distance;
     if (data.tollDistance !== undefined) this.tollDistance = data.tollDistance;
+    if (data.images !== undefined) this.images = data.images;
   }
 
-  private applyStatusChanged(data: any): void {
+  private applyStatusChanged(data: TripStatusChangedEvent['data']): void {
     this.status = data.status;
   }
 
-  private applyPriceUpdated(data: any): void {
+  private applyPriceUpdated(data: TripPriceUpdatedEvent['data']): void {
     if (data.price !== undefined) this.price = data.price;
     if (data.basePrice !== undefined) this.basePrice = data.basePrice;
     if (data.pricePerKm !== undefined) this.pricePerKm = data.pricePerKm;
@@ -403,34 +439,34 @@ export class Trip extends AggregateRoot {
     if (data.priceMode !== undefined) this.priceMode = data.priceMode;
   }
 
-  private applyTransportUpdated(data: any): void {
+  private applyTransportUpdated(data: TripTransportUpdatedEvent['data']): void {
     this.transportDetails = {
       ...this.transportDetails,
       ...data.transportDetails,
     };
   }
 
-  private applyDocumentAdded(data: any): void {
+  private applyDocumentAdded(data: TripDocumentAddedEvent['data']): void {
     this.documents.push(data.document);
   }
 
-  private applyDocumentRemoved(data: any): void {
+  private applyDocumentRemoved(data: TripDocumentRemovedEvent['data']): void {
     this.documents = this.documents.filter((d) => d.id !== data.documentId);
   }
 
-  private applyActivated(_data: any): void {
+  private applyActivated(): void {
     this.isActive = true;
   }
 
-  private applyDeactivated(_data: any): void {
+  private applyDeactivated(): void {
     this.isActive = false;
   }
 
-  private applyCancelled(_data: any): void {
+  private applyCancelled(): void {
     this.status = LoadStatus.CANCELLED;
   }
 
-  private applyCompleted(_data: any): void {
+  private applyCompleted(): void {
     this.status = LoadStatus.COMPLETED;
   }
 

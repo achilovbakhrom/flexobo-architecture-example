@@ -3,12 +3,10 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/main-service/src",
   "projectType": "application",
-  "tags": [],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",
       "outputs": ["{options.outputPath}"],
-      "cache": false,
       "options": {
         "outputPath": "dist/apps/main-service",
         "main": "apps/main-service/src/main.ts",
@@ -26,12 +24,11 @@
     "serve": {
       "executor": "@nx/js:node",
       "dependsOn": ["build"],
-      "cache": false,
       "options": {
         "buildTarget": "main-service:build",
         "watch": true,
         "inspect": "inspect",
-        "port": 9229,
+        "port": 9230,
         "debounce": 500,
         "runtimeArgs": ["--enable-source-maps"]
       }
@@ -41,5 +38,6 @@
         "passWithNoTests": true
       }
     }
-  }
+  },
+  "tags": ["scope:main", "type:service"]
 }

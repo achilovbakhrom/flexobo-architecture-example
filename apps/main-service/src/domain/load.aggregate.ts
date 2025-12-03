@@ -1,5 +1,5 @@
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
-import { EVENT_TYPES } from './event.constants';
+
 import {
   LoadStatus,
   TruckLoadType,
@@ -8,6 +8,7 @@ import {
   WeightUnit,
   LoadDocumentType,
 } from './enums';
+import { LoadEvent, LoadEventType } from './events/load.events';
 
 // ==============================================
 // Value Objects & Types
@@ -160,9 +161,35 @@ export class Load extends AggregateRoot {
     }
   ): Load {
     const load = new Load(loadId);
-    const event = load.createEvent(EVENT_TYPES.LOAD.CREATED, {
+    const event = load.createEvent(LoadEventType.Created, {
       ownerId,
-      ...data,
+      companyId: data.companyId,
+      transportTypeId: data.transportTypeId,
+      fromLocationId: data.fromLocationId,
+      toLocationId: data.toLocationId,
+      fromCountryCode: data.fromCountryCode,
+      toCountryCode: data.toCountryCode,
+      currencyId: data.currencyId,
+      loadingPointId: data.loadingTypeId,
+      unloadingPointId: data.unloadingTypeId,
+      loadingReadyDate: data.targetDate,
+      additionalLoadingReadyDate: data.additionalExtraDay,
+      truckLoadType: data.truckLoadType,
+      paymentMethods: data.paymentMethods,
+      paymentCondition: data.paymentCondition,
+      paymentDays: data.paymentDays,
+      prePayment: data.prePayment,
+      price: data.price,
+      basePrice: data.basePrice,
+      pricePerKm: data.pricePerKm,
+      isPricePerKmExceed: undefined,
+      priceMode: data.priceMode,
+      isNegotiable: data.negotiable,
+      distance: data.distance,
+      tollDistance: data.tollDistance,
+      privateDate: data.privateDate,
+      parentId: data.parentId,
+      isSystemLoad: data.isSystemLoad,
     });
     load.addEvent(event);
     load.apply(event);
@@ -217,8 +244,29 @@ export class Load extends AggregateRoot {
     prePayment?: number;
     distance?: number;
     tollDistance?: number;
+    images?: string[];
   }): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.UPDATED, data);
+    const event = this.createEvent(LoadEventType.Updated, {
+      transportTypeId: data.transportTypeId,
+      fromLocationId: data.fromLocationId,
+      toLocationId: data.toLocationId,
+      fromCountryCode: data.fromCountryCode,
+      toCountryCode: data.toCountryCode,
+      loadingPointId: data.loadingTypeId,
+      unloadingPointId: data.unloadingTypeId,
+      loadingReadyDate: data.targetDate,
+      additionalLoadingReadyDate: data.additionalExtraDay,
+      truckLoadType: data.truckLoadType,
+      isNegotiable: data.negotiable,
+      paymentMethods: data.paymentMethods,
+      paymentCondition: data.paymentCondition,
+      paymentDays: data.paymentDays,
+      prePayment: data.prePayment,
+      distance: data.distance,
+      tollDistance: data.tollDistance,
+      images: data.images,
+      updatedAt: new Date(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -230,7 +278,7 @@ export class Load extends AggregateRoot {
     isPricePerKmExceed?: boolean;
     priceMode?: PriceMode;
   }): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.PRICE_UPDATED, data);
+    const event = this.createEvent(LoadEventType.PriceUpdated, { ...data, updatedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
@@ -238,51 +286,55 @@ export class Load extends AggregateRoot {
   changeStatus(status: LoadStatus): void {
     if (this.status === status) return;
 
-    const event = this.createEvent(EVENT_TYPES.LOAD.STATUS_CHANGED, { status });
+    const event = this.createEvent(LoadEventType.StatusChanged, { status, changedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   addCargo(cargo: CargoItem): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.CARGO_ADDED, { cargo });
+    const event = this.createEvent(LoadEventType.CargoAdded, { cargo, addedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   updateCargo(cargoId: string, updates: Partial<CargoItem>): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.CARGO_UPDATED, {
+    const event = this.createEvent(LoadEventType.CargoUpdated, {
       cargoId,
       updates,
+      updatedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
   }
 
   removeCargo(cargoId: string): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.CARGO_REMOVED, { cargoId });
+    const event = this.createEvent(LoadEventType.CargoRemoved, { cargoId, removedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   updateFeatures(features: LoadFeatures): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.FEATURES_UPDATED, {
+    const event = this.createEvent(LoadEventType.FeaturesUpdated, {
       features,
+      updatedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
   }
 
   addDocument(document: LoadDocument): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.DOCUMENT_ADDED, {
+    const event = this.createEvent(LoadEventType.DocumentAdded, {
       document,
+      addedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
   }
 
   removeDocument(documentId: string): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.DOCUMENT_REMOVED, {
+    const event = this.createEvent(LoadEventType.DocumentRemoved, {
       documentId,
+      removedAt: new Date(),
     });
     this.addEvent(event);
     this.apply(event);
@@ -291,7 +343,7 @@ export class Load extends AggregateRoot {
   activate(): void {
     if (this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.LOAD.ACTIVATED, {});
+    const event = this.createEvent(LoadEventType.Activated, { activatedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
@@ -299,25 +351,25 @@ export class Load extends AggregateRoot {
   deactivate(): void {
     if (!this.isActive) return;
 
-    const event = this.createEvent(EVENT_TYPES.LOAD.DEACTIVATED, {});
+    const event = this.createEvent(LoadEventType.Deactivated, { deactivatedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   cancel(): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.CANCELLED, {});
+    const event = this.createEvent(LoadEventType.StatusChanged, { status: LoadStatus.CANCELLED, changedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   complete(): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.COMPLETED, {});
+    const event = this.createEvent(LoadEventType.StatusChanged, { status: LoadStatus.COMPLETED, changedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
 
   delete(): void {
-    const event = this.createEvent(EVENT_TYPES.LOAD.DELETED, {});
+    const event = this.createEvent(LoadEventType.Deleted, { deletedAt: new Date() });
     this.addEvent(event);
     this.apply(event);
   }
@@ -326,171 +378,162 @@ export class Load extends AggregateRoot {
   // Event Handlers (apply)
   // ==============================================
 
-  protected apply(event: DomainEvent): void {
+  protected apply(event: DomainEvent<LoadEvent>): void {
     switch (event.type) {
-      case EVENT_TYPES.LOAD.CREATED:
-        this.applyLoadCreated(event.data);
+      case LoadEventType.Created:
+        this.ownerId = event.data.ownerId;
+        this.companyId = event.data.companyId;
+        this.transportTypeId = event.data.transportTypeId;
+        this.fromLocationId = event.data.fromLocationId;
+        this.toLocationId = event.data.toLocationId;
+        this.fromCountryCode = event.data.fromCountryCode;
+        this.toCountryCode = event.data.toCountryCode;
+        this.currencyId = event.data.currencyId;
+        this.loadingTypeId = event.data.loadingPointId;
+        this.unloadingTypeId = event.data.unloadingPointId;
+        this.targetDate = new Date(event.data.loadingReadyDate);
+        this.truckLoadType = event.data.truckLoadType || TruckLoadType.FTL;
+        this.negotiable = event.data.isNegotiable || false;
+        this.paymentMethods = event.data.paymentMethods || [];
+        this.paymentCondition = event.data.paymentCondition || false;
+        this.paymentDays = event.data.paymentDays || 0;
+        this.prePayment = event.data.prePayment || 0;
+        this.price = event.data.price;
+        this.basePrice = event.data.basePrice || 0;
+        this.pricePerKm = event.data.pricePerKm || 0;
+        this.isPricePerKmExceed = event.data.isPricePerKmExceed;
+        this.priceMode = event.data.priceMode;
+        this.distance = event.data.distance;
+        this.tollDistance = event.data.tollDistance;
+        this.additionalExtraDay = event.data.additionalLoadingReadyDate
+          ? new Date(event.data.additionalLoadingReadyDate)
+          : undefined;
+        this.privateDate = event.data.privateDate
+          ? new Date(event.data.privateDate)
+          : undefined;
+        this.parentId = event.data.parentId;
+        this.isSystemLoad = event.data.isSystemLoad || false;
+        this.status = LoadStatus.OPEN;
+        this.isActive = true;
+        if (event.data.images) {
+          this.images = event.data.images;
+        }
+        if (event.data.cargos) {
+          this.cargos = event.data.cargos;
+        }
+        if (event.data.features) {
+          this.features = event.data.features;
+        }
         break;
-      case EVENT_TYPES.LOAD.UPDATED:
-        this.applyLoadUpdated(event.data);
+
+      case LoadEventType.Updated:
+        if (event.data.transportTypeId !== undefined)
+          this.transportTypeId = event.data.transportTypeId;
+        if (event.data.fromLocationId !== undefined)
+          this.fromLocationId = event.data.fromLocationId;
+        if (event.data.toLocationId !== undefined)
+          this.toLocationId = event.data.toLocationId;
+        if (event.data.fromCountryCode !== undefined)
+          this.fromCountryCode = event.data.fromCountryCode;
+        if (event.data.toCountryCode !== undefined)
+          this.toCountryCode = event.data.toCountryCode;
+        if (event.data.loadingPointId !== undefined)
+          this.loadingTypeId = event.data.loadingPointId;
+        if (event.data.unloadingPointId !== undefined)
+          this.unloadingTypeId = event.data.unloadingPointId;
+        if (event.data.loadingReadyDate !== undefined)
+          this.targetDate = new Date(event.data.loadingReadyDate);
+        if (event.data.additionalLoadingReadyDate !== undefined)
+          this.additionalExtraDay = new Date(event.data.additionalLoadingReadyDate);
+        if (event.data.truckLoadType !== undefined)
+          this.truckLoadType = event.data.truckLoadType;
+        if (event.data.isNegotiable !== undefined)
+          this.negotiable = event.data.isNegotiable;
+        if (event.data.paymentMethods !== undefined)
+          this.paymentMethods = event.data.paymentMethods;
+        if (event.data.paymentCondition !== undefined)
+          this.paymentCondition = event.data.paymentCondition;
+        if (event.data.paymentDays !== undefined)
+          this.paymentDays = event.data.paymentDays;
+        if (event.data.prePayment !== undefined)
+          this.prePayment = event.data.prePayment;
+        if (event.data.distance !== undefined)
+          this.distance = event.data.distance;
+        if (event.data.tollDistance !== undefined)
+          this.tollDistance = event.data.tollDistance;
+        if (event.data.images !== undefined)
+          this.images = event.data.images;
         break;
-      case EVENT_TYPES.LOAD.STATUS_CHANGED:
-        this.applyStatusChanged(event.data);
+
+      case LoadEventType.StatusChanged:
+        this.status = event.data.status;
         break;
-      case EVENT_TYPES.LOAD.PRICE_UPDATED:
-        this.applyPriceUpdated(event.data);
+
+      case LoadEventType.PriceUpdated:
+        if (event.data.price !== undefined) this.price = event.data.price;
+        if (event.data.basePrice !== undefined)
+          this.basePrice = event.data.basePrice;
+        if (event.data.pricePerKm !== undefined)
+          this.pricePerKm = event.data.pricePerKm;
+        if (event.data.isPricePerKmExceed !== undefined)
+          this.isPricePerKmExceed = event.data.isPricePerKmExceed;
+        if (event.data.priceMode !== undefined)
+          this.priceMode = event.data.priceMode;
+        if (event.data.paymentMethods !== undefined)
+          this.paymentMethods = event.data.paymentMethods;
         break;
-      case EVENT_TYPES.LOAD.CARGO_ADDED:
-        this.applyCargoAdded(event.data);
+
+      case LoadEventType.CargoAdded:
+        this.cargos.push(event.data.cargo);
         break;
-      case EVENT_TYPES.LOAD.CARGO_UPDATED:
-        this.applyCargoUpdated(event.data);
+
+      case LoadEventType.CargoUpdated: {
+        const cargoIndex = this.cargos.findIndex(
+          (c) => c.id === event.data.cargoId
+        );
+        if (cargoIndex !== -1) {
+          this.cargos[cargoIndex] = {
+            ...this.cargos[cargoIndex],
+            ...event.data.updates,
+          };
+        }
         break;
-      case EVENT_TYPES.LOAD.CARGO_REMOVED:
-        this.applyCargoRemoved(event.data);
+      }
+
+      case LoadEventType.CargoRemoved:
+        this.cargos = this.cargos.filter((c) => c.id !== event.data.cargoId);
         break;
-      case EVENT_TYPES.LOAD.FEATURES_UPDATED:
-        this.applyFeaturesUpdated(event.data);
+
+      case LoadEventType.FeaturesUpdated:
+        this.features = event.data.features;
         break;
-      case EVENT_TYPES.LOAD.DOCUMENT_ADDED:
-        this.applyDocumentAdded(event.data);
+
+      case LoadEventType.DocumentAdded:
+        this.documents.push(event.data.document);
         break;
-      case EVENT_TYPES.LOAD.DOCUMENT_REMOVED:
-        this.applyDocumentRemoved(event.data);
+
+      case LoadEventType.DocumentRemoved:
+        this.documents = this.documents.filter(
+          (d) => d.id !== event.data.documentId
+        );
         break;
-      case EVENT_TYPES.LOAD.ACTIVATED:
-        this.applyActivated(event.data);
+
+      case LoadEventType.Activated:
+        this.isActive = true;
         break;
-      case EVENT_TYPES.LOAD.DEACTIVATED:
-        this.applyDeactivated(event.data);
+
+      case LoadEventType.Deactivated:
+        this.isActive = false;
         break;
-      case EVENT_TYPES.LOAD.CANCELLED:
-        this.applyCancelled(event.data);
-        break;
-      case EVENT_TYPES.LOAD.COMPLETED:
-        this.applyCompleted(event.data);
-        break;
-      case EVENT_TYPES.LOAD.DELETED:
+
+      case LoadEventType.Deleted:
         // Handled by projection
         break;
+
       default:
         // Ignore unknown events
         break;
     }
-  }
-
-  private applyLoadCreated(data: any): void {
-    this.ownerId = data.ownerId;
-    this.companyId = data.companyId;
-    this.transportTypeId = data.transportTypeId;
-    this.fromLocationId = data.fromLocationId;
-    this.toLocationId = data.toLocationId;
-    this.fromCountryCode = data.fromCountryCode;
-    this.toCountryCode = data.toCountryCode;
-    this.currencyId = data.currencyId;
-    this.loadingTypeId = data.loadingTypeId;
-    this.unloadingTypeId = data.unloadingTypeId;
-    this.targetDate = new Date(data.targetDate);
-    this.truckLoadType = data.truckLoadType || TruckLoadType.FTL;
-    this.negotiable = data.negotiable || false;
-    this.paymentMethods = data.paymentMethods || [];
-    this.paymentCondition = data.paymentCondition || false;
-    this.paymentDays = data.paymentDays || 0;
-    this.prePayment = data.prePayment || 0;
-    this.price = data.price;
-    this.basePrice = data.basePrice || 0;
-    this.pricePerKm = data.pricePerKm || 0;
-    this.priceMode = data.priceMode;
-    this.distance = data.distance;
-    this.tollDistance = data.tollDistance;
-    this.additionalExtraDay = data.additionalExtraDay
-      ? new Date(data.additionalExtraDay)
-      : undefined;
-    this.privateDate = data.privateDate
-      ? new Date(data.privateDate)
-      : undefined;
-    this.parentId = data.parentId;
-    this.isSystemLoad = data.isSystemLoad || false;
-    this.status = LoadStatus.OPEN;
-    this.isActive = true;
-  }
-
-  private applyLoadUpdated(data: any): void {
-    if (data.transportTypeId) this.transportTypeId = data.transportTypeId;
-    if (data.fromLocationId) this.fromLocationId = data.fromLocationId;
-    if (data.toLocationId) this.toLocationId = data.toLocationId;
-    if (data.fromCountryCode) this.fromCountryCode = data.fromCountryCode;
-    if (data.toCountryCode) this.toCountryCode = data.toCountryCode;
-    if (data.loadingTypeId) this.loadingTypeId = data.loadingTypeId;
-    if (data.unloadingTypeId) this.unloadingTypeId = data.unloadingTypeId;
-    if (data.targetDate) this.targetDate = new Date(data.targetDate);
-    if (data.additionalExtraDay)
-      this.additionalExtraDay = new Date(data.additionalExtraDay);
-    if (data.truckLoadType) this.truckLoadType = data.truckLoadType;
-    if (data.negotiable !== undefined) this.negotiable = data.negotiable;
-    if (data.paymentMethods) this.paymentMethods = data.paymentMethods;
-    if (data.paymentCondition !== undefined)
-      this.paymentCondition = data.paymentCondition;
-    if (data.paymentDays !== undefined) this.paymentDays = data.paymentDays;
-    if (data.prePayment !== undefined) this.prePayment = data.prePayment;
-    if (data.distance !== undefined) this.distance = data.distance;
-    if (data.tollDistance !== undefined) this.tollDistance = data.tollDistance;
-  }
-
-  private applyStatusChanged(data: any): void {
-    this.status = data.status;
-  }
-
-  private applyPriceUpdated(data: any): void {
-    if (data.price !== undefined) this.price = data.price;
-    if (data.basePrice !== undefined) this.basePrice = data.basePrice;
-    if (data.pricePerKm !== undefined) this.pricePerKm = data.pricePerKm;
-    if (data.isPricePerKmExceed !== undefined)
-      this.isPricePerKmExceed = data.isPricePerKmExceed;
-    if (data.priceMode !== undefined) this.priceMode = data.priceMode;
-  }
-
-  private applyCargoAdded(data: any): void {
-    this.cargos.push(data.cargo);
-  }
-
-  private applyCargoUpdated(data: any): void {
-    const index = this.cargos.findIndex((c) => c.id === data.cargoId);
-    if (index !== -1) {
-      this.cargos[index] = { ...this.cargos[index], ...data.updates };
-    }
-  }
-
-  private applyCargoRemoved(data: any): void {
-    this.cargos = this.cargos.filter((c) => c.id !== data.cargoId);
-  }
-
-  private applyFeaturesUpdated(data: any): void {
-    this.features = data.features;
-  }
-
-  private applyDocumentAdded(data: any): void {
-    this.documents.push(data.document);
-  }
-
-  private applyDocumentRemoved(data: any): void {
-    this.documents = this.documents.filter((d) => d.id !== data.documentId);
-  }
-
-  private applyActivated(_data: any): void {
-    this.isActive = true;
-  }
-
-  private applyDeactivated(_data: any): void {
-    this.isActive = false;
-  }
-
-  private applyCancelled(_data: any): void {
-    this.status = LoadStatus.CANCELLED;
-  }
-
-  private applyCompleted(_data: any): void {
-    this.status = LoadStatus.COMPLETED;
   }
 
   // ==============================================
