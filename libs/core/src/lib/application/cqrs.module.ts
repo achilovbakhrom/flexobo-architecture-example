@@ -5,8 +5,10 @@ import { ICommandHandler, ICommand } from './commands/command.interface';
 import { IQueryHandler, IQuery } from './queries/query.interface';
 
 export interface CqrsModuleOptions {
-  commandHandlers?: Type<ICommandHandler<ICommand, unknown>>[];
-  queryHandlers?: Type<IQueryHandler<IQuery, unknown>>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  commandHandlers?: Type<any>[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  queryHandlers?: Type<any>[];
 }
 
 export const CQRS_COMMAND_HANDLERS = 'CQRS_COMMAND_HANDLERS';
@@ -18,8 +20,10 @@ export class CqrsModule implements OnModuleInit {
   constructor(
     private readonly commandBus: CommandBus,
     private readonly queryBus: QueryBus,
-    @Optional() @Inject(CQRS_COMMAND_HANDLERS) private readonly commandHandlers: Type<ICommandHandler<ICommand, unknown>>[] = [],
-    @Optional() @Inject(CQRS_QUERY_HANDLERS) private readonly queryHandlers: Type<IQueryHandler<IQuery, unknown>>[] = [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    @Optional() @Inject(CQRS_COMMAND_HANDLERS) private readonly commandHandlers: Type<any>[] = [],
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    @Optional() @Inject(CQRS_QUERY_HANDLERS) private readonly queryHandlers: Type<any>[] = [],
   ) {}
 
   onModuleInit() {
