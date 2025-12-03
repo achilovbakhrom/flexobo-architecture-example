@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/main-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ EVENT SOURCING ============
+
+model Event {
+  id            String   @id @default(uuid())
+  aggregateId   String
+  aggregateType String   // LOAD, TRIP, BID, BOOKING, TRANSPORT, BOARD
+  eventType     String
+  payload       Json
+  metadata      Json?
+  version       Int
+  createdAt     DateTime @default(now())
+
+  @@index([aggregateId, aggregateType])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model Outbox {
+  id          String    @id @default(uuid())
+  eventType   String
+  payload     Json
+  routingKey  String
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  @@index([published, createdAt])
+}
+
+// ============ READ MODELS ============
+
+model LoadReadModel {
+  id            String   @id
+  ownerId       String
+  companyId     String
+  status        String   // DRAFT, ACTIVE, BOOKED, COMPLETED, CANCELLED
+
+  // Location
+  fromCountry   String
+  fromCity      String
+  fromAddress   String?
+  fromLat       Float?
+  fromLng       Float?
+  toCountry     String
+  toCity        String
+  toAddress     String?
+  toLat         Float?
+  toLng         Float?
+
+  // Transport requirements
+  transportType String   // TRUCK, VAN, CONTAINER, etc.
+  loadingTypes  String[] // TOP, SIDE, REAR
+
+  // Cargo
+  cargos        Json     // Array of {name, weight, volume, quantity, packagingType}
+  totalWeight   Float
+  totalVolume   Float?
+
+  // Features & Requirements
+  features       String[] // ADR, TEMP_CONTROL, GPS, etc.
+  adrClasses     String[]
+  temperatureMin Float?
+  temperatureMax Float?
+
+  // Price
+  price        Float?
+  currency     String  @default("USD")
+  paymentTerms String?
+
+  // Dates
+  loadingDate     DateTime
+  loadingDateTo   DateTime?
+  unloadingDate   DateTime?
+
+  // Visibility
+  boardIds String[] // Private boards
+  isPublic Boolean  @default(true)
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([companyId])
+  @@index([status])
+  @@index([transportType])
+  @@index([fromCountry, toCountry])
+  @@index([loadingDate])
+}
+
+model TripReadModel {
+  id        String @id
+  ownerId   String
+  companyId String
+  status    String // DRAFT, ACTIVE, BOOKED, COMPLETED, CANCELLED
+
+  // Embedded Transport snapshot
+  transport Json // {id, type, capacity, dimensions, loadingTypes, features, permits}
+
+  // Route points
+  loadingPoints   Json // Array of {country, city, address, lat, lng, date, radius}
+  unloadingPoints Json // Array of {country, city, address, lat, lng, date, radius}
+
+  // Price
+  price        Float?
+  currency     String  @default("USD")
+  paymentTerms String?
+
+  // Visibility
+  boardIds String[]
+  isPublic Boolean  @default(true)
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([companyId])
+  @@index([status])
+}
+
+model TransportReadModel {
+  id        String @id
+  ownerId   String
+  companyId String
+
+  // Type & Capacity
+  transportType String
+  loadingTypes  String[]
+  capacityTons  Float
+  capacityM3    Float?
+
+  // Dimensions
+  lengthM Float?
+  widthM  Float?
+  heightM Float?
+
+  // Features & Permits
+  features   String[] // GPS, TEMP_CONTROL, etc.
+  adrClasses String[]
+  permits    String[] // TIR, CMR, etc.
+
+  // Status
+  isActive Boolean @default(true)
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([companyId])
+  @@index([transportType])
+  @@index([isActive])
+}
+
+model BidReadModel {
+  id       String @id
+  bidderId String
+  ownerId  String
+
+  // Polymorphic reference
+  postType String // LOAD | TRIP
+  postId   String
+
+  // Transport (for bids on loads)
+  transportIds String[]
+
+  // Price
+  proposedPrice Float
+  currency      String @default("USD")
+
+  // Negotiation
+  status           String // PENDING, COUNTERED, ACCEPTED, REJECTED, EXPIRED, CANCELLED
+  negotiationRound Int    @default(1)
+
+  // Chat integration
+  chatRoomId String?
+
+  // Metadata
+  version   Int       @default(1)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  expiresAt DateTime?
+
+  @@index([bidderId])
+  @@index([ownerId])
+  @@index([postType, postId])
+  @@index([status])
+  @@index([chatRoomId])
+}
+
+model NegotiationStepReadModel {
+  id       String @id
+  bidId    String
+  authorId String
+
+  stepNumber Int
+  priceOffer Float
+  currency   String
+
+  isAccepted Boolean @default(false)
+  isRejected Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([bidId])
+  @@index([authorId])
+}
+
+model BookingReadModel {
+  id         String @id
+  customerId String // The one who initiated (bidder)
+  ownerId    String // Post owner
+
+  // References
+  postType String // LOAD | TRIP
+  postId   String
+  bidId    String
+
+  // Final terms
+  finalPrice Float
+  currency   String @default("USD")
+
+  // Status
+  status String // PENDING, CONFIRMED, IN_PROGRESS, COMPLETED, CANCELLED, DISPUTED
+
+  // Ratings
+  customerRating  Float?
+  customerComment String?
+  ownerRating     Float?
+  ownerComment    String?
+
+  // Metadata
+  version     Int       @default(1)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([customerId])
+  @@index([ownerId])
+  @@index([postType, postId])
+  @@index([bidId])
+  @@index([status])
+}
+
+model BoardReadModel {
+  id        String @id
+  ownerId   String
+  companyId String
+
+  name        String
+  description String?
+
+  // Members (JSON array of {userId, role})
+  members Json @default("[]")
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+  @@index([companyId])
+}

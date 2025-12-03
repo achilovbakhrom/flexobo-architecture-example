@@ -6,6 +6,27 @@ import { OutboxService } from '../outbox/outbox.service';
 import { SnapshotService } from '../snapshot/snapshot.service';
 
 /**
+ * Interface for aggregate stores
+ * Used by command handlers to load and save aggregates
+ */
+export interface IAggregateStore<T extends AggregateRoot> {
+  /**
+   * Load an aggregate by ID from event store
+   */
+  load(aggregateId: string): Promise<T | null>;
+
+  /**
+   * Check if an aggregate exists in the event store
+   */
+  exists(aggregateId: string): Promise<boolean>;
+
+  /**
+   * Save aggregate - persists uncommitted events to event store and publishes to broker
+   */
+  save(aggregate: T): Promise<DomainEvent[]>;
+}
+
+/**
  * Configuration for aggregate snapshot restoration
  */
 export interface AggregateRestorer<T extends AggregateRoot, TSnapshot> {
