@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package billing;
+
+service BillingService {
+  // Check if a usage action is within subscription limits
+  rpc CheckSubscriptionLimit(CheckLimitRequest) returns (CheckLimitResponse);
+
+  // Get current subscription plan and features for a company
+  rpc GetSubscriptionPlan(GetPlanRequest) returns (GetPlanResponse);
+
+  // Record usage for a company (called after action is performed)
+  rpc RecordUsage(RecordUsageRequest) returns (RecordUsageResponse);
+
+  // Get current usage stats for a subscription
+  rpc GetUsageStats(GetUsageStatsRequest) returns (GetUsageStatsResponse);
+}
+
+message CheckLimitRequest {
+  string company_id = 1;
+  string usage_type = 2; // LOAD_CREATED, TRIP_POSTED, BID_PLACED, etc.
+  int32 quantity = 3;    // How many units to check (default 1)
+}
+
+message CheckLimitResponse {
+  bool allowed = 1;
+  string reason = 2;         // Reason if not allowed
+  int32 current_usage = 3;
+  int32 limit = 4;           // -1 for unlimited
+  int32 remaining = 5;       // -1 for unlimited
+}
+
+message GetPlanRequest {
+  string company_id = 1;
+}
+
+message GetPlanResponse {
+  bool found = 1;
+  SubscriptionInfo subscription = 2;
+  PlanInfo plan = 3;
+}
+
+message SubscriptionInfo {
+  string id = 1;
+  string status = 2;           // TRIALING, ACTIVE, PAST_DUE, CANCELLED, EXPIRED
+  string billing_cycle = 3;    // MONTHLY, YEARLY
+  string current_period_start = 4;
+  string current_period_end = 5;
+  string trial_end = 6;
+  bool cancel_at_period_end = 7;
+}
+
+message PlanInfo {
+  string id = 1;
+  string name = 2;             // FREE, STARTER, PROFESSIONAL, ENTERPRISE
+  string display_name = 3;
+  repeated string features = 4; // ANALYTICS, API_ACCESS, etc.
+  PlanLimits limits = 5;
+}
+
+message PlanLimits {
+  int32 loads_per_month = 1;    // -1 for unlimited
+  int32 trips_per_month = 2;
+  int32 bids_per_month = 3;
+  int32 team_members = 4;
+  int32 storage_gb = 5;
+  int32 api_requests_per_day = 6;
+}
+
+message RecordUsageRequest {
+  string company_id = 1;
+  string usage_type = 2;
+  int32 quantity = 3;          // Default 1
+  string entity_type = 4;      // Optional: LOAD, TRIP, BID, etc.
+  string entity_id = 5;        // Optional: ID of the created entity
+}
+
+message RecordUsageResponse {
+  bool success = 1;
+  int32 new_usage = 2;
+  int32 limit = 3;
+  int32 remaining = 4;
+}
+
+message GetUsageStatsRequest {
+  string company_id = 1;
+}
+
+message GetUsageStatsResponse {
+  bool found = 1;
+  map<string, UsageStat> usage = 2; // keyed by usage_type
+}
+
+message UsageStat {
+  int32 current = 1;
+  int32 limit = 2;     // -1 for unlimited
+  int32 remaining = 3; // -1 for unlimited
+}

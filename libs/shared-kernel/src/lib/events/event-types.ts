@@ -93,6 +93,40 @@ export const EVENT_TYPES = {
     CANCELLED: 'booking.cancelled',
     COMPLETED: 'booking.completed',
   },
+  BILLING: {
+    PLAN: {
+      CREATED: 'billing.plan.created',
+      UPDATED: 'billing.plan.updated',
+      ACTIVATED: 'billing.plan.activated',
+      DEACTIVATED: 'billing.plan.deactivated',
+    },
+    SUBSCRIPTION: {
+      CREATED: 'billing.subscription.created',
+      ACTIVATED: 'billing.subscription.activated',
+      PLAN_CHANGED: 'billing.subscription.plan_changed',
+      CANCELLED: 'billing.subscription.cancelled',
+      CANCELLATION_SCHEDULED: 'billing.subscription.cancellation_scheduled',
+      RENEWED: 'billing.subscription.renewed',
+      PAST_DUE: 'billing.subscription.past_due',
+      EXPIRED: 'billing.subscription.expired',
+      USAGE_RECORDED: 'billing.subscription.usage_recorded',
+      USAGE_LIMIT_REACHED: 'billing.subscription.usage_limit_reached',
+    },
+    PAYMENT: {
+      INITIATED: 'billing.payment.initiated',
+      PROCESSING: 'billing.payment.processing',
+      SUCCEEDED: 'billing.payment.succeeded',
+      FAILED: 'billing.payment.failed',
+      REFUNDED: 'billing.payment.refunded',
+    },
+    INVOICE: {
+      CREATED: 'billing.invoice.created',
+      FINALIZED: 'billing.invoice.finalized',
+      PAID: 'billing.invoice.paid',
+      VOIDED: 'billing.invoice.voided',
+      PDF_GENERATED: 'billing.invoice.pdf_generated',
+    },
+  },
 } as const;
 
 export type OrderEventTypes =

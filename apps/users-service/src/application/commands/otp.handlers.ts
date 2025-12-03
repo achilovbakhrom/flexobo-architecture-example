@@ -5,12 +5,7 @@ import {
   Success,
   Failure,
 } from '@flexobo/core';
-import {
-  Inject,
-  HttpException,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Inject, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
   SendOTPCommand,
   VerifyOTPCommand,
@@ -19,8 +14,6 @@ import {
 import {
   IUserRepository,
   USER_REPOSITORY,
-  IOTPRepository,
-  OTP_REPOSITORY,
   IOTPService,
   OTP_SERVICE,
   ISmsService,
@@ -30,7 +23,9 @@ import {
   IUser,
   ErrorCodes,
   ErrorMessages,
+  AuthMethod,
 } from '../../ports';
+import { IUserAggregateStore, USER_AGGREGATE_STORE } from '../../ports/user-store.port';
 
 export interface SendOTPResult {
   codeHash: string;
@@ -47,52 +42,58 @@ export class SendOTPHandler
 {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
-    @Inject(OTP_REPOSITORY) private readonly otpRepository: IOTPRepository,
+    @Inject(USER_AGGREGATE_STORE)
+    private readonly userAggregateStore: IUserAggregateStore,
     @Inject(OTP_SERVICE) private readonly otpService: IOTPService,
     @Inject(SMS_SERVICE) private readonly smsService: ISmsService,
     @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService
   ) {}
 
-  async execute(command: SendOTPCommand): Promise<Result<SendOTPResult, Error>> {
+  async execute(
+    command: SendOTPCommand
+  ): Promise<Result<SendOTPResult, Error>> {
     try {
-      if (command.forRegistration) {
-        if (command.authMethod === 'PHONE_NUMBER' && command.phoneNumber) {
-          const existing = await this.userRepository.findByPhoneNumber(
-            command.phoneNumber
-          );
-          if (existing) {
-            return new Failure(
-              new HttpException(
-                {
-                  statusCode: 400,
-                  error: ErrorCodes.PHONE_EXISTS,
-                  message: ErrorMessages[ErrorCodes.PHONE_EXISTS],
-                },
-                400
-              )
-            );
-          }
-        } else if (command.authMethod === 'EMAIL' && command.email) {
-          const existing = await this.userRepository.findByEmail(command.email);
-          if (existing) {
-            return new Failure(
-              new HttpException(
-                {
-                  statusCode: 400,
-                  error: ErrorCodes.EMAIL_EXISTS,
-                  message: ErrorMessages[ErrorCodes.EMAIL_EXISTS],
-                },
-                400
-              )
-            );
-          }
-        }
+      // Find user by phone or email
+      let user: IUser | null = null;
+
+      if (
+        command.authMethod === AuthMethod.PhoneNumber &&
+        command.phoneNumber
+      ) {
+        user = await this.userRepository.findByPhoneNumber(command.phoneNumber);
+      } else if (command.authMethod === AuthMethod.Email && command.email) {
+        user = await this.userRepository.findByEmail(command.email);
       }
 
+      // User must exist to request OTP
+      if (!user) {
+        return new Failure(
+          new NotFoundException({
+            statusCode: 404,
+            error: ErrorCodes.USER_NOT_FOUND,
+            message: ErrorMessages[ErrorCodes.USER_NOT_FOUND],
+          })
+        );
+      }
+
+      // Load the user aggregate
+      const userAggregate = await this.userAggregateStore.load(user.id);
+      if (!userAggregate) {
+        return new Failure(
+          new NotFoundException({
+            statusCode: 404,
+            error: ErrorCodes.USER_NOT_FOUND,
+            message: ErrorMessages[ErrorCodes.USER_NOT_FOUND],
+          })
+        );
+      }
+
+      // Generate OTP
       const { code, codeHash } = this.otpService.generateOTP();
       const expiresAt = this.otpService.getExpiresAt();
 
-      await this.otpRepository.create({
+      // Request OTP on user aggregate
+      userAggregate.requestOTP({
         code,
         codeHash,
         authMethod: command.authMethod,
@@ -101,9 +102,16 @@ export class SendOTPHandler
         expiresAt,
       });
 
-      if (command.authMethod === 'PHONE_NUMBER' && command.phoneNumber) {
+      // Save the aggregate
+      await this.userAggregateStore.save(userAggregate);
+
+      // Send OTP via appropriate channel
+      if (
+        command.authMethod === AuthMethod.PhoneNumber &&
+        command.phoneNumber
+      ) {
         await this.smsService.send(String(code), command.phoneNumber);
-      } else if (command.authMethod === 'EMAIL' && command.email) {
+      } else if (command.authMethod === AuthMethod.Email && command.email) {
         await this.emailService.sendOTP(command.email, String(code));
       }
 
@@ -122,21 +130,25 @@ export class VerifyOTPHandler
   implements ICommandHandler<VerifyOTPCommand, VerifyOTPResult>
 {
   constructor(
-    @Inject(OTP_REPOSITORY) private readonly otpRepository: IOTPRepository
+    @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
+    @Inject(USER_AGGREGATE_STORE)
+    private readonly userAggregateStore: IUserAggregateStore
   ) {}
 
   async execute(
     command: VerifyOTPCommand
   ): Promise<Result<VerifyOTPResult, Error>> {
     try {
-      const otp = await this.otpRepository.findByCodeAndHash({
-        code: command.code,
-        codeHash: command.codeHash,
-        phoneNumber: command.phoneNumber,
-        email: command.email,
-      });
+      // Find user by phone or email
+      let user: IUser | null = null;
 
-      if (!otp) {
+      if (command.phoneNumber) {
+        user = await this.userRepository.findByPhoneNumber(command.phoneNumber);
+      } else if (command.email) {
+        user = await this.userRepository.findByEmail(command.email);
+      }
+
+      if (!user) {
         return new Failure(
           new BadRequestException({
             statusCode: 400,
@@ -146,8 +158,46 @@ export class VerifyOTPHandler
         );
       }
 
-      if (new Date() > otp.expiresAt) {
-        await this.otpRepository.delete(otp.id);
+      // Load user aggregate
+      const userAggregate = await this.userAggregateStore.load(user.id);
+      if (!userAggregate) {
+        return new Failure(
+          new BadRequestException({
+            statusCode: 400,
+            error: ErrorCodes.INVALID_OTP,
+            message: ErrorMessages[ErrorCodes.INVALID_OTP],
+          })
+        );
+      }
+
+      // Check if OTP exists and matches
+      const currentOTP = userAggregate.currentOTP;
+      if (!currentOTP) {
+        return new Failure(
+          new BadRequestException({
+            statusCode: 400,
+            error: ErrorCodes.INVALID_OTP,
+            message: ErrorMessages[ErrorCodes.INVALID_OTP],
+          })
+        );
+      }
+
+      // Validate code and hash
+      if (
+        currentOTP.code !== command.code ||
+        currentOTP.codeHash !== command.codeHash
+      ) {
+        return new Failure(
+          new BadRequestException({
+            statusCode: 400,
+            error: ErrorCodes.INVALID_OTP,
+            message: ErrorMessages[ErrorCodes.INVALID_OTP],
+          })
+        );
+      }
+
+      // Check expiration
+      if (new Date() > currentOTP.expiresAt) {
         return new Failure(
           new BadRequestException({
             statusCode: 400,
@@ -157,7 +207,9 @@ export class VerifyOTPHandler
         );
       }
 
-      await this.otpRepository.delete(otp.id);
+      // Mark OTP as used
+      userAggregate.useOTP(command.codeHash);
+      await this.userAggregateStore.save(userAggregate);
 
       return new Success({ verified: true });
     } catch (error) {
@@ -172,7 +224,8 @@ export class ForgotPasswordHandler
 {
   constructor(
     @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
-    @Inject(OTP_REPOSITORY) private readonly otpRepository: IOTPRepository,
+    @Inject(USER_AGGREGATE_STORE)
+    private readonly userAggregateStore: IUserAggregateStore,
     @Inject(OTP_SERVICE) private readonly otpService: IOTPService,
     @Inject(SMS_SERVICE) private readonly smsService: ISmsService,
     @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService
@@ -182,11 +235,15 @@ export class ForgotPasswordHandler
     command: ForgotPasswordCommand
   ): Promise<Result<SendOTPResult, Error>> {
     try {
+      // Find user by phone or email
       let user: IUser | null = null;
 
-      if (command.authMethod === 'PHONE_NUMBER' && command.phoneNumber) {
+      if (
+        command.authMethod === AuthMethod.PhoneNumber &&
+        command.phoneNumber
+      ) {
         user = await this.userRepository.findByPhoneNumber(command.phoneNumber);
-      } else if (command.authMethod === 'EMAIL' && command.email) {
+      } else if (command.authMethod === AuthMethod.Email && command.email) {
         user = await this.userRepository.findByEmail(command.email);
       }
 
@@ -196,10 +253,20 @@ export class ForgotPasswordHandler
         );
       }
 
+      // Load user aggregate
+      const userAggregate = await this.userAggregateStore.load(user.id);
+      if (!userAggregate) {
+        return new Failure(
+          new NotFoundException(ErrorMessages[ErrorCodes.USER_NOT_FOUND])
+        );
+      }
+
+      // Generate OTP
       const { code, codeHash } = this.otpService.generateOTP();
       const expiresAt = this.otpService.getExpiresAt();
 
-      await this.otpRepository.create({
+      // Request OTP on user aggregate
+      userAggregate.requestOTP({
         code,
         codeHash,
         authMethod: command.authMethod,
@@ -208,9 +275,16 @@ export class ForgotPasswordHandler
         expiresAt,
       });
 
-      if (command.authMethod === 'PHONE_NUMBER' && command.phoneNumber) {
+      // Save the aggregate
+      await this.userAggregateStore.save(userAggregate);
+
+      // Send OTP via appropriate channel
+      if (
+        command.authMethod === AuthMethod.PhoneNumber &&
+        command.phoneNumber
+      ) {
         await this.smsService.send(String(code), command.phoneNumber);
-      } else if (command.authMethod === 'EMAIL' && command.email) {
+      } else if (command.authMethod === AuthMethod.Email && command.email) {
         await this.emailService.sendOTP(command.email, String(code));
       }
 

@@ -8,6 +8,7 @@ import {
   IFileRepository,
   FILE_REPOSITORY,
   FileUploadDto,
+  MulterFile,
 } from '../../ports/file-storage.port';
 
 @Injectable()
@@ -30,7 +31,7 @@ export class FileStorageService implements IFileStorageService {
     }
   }
 
-  async upload(file: Express.Multer.File, uploaderId: string): Promise<FileUploadDto> {
+  async upload(file: MulterFile, uploaderId: string): Promise<FileUploadDto> {
     const fileId = uuidv4();
     const extension = path.extname(file.originalname);
     const fileName = `${fileId}${extension}`;
@@ -85,7 +86,7 @@ export class FileStorageService implements IFileStorageService {
   private async uploadLocal(
     buffer: Buffer,
     fileName: string,
-    file: Express.Multer.File,
+    file: MulterFile,
     fileId: string,
     uploaderId: string
   ): Promise<FileUploadDto> {
