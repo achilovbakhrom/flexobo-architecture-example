@@ -14,10 +14,8 @@ export class OTPService implements IOTPService {
   }
 
   generateOTP(): OTPCode {
-    // Generate 6-digit code
     const code = Math.floor(100000 + Math.random() * 900000);
 
-    // Generate code hash for verification
     const codeToken = crypto.randomBytes(32).toString('hex');
     const codeHash = crypto
       .createHash('sha256')

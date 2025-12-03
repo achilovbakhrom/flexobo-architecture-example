@@ -12,4 +12,7 @@ export default () => ({
   rabbitmq: {
     url: process.env.RABBITMQ_URL,
   },
+  google: {
+    clientId: process.env.GOOGLE_CLIENT_ID,
+  },
 });
