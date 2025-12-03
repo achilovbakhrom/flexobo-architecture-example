@@ -9,47 +9,7 @@ import {
   AuthPlatform,
 } from '../../ports';
 import { IUser } from '../../ports/user.interface';
-
-interface UserRecord {
-  id: string;
-  uniqueId: string;
-  email: string | null;
-  phoneNumber: string | null;
-  telegramId: string | null;
-  googleId: string | null;
-  passwordHash: string;
-  fio: string;
-  avatar: string | null;
-  role: string;
-  userType: string | null;
-  status: string;
-  language: string;
-  isPrivacyPolicyAccepted: boolean;
-  isSubscribedNewsletter: boolean;
-  platform: string | null;
-  isVerified: boolean;
-  lastLoginAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-}
-
-interface UserWhereUniqueInput {
-  id?: string;
-  email?: string;
-  phoneNumber?: string;
-  telegramId?: string;
-  googleId?: string;
-  uniqueId?: string;
-}
-
-interface UserPrismaClient {
-  user: {
-    findUnique: (args: { where: UserWhereUniqueInput }) => Promise<UserRecord | null>;
-    findMany: (args: { where: { id: { in: string[] } } }) => Promise<UserRecord[]>;
-    create: (args: { data: Partial<UserRecord> }) => Promise<UserRecord>;
-    update: (args: { where: { id: string }; data: Partial<UserRecord> }) => Promise<UserRecord>;
-  };
-}
+import { UserRecord, UserPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
