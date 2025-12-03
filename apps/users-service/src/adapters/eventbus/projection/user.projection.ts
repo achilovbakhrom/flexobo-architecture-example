@@ -134,12 +134,14 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         passwordHash: event.data['passwordHash'] as string,
         fio: event.data['fio'] as string,
         avatar: null,
-        role: UserRole.USER,
+        role: UserRole.User,
         userType: event.data['userType'] as any,
-        status: UserStatus.ACTIVE,
+        status: UserStatus.Active,
         language: 'en',
-        isPrivacyPolicyAccepted: (event.data['isPrivacyPolicyAccepted'] as boolean) ?? false,
-        isSubscribedNewsletter: (event.data['isSubscribedNewsletter'] as boolean) ?? false,
+        isPrivacyPolicyAccepted:
+          (event.data['isPrivacyPolicyAccepted'] as boolean) ?? false,
+        isSubscribedNewsletter:
+          (event.data['isSubscribedNewsletter'] as boolean) ?? false,
         platform: event.data['platform'] as any,
         isVerified: false,
         lastLoginAt: null,
@@ -179,14 +181,14 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
   private async onUserActivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.ACTIVE
+      UserStatus.Active
     );
   }
 
   private async onUserDeactivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.INACTIVE
+      UserStatus.Inactive
     );
   }
 }

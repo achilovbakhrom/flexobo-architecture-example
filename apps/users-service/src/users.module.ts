@@ -15,10 +15,10 @@ import {
   TOKEN_REPOSITORY,
   TOKEN_SERVICE,
   PASSWORD_SERVICE,
-  OTP_REPOSITORY,
   OTP_SERVICE,
   SMS_SERVICE,
   EMAIL_SERVICE,
+  GOOGLE_AUTH_SERVICE,
 } from './ports';
 import { USER_AGGREGATE_STORE } from './ports/user-store.port';
 
@@ -27,7 +27,6 @@ import {
   PrismaUserRepository,
   PrismaUserReadModelRepository,
   PrismaTokenRepository,
-  OTPRepository,
   UserAggregateStore,
 } from './adapters/persistence';
 
@@ -38,6 +37,7 @@ import {
   OTPService,
   SmsService,
   EmailService,
+  GoogleAuthService,
 } from './adapters/services';
 
 // Adapters - Eventbus
@@ -58,6 +58,7 @@ import {
   SendOTPHandler,
   VerifyOTPHandler,
   ForgotPasswordHandler,
+  AuthWithGoogleHandler,
 } from './application/commands';
 
 // Query Handlers
@@ -82,6 +83,7 @@ const CommandHandlers = [
   SendOTPHandler,
   VerifyOTPHandler,
   ForgotPasswordHandler,
+  AuthWithGoogleHandler,
 ];
 
 const QueryHandlers = [
@@ -151,10 +153,6 @@ const QueryHandlers = [
       useClass: BcryptPasswordService,
     },
     {
-      provide: OTP_REPOSITORY,
-      useClass: OTPRepository,
-    },
-    {
       provide: OTP_SERVICE,
       useClass: OTPService,
     },
@@ -165,6 +163,10 @@ const QueryHandlers = [
     {
       provide: EMAIL_SERVICE,
       useClass: EmailService,
+    },
+    {
+      provide: GOOGLE_AUTH_SERVICE,
+      useClass: GoogleAuthService,
     },
     {
       provide: USER_AGGREGATE_STORE,

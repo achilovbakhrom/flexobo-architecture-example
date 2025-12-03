@@ -1,31 +1,32 @@
 export enum UserRole {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  SUPERADMIN = 'SUPERADMIN',
+  User = 'user',
+  Admin = 'admin',
+  SuperAdmin = 'superadmin',
 }
 
 export enum UserStatus {
-  ACTIVE = 'ACTIVE',
-  INACTIVE = 'INACTIVE',
-  SUSPENDED = 'SUSPENDED',
-  BLOCKED = 'BLOCKED',
+  Active = 'active',
+  Inactive = 'inactive',
+  Suspended = 'suspended',
+  Blocked = 'blocked',
 }
 
 export enum UserType {
-  BROKER = 'BROKER',
-  LOAD_OWNER = 'LOAD_OWNER',
-  CARRIER = 'CARRIER',
-  COMPANY_DRIVER = 'COMPANY_DRIVER',
-  OWNER_OPERATOR = 'OWNER_OPERATOR',
+  Broker = 'broker',
+  LoadOwner = 'load_owner',
+  Carrier = 'carrier',
+  CompanyDriver = 'company_driver',
+  OwnerOperator = 'owner_operator',
 }
 
 export enum AuthPlatform {
-  WEB = 'WEB',
-  MOBILE = 'MOBILE',
-  TELEGRAM = 'TELEGRAM',
+  Web = 'web',
+  Mobile = 'mobile',
+  Telegram = 'telegram',
+  Google = 'google',
 }
 
 export enum TokenType {
-  ACCESS = 'ACCESS',
-  REFRESH = 'REFRESH',
+  Access = 'access',
+  Refresh = 'refresh',
 }

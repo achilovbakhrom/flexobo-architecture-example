@@ -7,6 +7,7 @@ export interface CreateUserData {
   passwordHash: string;
   phoneNumber?: string;
   telegramId?: string;
+  googleId?: string;
   email?: string;
   isPrivacyPolicyAccepted?: boolean;
   isSubscribedNewsletter?: boolean;
@@ -28,6 +29,7 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<IUser | null>;
   findByPhoneNumber(phoneNumber: string): Promise<IUser | null>;
   findByTelegramId(telegramId: string): Promise<IUser | null>;
+  findByGoogleId(googleId: string): Promise<IUser | null>;
   findByIds(ids: string[]): Promise<IUser[]>;
   create(data: CreateUserData): Promise<IUser>;
   update(id: string, data: UpdateUserData): Promise<IUser>;

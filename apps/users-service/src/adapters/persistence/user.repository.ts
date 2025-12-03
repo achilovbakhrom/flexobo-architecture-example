@@ -55,6 +55,14 @@ export class PrismaUserRepository implements IUserRepository {
     return user ? this.mapToUser(user) : null;
   }
 
+  async findByGoogleId(googleId: string): Promise<IUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { googleId },
+    });
+
+    return user ? this.mapToUser(user) : null;
+  }
+
   async findByIds(ids: string[]): Promise<IUser[]> {
     const users = await this.prisma.user.findMany({
       where: { id: { in: ids } },
@@ -71,6 +79,7 @@ export class PrismaUserRepository implements IUserRepository {
         passwordHash: data.passwordHash,
         phoneNumber: data.phoneNumber,
         telegramId: data.telegramId,
+        googleId: data.googleId,
         email: data.email,
         isPrivacyPolicyAccepted: data.isPrivacyPolicyAccepted ?? false,
         isSubscribedNewsletter: data.isSubscribedNewsletter ?? false,
@@ -216,6 +225,7 @@ export class PrismaUserRepository implements IUserRepository {
       email: user.email,
       phoneNumber: user.phoneNumber,
       telegramId: user.telegramId,
+      googleId: user.googleId,
       passwordHash: user.passwordHash,
       fio: user.fio,
       avatar: user.avatar,

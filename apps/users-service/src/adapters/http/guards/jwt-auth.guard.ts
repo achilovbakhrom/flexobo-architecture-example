@@ -70,7 +70,7 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('User not found');
       }
 
-      if (user.status !== UserStatus.ACTIVE) {
+      if (user.status !== UserStatus.Active) {
         throw new UnauthorizedException('User account is not active');
       }
 
