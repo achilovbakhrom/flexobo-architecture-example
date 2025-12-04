@@ -31,7 +31,8 @@
         "e2e/admin-panel-e2e/**/*",
         "apps/users-service-e2e/**/*",
         "apps/chat-service-e2e/**/*",
-        "apps/main-service-e2e/**/*"
+        "apps/main-service-e2e/**/*",
+        "apps/billing-service-e2e/**/*"
       ]
     },
     {

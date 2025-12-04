@@ -9,12 +9,9 @@ export class EmailService implements IEmailService {
   constructor(private readonly configService: ConfigService) {}
 
   async send(to: string, subject: string, body: string): Promise<void> {
-    // TODO: Implement actual email sending via provider (SendGrid, AWS SES, etc.)
-    // For now, just log the message
     this.logger.log(`Sending email to ${to}: ${subject}`);
     this.logger.debug(`Email body: ${body}`);
 
-    // In production, integrate with actual email provider:
     // const emailApiKey = this.configService.get<string>('EMAIL_API_KEY');
     // await sendgrid.send({ to, subject, html: body });
   }

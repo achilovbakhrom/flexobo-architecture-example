@@ -110,3 +110,13 @@ export class LinkTelegramCommand implements ICommand {
     public readonly telegramId: string
   ) {}
 }
+
+// Google Commands
+export class AuthWithGoogleCommand implements ICommand {
+  constructor(
+    public readonly idToken: string,
+    public readonly isPrivacyPolicyAccepted?: boolean,
+    public readonly isSubscribedNewsletter?: boolean,
+    public readonly userType?: UserType
+  ) {}
+}

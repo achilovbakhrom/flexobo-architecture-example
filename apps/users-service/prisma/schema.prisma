@@ -87,12 +87,13 @@ model User {
     email                     String?      @unique
     phoneNumber               String?      @unique @map("phone_number")
     telegramId                String?      @unique @map("telegram_id")
+    googleId                  String?      @unique @map("google_id")
     passwordHash              String       @map("password_hash")
     fio                       String
     avatar                    String?
-    role                      UserRole     @default(USER)
+    role                      UserRole     @default(user)
     userType                  UserType?    @map("user_type")
-    status                    UserStatus   @default(ACTIVE)
+    status                    UserStatus   @default(active)
     language                  String       @default("en") @map("user_lang")
     isPrivacyPolicyAccepted   Boolean      @default(false) @map("is_privacy_policy_accepted")
     isSubscribedNewsletter    Boolean      @default(false) @map("is_subscribed_newsletter")
@@ -104,11 +105,10 @@ model User {
     createdAt                 DateTime     @default(now()) @map("created_at")
     updatedAt                 DateTime     @updatedAt @map("updated_at")
 
-    refreshTokens RefreshToken[]
-
     @@index([email])
     @@index([phoneNumber])
     @@index([telegramId])
+    @@index([googleId])
     @@index([uniqueId])
     @@index([role])
     @@index([status])
@@ -117,33 +117,35 @@ model User {
 }
 
 enum UserRole {
-    USER
-    ADMIN
-    SUPERADMIN
+    user
+    admin
+    superadmin
 }
 
 enum UserStatus {
-    ACTIVE
-    INACTIVE
-    SUSPENDED
-    BLOCKED
+    active
+    inactive
+    suspended
+    blocked
 }
 
 enum UserType {
-    BROKER
-    LOAD_OWNER
-    CARRIER
-    COMPANY_DRIVER
-    OWNER_OPERATOR
+    broker
+    load_owner
+    carrier
+    company_driver
+    owner_operator
 }
 
 enum AuthPlatform {
-    WEB
-    MOBILE
-    TELEGRAM
+    web
+    mobile
+    telegram
+    google
 }
 
 // Refresh Token for JWT refresh
+// Note: No FK to User because in event sourcing the read model may not exist yet when tokens are created
 model RefreshToken {
     id          String    @id @default(uuid())
     userId      String    @map("user_id")
@@ -152,8 +154,6 @@ model RefreshToken {
     expiresAt   DateTime  @map("expires_at")
     revokedAt   DateTime? @map("revoked_at")
     createdAt   DateTime  @default(now()) @map("created_at")
-
-    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
     @@index([userId])
     @@index([token])

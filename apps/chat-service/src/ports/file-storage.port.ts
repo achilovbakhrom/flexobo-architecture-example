@@ -1,3 +1,5 @@
+import { Multer } from 'multer';
+
 // ============================================================
 // File Upload DTO
 // ============================================================
@@ -13,11 +15,17 @@ export interface FileUploadDto {
 }
 
 // ============================================================
+// Multer File Type
+// ============================================================
+
+export type MulterFile = Express.Multer.File;
+
+// ============================================================
 // File Storage Service Port
 // ============================================================
 
 export interface IFileStorageService {
-  upload(file: Express.Multer.File, uploaderId: string): Promise<FileUploadDto>;
+  upload(file: MulterFile, uploaderId: string): Promise<FileUploadDto>;
   getUrl(fileId: string): Promise<string | null>;
   getFile(fileId: string): Promise<FileUploadDto | null>;
   delete(fileId: string): Promise<void>;

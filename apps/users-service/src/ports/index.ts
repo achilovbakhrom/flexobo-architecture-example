@@ -3,12 +3,13 @@ export * from './user-read-model.port';
 export * from './token-repository.port';
 export * from './token-service.port';
 export * from './password-service.port';
-export * from './otp-repository.port';
 export * from './otp-service.port';
 export * from './sms-service.port';
 export * from './email-service.port';
+export * from './google-auth-service.port';
 
 // Re-export domain types for adapters to use
 export * from './user.enums';
 export * from './user.interface';
+export * from './user.events';
 export * from '../domain/constants/error.constants';

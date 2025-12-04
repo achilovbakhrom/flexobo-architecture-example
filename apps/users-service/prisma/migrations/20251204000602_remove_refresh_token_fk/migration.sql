@@ -1,0 +1,2 @@
+-- DropForeignKey
+ALTER TABLE "refresh_tokens" DROP CONSTRAINT "refresh_tokens_user_id_fkey";

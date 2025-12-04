@@ -258,8 +258,14 @@ export class OutboxWorker implements OnModuleInit, OnModuleDestroy {
    * e.g., OrderCreated -> order.created
    *       OrderItemAdded -> order.item_added
    *       PaymentCompleted -> payment.completed
+   *       user.otp_used -> user.otp_used (already in correct format)
    */
   private eventTypeToRoutingKey(eventType: string): string {
+    // If event type already contains dots, it's already in routing key format
+    if (eventType.includes('.')) {
+      return eventType;
+    }
+
     // Convert PascalCase to snake_case with dots
     // OrderCreated -> order.created
     // OrderItemAdded -> order.item_added

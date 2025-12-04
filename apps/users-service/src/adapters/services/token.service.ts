@@ -119,6 +119,7 @@ export class JwtTokenService implements ITokenService {
     return {
       accessToken,
       refreshToken,
+      jti, // Return access token JTI for tracking in User aggregate
     };
   }
 

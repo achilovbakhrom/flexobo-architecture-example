@@ -6,6 +6,7 @@ export interface UserReadModelDto {
   email?: string | null;
   phoneNumber?: string | null;
   telegramId?: string | null;
+  googleId?: string | null;
   passwordHash: string;
   fio: string;
   avatar?: string | null;
@@ -23,20 +24,10 @@ export interface UserReadModelDto {
 }
 
 export interface VersionedUpsertOptions {
-  eventId?: string;
-  expectedVersion?: number;
   version?: number;
 }
 
 export interface IUserReadModelRepository {
-  findById(userId: string): Promise<UserReadModelDto | null>;
-
-  findByEmail(email: string): Promise<UserReadModelDto | null>;
-
-  findByPhoneNumber(phoneNumber: string): Promise<UserReadModelDto | null>;
-
-  findByTelegramId(telegramId: string): Promise<UserReadModelDto | null>;
-
   upsert(
     user: Omit<UserReadModelDto, 'createdAt'>,
     options?: VersionedUpsertOptions
@@ -49,22 +40,23 @@ export interface IUserReadModelRepository {
       phoneNumber?: string;
       language?: string;
       avatar?: string;
-    }
+    },
+    version?: number
   ): Promise<void>;
 
-  updatePassword(userId: string, passwordHash: string): Promise<void>;
+  updatePassword(userId: string, passwordHash: string, version?: number): Promise<void>;
 
-  updateTelegramId(userId: string, telegramId: string): Promise<void>;
+  updateTelegramId(userId: string, telegramId: string, version?: number): Promise<void>;
 
-  updateLastLogin(userId: string): Promise<void>;
+  updateGoogleId(userId: string, googleId: string, version?: number): Promise<void>;
 
-  updateStatus(userId: string, status: UserStatus): Promise<void>;
+  updateLastLogin(userId: string, version?: number): Promise<void>;
 
-  delete(userId: string): Promise<void>;
+  updateStatus(userId: string, status: UserStatus, version?: number): Promise<void>;
 
-  getVersion(userId: string): Promise<number>;
+  updateIsVerified(userId: string, isVerified: boolean, version?: number): Promise<void>;
 
-  isEventProcessed(userId: string, eventId: string): Promise<boolean>;
+  updateVersion(userId: string, version: number): Promise<void>;
 }
 
 export const USER_READ_MODEL_REPOSITORY = Symbol('IUserReadModelRepository');
