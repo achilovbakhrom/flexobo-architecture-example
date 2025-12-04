@@ -58,8 +58,8 @@ export class ChatGrpcClient implements IChatServiceClient, OnModuleInit {
     );
 
     const PROTO_PATH = join(
-      __dirname,
-      '../../../../../libs/shared-kernel/src/lib/grpc/proto/chat.proto'
+      process.cwd(),
+      'libs/shared-kernel/src/lib/grpc/proto/chat.proto'
     );
 
     const packageDefinition = protoLoader.loadSync(PROTO_PATH, {

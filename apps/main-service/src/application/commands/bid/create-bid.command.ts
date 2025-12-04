@@ -1,12 +1,9 @@
 import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { ICommand, ICommandHandler, CommandHandler, IAggregateStore, Result, Success, Failure } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { Bid } from '../../../domain/aggregates/bid.aggregate';
 import { PostType } from '../../../domain/constants/enums';
-import {
-  IBidAggregateStore,
-  BID_AGGREGATE_STORE,
-} from '../../../ports/bid.repository';
+import { BID_AGGREGATE_STORE } from '../../../ports/bid.repository';
 import {
   ILoadReadRepository,
   LOAD_READ_REPOSITORY,
@@ -39,10 +36,10 @@ export interface CreateBidResult {
 
 @Injectable()
 @CommandHandler(CreateBidCommand)
-export class CreateBidHandler implements ICommandHandler<CreateBidCommand> {
+export class CreateBidHandler implements ICommandHandler<CreateBidCommand, CreateBidResult> {
   constructor(
     @Inject(BID_AGGREGATE_STORE)
-    private readonly bidStore: IBidAggregateStore,
+    private readonly bidStore: IAggregateStore<Bid>,
     @Inject(LOAD_READ_REPOSITORY)
     private readonly loadRepo: ILoadReadRepository,
     @Inject(TRIP_READ_REPOSITORY)
@@ -51,7 +48,8 @@ export class CreateBidHandler implements ICommandHandler<CreateBidCommand> {
     private readonly chatClient: IChatServiceClient
   ) {}
 
-  async execute(command: CreateBidCommand): Promise<CreateBidResult> {
+  async execute(command: CreateBidCommand): Promise<Result<CreateBidResult, Error>> {
+    try {
     // Get the post owner
     let ownerId: string;
 
@@ -104,9 +102,12 @@ export class CreateBidHandler implements ICommandHandler<CreateBidCommand> {
 
     await this.bidStore.save(bid);
 
-    return {
+    return new Success({
       bidId,
       chatRoomId: chatRoom.roomId,
-    };
+    });
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }

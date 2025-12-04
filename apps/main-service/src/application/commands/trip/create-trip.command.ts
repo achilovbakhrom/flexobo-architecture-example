@@ -1,9 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { ICommand, ICommandHandler, CommandHandler, IAggregateStore, Result, Success, Failure } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { Trip } from '../../../domain/aggregates/trip.aggregate';
 import {
-  ITripAggregateStore,
   TRIP_AGGREGATE_STORE,
 } from '../../../ports/trip.repository';
 
@@ -52,38 +51,42 @@ export class CreateTripCommand implements ICommand {
 
 @Injectable()
 @CommandHandler(CreateTripCommand)
-export class CreateTripHandler implements ICommandHandler<CreateTripCommand> {
+export class CreateTripHandler implements ICommandHandler<CreateTripCommand, string> {
   constructor(
     @Inject(TRIP_AGGREGATE_STORE)
-    private readonly tripStore: ITripAggregateStore
+    private readonly tripStore: IAggregateStore<Trip>
   ) {}
 
-  async execute(command: CreateTripCommand): Promise<string> {
-    const tripId = uuidv4();
+  async execute(command: CreateTripCommand): Promise<Result<string, Error>> {
+    try {
+      const tripId = uuidv4();
 
-    const trip = Trip.create(tripId, {
-      ownerId: command.ownerId,
-      companyId: command.companyId,
-      transport: {
-        id: command.transport.id,
-        type: command.transport.type,
-        capacity: command.transport.capacity,
-        dimensions: command.transport.dimensions,
-        loadingTypes: command.transport.loadingTypes,
-        features: command.transport.features ?? [],
-        permits: command.transport.permits ?? [],
-      },
-      loadingPoints: command.loadingPoints,
-      unloadingPoints: command.unloadingPoints,
-      price: command.price,
-      currency: command.currency || 'USD',
-      paymentTerms: command.paymentTerms,
-      boardIds: command.boardIds || [],
-      isPublic: command.isPublic ?? true,
-    });
+      const trip = Trip.create(tripId, {
+        ownerId: command.ownerId,
+        companyId: command.companyId,
+        transport: {
+          id: command.transport.id,
+          type: command.transport.type,
+          capacity: command.transport.capacity,
+          dimensions: command.transport.dimensions,
+          loadingTypes: command.transport.loadingTypes,
+          features: command.transport.features ?? [],
+          permits: command.transport.permits ?? [],
+        },
+        loadingPoints: command.loadingPoints,
+        unloadingPoints: command.unloadingPoints,
+        price: command.price,
+        currency: command.currency || 'USD',
+        paymentTerms: command.paymentTerms,
+        boardIds: command.boardIds || [],
+        isPublic: command.isPublic ?? true,
+      });
 
-    await this.tripStore.save(trip);
+      await this.tripStore.save(trip);
 
-    return tripId;
+      return new Success(tripId);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }

@@ -8,13 +8,21 @@
  *   npx tsx scripts/dev.ts users    # Run users-service
  *   npx tsx scripts/dev.ts chat     # Run chat-service
  *   npx tsx scripts/dev.ts file     # Run file-service
+ *   npx tsx scripts/dev.ts main     # Run main-service
  *   npx tsx scripts/dev.ts all      # Run all services
  *   npx tsx scripts/dev.ts stop     # Stop all services and containers
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'order' | 'gateway' | 'admin' | 'users' | 'chat' | 'file';
+type ServiceName =
+  | 'order'
+  | 'gateway'
+  | 'admin'
+  | 'users'
+  | 'chat'
+  | 'file'
+  | 'main';
 
 interface ServiceConfig {
   name: string;
@@ -59,6 +67,12 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'file-service',
     dockerCompose: 'apps/file-service/docker-compose.yml',
     color: '\x1b[91m', // light red
+  },
+  main: {
+    name: 'main-service',
+    nxProject: 'main-service',
+    dockerCompose: 'apps/main-service/docker-compose.yml',
+    color: '\x1b[95m', // light magenta
   },
 };
 
@@ -192,7 +206,20 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['order', 'gateway', 'admin', 'users', 'chat', 'file', 'all', 'stop'].includes(arg)) {
+  if (
+    !arg ||
+    ![
+      'order',
+      'gateway',
+      'admin',
+      'users',
+      'chat',
+      'file',
+      'main',
+      'all',
+      'stop',
+    ].includes(arg)
+  ) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 
@@ -203,6 +230,7 @@ Commands:
   users    - Run users-service (port 3003)
   chat     - Run chat-service (port 3004)
   file     - Run file-service (port 3005)
+  main     - Run main-service (port 3006)
   all      - Run all services
   stop     - Stop all services and containers
 `);

@@ -1,4 +1,4 @@
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import { Inject, NotFoundException } from '@nestjs/common';
 import {
   TRANSPORT_READ_REPOSITORY,
