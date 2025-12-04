@@ -11,8 +11,42 @@ import { UserPrismaClient } from './prisma-types';
 export class PrismaUserReadModelRepository implements IUserReadModelRepository {
   constructor(@Inject('PrismaClient') private readonly prisma: UserPrismaClient) {}
 
+  async findById(id: string): Promise<UserReadModelDto | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      uniqueId: user.uniqueId,
+      email: user.email,
+      phoneNumber: user.phoneNumber,
+      telegramId: user.telegramId,
+      googleId: user.googleId,
+      passwordHash: user.passwordHash,
+      fio: user.fio,
+      avatar: user.avatar,
+      role: user.role as any,
+      userType: user.userType as any,
+      status: user.status as any,
+      language: user.language,
+      isPrivacyPolicyAccepted: user.isPrivacyPolicyAccepted,
+      isSubscribedNewsletter: user.isSubscribedNewsletter,
+      platform: user.platform as any,
+      isVerified: user.isVerified,
+      lastLoginAt: user.lastLoginAt,
+      version: user.version,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    };
+  }
+
   async upsert(
-    user: Omit<UserReadModelDto, 'createdAt'>,
+    user: Omit<UserReadModelDto, 'createdAt' | 'version'>,
     options?: VersionedUpsertOptions
   ): Promise<boolean> {
     await this.prisma.user.upsert({

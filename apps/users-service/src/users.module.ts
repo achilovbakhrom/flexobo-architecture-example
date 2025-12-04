@@ -1,7 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
-import { CqrsModule, MessagingModule, EventStoreModule, OutboxModule, MESSAGE_PUBLISHER, SnapshotModule } from '@flexobo/core';
+import {
+  CqrsModule,
+  MessagingModule,
+  EventStoreModule,
+  OutboxModule,
+  MESSAGE_PUBLISHER,
+  SnapshotModule,
+} from '@flexobo/core';
 import { PrismaModule } from './prisma.module';
 import { AuthController } from './adapters/http/v1/auth.controller';
 import { UsersGrpcController } from './adapters/grpc/users.grpc.controller';
@@ -115,6 +122,12 @@ const QueryHandlers = [
         config: {
           url: configService.get('rabbitmq.url', 'amqp://localhost:5672'),
           exchange: configService.get('rabbitmq.exchange', 'flexobo.events'),
+          retry: {
+            backoffMultiplier: 1,
+            maxRetries: 10,
+            initialDelayMs: 1000,
+            maxDelayMs: 30000,
+          },
         },
       }),
       inject: [ConfigService],
@@ -126,13 +139,20 @@ const QueryHandlers = [
     EventStoreModule.forRoot({ enableUpcasting: false }),
     OutboxModule.forRoot({
       workerConfig: { pollingIntervalMs: 5000, batchSize: 100, enabled: true },
-      messagePublisher: { provide: 'IMessagePublisher', useExisting: MESSAGE_PUBLISHER },
+      messagePublisher: {
+        provide: 'IMessagePublisher',
+        useExisting: MESSAGE_PUBLISHER,
+      },
     }),
     SnapshotModule.forRootAsync({
       imports: [PrismaModule],
       useFactory: (prismaClient: unknown) => ({
         prismaClient,
-        strategy: { snapshotFrequency: 20, keepLatestSnapshots: 2, enabled: true },
+        strategy: {
+          snapshotFrequency: 20,
+          keepLatestSnapshots: 2,
+          enabled: true,
+        },
       }),
       inject: ['PrismaClient'],
     }),

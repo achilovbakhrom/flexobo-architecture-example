@@ -19,6 +19,7 @@ export interface UserReadModelDto {
   platform?: AuthPlatform | null;
   isVerified: boolean;
   lastLoginAt?: Date | null;
+  version: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -28,8 +29,10 @@ export interface VersionedUpsertOptions {
 }
 
 export interface IUserReadModelRepository {
+  findById(id: string): Promise<UserReadModelDto | null>;
+
   upsert(
-    user: Omit<UserReadModelDto, 'createdAt'>,
+    user: Omit<UserReadModelDto, 'createdAt' | 'version'>,
     options?: VersionedUpsertOptions
   ): Promise<boolean>;
 
