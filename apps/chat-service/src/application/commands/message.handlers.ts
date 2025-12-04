@@ -70,7 +70,7 @@ export class SendMessageHandler
         senderId: command.senderId,
         senderType: command.senderType,
         content: command.content,
-        type: command.type || MessageType.TEXT,
+        type: command.type || MessageType.Text,
         fileUrls: command.fileUrls,
         fileName: command.fileName,
         fileMetadata: command.fileMetadata,
@@ -108,7 +108,7 @@ export class SendMessageHandler
 
       // Update room with message info and increment unread counts
       const preview = messageState.content?.substring(0, 100) ||
-        (messageState.type !== MessageType.TEXT ? `[${messageState.type}]` : '');
+        (messageState.type !== MessageType.Text ? `[${messageState.type}]` : '');
 
       room.addMessage(message.id, preview, command.senderId);
       await this.roomStore.save(room);

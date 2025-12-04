@@ -127,7 +127,7 @@ export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
       isGroup: (event.data['isGroup'] as boolean) ?? false,
       groupName: event.data['groupName'] as string | undefined,
       isSupportChat: (event.data['isSupportChat'] as boolean) ?? false,
-      status: ChatRoomStatus.ACTIVE,
+      status: ChatRoomStatus.Active,
       unreadCounts: {},
       translationSettings: {},
       lastMessagePreview: undefined,
@@ -207,7 +207,7 @@ export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
 
   private async onRoomArchived(event: ChatRoomEventPayload): Promise<void> {
     await this.roomRepository.update(event.aggregateId, {
-      status: ChatRoomStatus.ARCHIVED,
+      status: ChatRoomStatus.Archived,
       version: event.version,
     });
   }

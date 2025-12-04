@@ -112,7 +112,7 @@ export class ChatGateway
       this.logger.log(`User connected: ${result.userId}`);
 
       // Emit online users
-      this.server.emit(ChatEvents.ONLINE_USERS, this.getOnlineUsers());
+      this.server.emit(ChatEvents.OnlineUsers, this.getOnlineUsers());
 
       // Emit unread chats count to the connected user
       await this.emitUserUnreadChatsCount(result.userId, client);
@@ -139,13 +139,13 @@ export class ChatGateway
     }
 
     // Emit updated online users
-    this.server.emit(ChatEvents.ONLINE_USERS, this.getOnlineUsers());
+    this.server.emit(ChatEvents.OnlineUsers, this.getOnlineUsers());
 
     this.logger.log(`User disconnected: ${userId}`);
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.JOIN_ROOM)
+  @SubscribeMessage(ChatEvents.JoinRoom)
   async handleJoinRoom(
     @MessageBody() body: JoinRoomDto,
     @ConnectedSocket() client: AuthenticatedSocket
@@ -154,7 +154,7 @@ export class ChatGateway
     const room = await this.queryBus.execute<ChatRoomReadModelDto | null>(query);
 
     if (!room) {
-      client.emit(ChatEvents.ERROR, { message: 'Room not found' });
+      client.emit(ChatEvents.Error, { message: 'Room not found' });
       return;
     }
 
@@ -162,16 +162,16 @@ export class ChatGateway
 
     // Verify user is a participant
     if (!room.participants.includes(userId)) {
-      client.emit(ChatEvents.ERROR, { message: 'Not a participant of this room' });
+      client.emit(ChatEvents.Error, { message: 'Not a participant of this room' });
       return;
     }
 
     client.join(body.roomId);
-    client.emit(ChatEvents.JOINED_ROOM, { roomId: body.roomId });
+    client.emit(ChatEvents.JoinedRoom, { roomId: body.roomId });
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.SEND_MESSAGE)
+  @SubscribeMessage(ChatEvents.SendMessage)
   async handleSendMessage(
     @MessageBody() body: SendMessageDto,
     @ConnectedSocket() client: AuthenticatedSocket
@@ -195,7 +195,7 @@ export class ChatGateway
     const result = await this.commandBus.execute<SendMessageResult>(command);
 
     if (result.isFailure) {
-      client.emit(ChatEvents.ERROR, { message: result.error?.message || 'Failed to send message' });
+      client.emit(ChatEvents.Error, { message: result.error?.message || 'Failed to send message' });
       return;
     }
 
@@ -203,7 +203,7 @@ export class ChatGateway
     client.join(body.roomId);
 
     // Emit message to room
-    this.server.to(body.roomId).emit(ChatEvents.RECEIVE_MESSAGE, result.value.message);
+    this.server.to(body.roomId).emit(ChatEvents.ReceiveMessage, result.value.message);
 
     // Emit unread count updates
     this.emitUnreadCountUpdate(body.roomId, result.value.unreadCounts);
@@ -211,20 +211,20 @@ export class ChatGateway
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.TYPING)
+  @SubscribeMessage(ChatEvents.Typing)
   handleTyping(
     @MessageBody() data: { roomId: string },
     @ConnectedSocket() client: AuthenticatedSocket
   ) {
     const { userId } = getUserFromSocket(client);
-    client.to(data.roomId).emit(ChatEvents.USER_TYPING, {
+    client.to(data.roomId).emit(ChatEvents.UserTyping, {
       roomId: data.roomId,
       userId,
     });
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.LOAD_HISTORY)
+  @SubscribeMessage(ChatEvents.LoadHistory)
   async handleLoadHistory(
     @MessageBody() data: { roomId: string; page: number },
     @ConnectedSocket() client: AuthenticatedSocket
@@ -232,11 +232,11 @@ export class ChatGateway
     const query = new GetRoomMessagesQuery(data.roomId, data.page, 20);
     const result = await this.queryBus.execute<PaginatedResult<ChatMessageReadModelDto>>(query);
 
-    client.emit(ChatEvents.CHAT_HISTORY, result.data.reverse());
+    client.emit(ChatEvents.ChatHistory, result.data.reverse());
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.MARK_MESSAGE_AS_READ)
+  @SubscribeMessage(ChatEvents.MarkMessageAsRead)
   async handleMarkAsRead(
     @MessageBody() data: MarkAsReadDto,
     @ConnectedSocket() client: AuthenticatedSocket
@@ -247,13 +247,13 @@ export class ChatGateway
     const result = await this.commandBus.execute<ChatMessageReadModelDto>(command);
 
     if (result.isFailure) {
-      client.emit(ChatEvents.ERROR, { message: result.error?.message || 'Failed to mark message as read' });
+      client.emit(ChatEvents.Error, { message: result.error?.message || 'Failed to mark message as read' });
       return;
     }
 
     const message = result.value;
 
-    this.server.to(message.roomId).emit(ChatEvents.MESSAGE_READ, {
+    this.server.to(message.roomId).emit(ChatEvents.MessageRead, {
       messageId: data.messageId,
       readerId: userId,
       readAt: message.readAt,
@@ -271,14 +271,14 @@ export class ChatGateway
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.UNREAD_CHATS_COUNT)
+  @SubscribeMessage(ChatEvents.UnreadChatsCount)
   async handleUnreadChatsCount(@ConnectedSocket() client: AuthenticatedSocket) {
     const { userId } = getUserFromSocket(client);
     await this.emitUserUnreadChatsCount(userId, client);
   }
 
   @UseGuards(WsJwtGuard)
-  @SubscribeMessage(ChatEvents.MARK_ROOM_AS_READ)
+  @SubscribeMessage(ChatEvents.MarkRoomAsRead)
   async handleMarkRoomAsRead(
     @MessageBody() data: MarkRoomAsReadDto,
     @ConnectedSocket() client: AuthenticatedSocket
@@ -289,13 +289,13 @@ export class ChatGateway
     const result = await this.commandBus.execute<ChatRoomReadModelDto>(command);
 
     if (result.isFailure) {
-      client.emit(ChatEvents.ERROR, { message: result.error?.message || 'Failed to mark room as read' });
+      client.emit(ChatEvents.Error, { message: result.error?.message || 'Failed to mark room as read' });
       return;
     }
 
     const room = result.value;
 
-    this.server.to(room.id).emit(ChatEvents.ROOM_READ, {
+    this.server.to(room.id).emit(ChatEvents.RoomRead, {
       unreadCounts: room.unreadCounts,
       readerId: userId,
       readAt: Date.now(),
@@ -357,7 +357,7 @@ export class ChatGateway
   // ============================================================
 
   private emitUnreadCountUpdate(roomId: string, unreadCounts: Record<string, number>) {
-    this.server.to(roomId).emit(ChatEvents.UNREAD_COUNT_UPDATED, {
+    this.server.to(roomId).emit(ChatEvents.UnreadCountUpdated, {
       roomId,
       unreadCounts,
       updatedAt: Date.now(),
@@ -367,7 +367,7 @@ export class ChatGateway
   private async emitUserUnreadChatsCount(userId: string, client: Socket) {
     const query = new GetUserUnreadStatsQuery(userId);
     const unreadData = await this.queryBus.execute<UnreadStatsResult>(query);
-    client.emit(ChatEvents.UNREAD_CHATS_COUNT, unreadData);
+    client.emit(ChatEvents.UnreadChatsCount, unreadData);
   }
 
   private extractTokenFromSocket(client: Socket): string | undefined {
@@ -391,11 +391,11 @@ export class ChatGateway
   private mapRoleToSenderType(role: string): SenderType {
     switch (role.toUpperCase()) {
       case 'ADMIN':
-        return SenderType.ADMIN;
+        return SenderType.Admin;
       case 'SUPERADMIN':
-        return SenderType.SUPERADMIN;
+        return SenderType.Superadmin;
       default:
-        return SenderType.USER;
+        return SenderType.User;
     }
   }
 }

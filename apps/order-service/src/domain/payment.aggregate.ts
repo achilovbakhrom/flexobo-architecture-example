@@ -21,6 +21,18 @@ export interface PaymentAmount {
   currency: string;
 }
 
+export interface PaymentSnapshotData {
+  id: string;
+  orderId: string;
+  amount: PaymentAmount;
+  status: PaymentStatus;
+  paymentMethod: PaymentMethod;
+  transactionId?: string;
+  failureReason?: string;
+  refundedAmount?: PaymentAmount;
+  processedAt?: string;
+}
+
 export class Payment extends AggregateRoot {
   private orderId!: string;
   private amount!: PaymentAmount;
@@ -59,22 +71,26 @@ export class Payment extends AggregateRoot {
     return payment;
   }
 
+  toSnapshot(): PaymentSnapshotData {
+    return {
+      id: this._id,
+      orderId: this.orderId,
+      amount: this.amount,
+      status: this.status,
+      paymentMethod: this.paymentMethod,
+      transactionId: this.transactionId,
+      failureReason: this.failureReason,
+      refundedAmount: this.refundedAmount,
+      processedAt: this.processedAt?.toISOString(),
+    };
+  }
+
   static fromSnapshot(
-    snapshotData: {
-      _id: string;
-      orderId: string;
-      amount: PaymentAmount;
-      status: PaymentStatus;
-      paymentMethod: PaymentMethod;
-      transactionId?: string;
-      failureReason?: string;
-      refundedAmount?: PaymentAmount;
-      processedAt?: string;
-    },
+    snapshotData: PaymentSnapshotData,
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
   ): Payment {
-    const payment = new Payment(snapshotData._id);
+    const payment = new Payment(snapshotData.id);
 
     payment.orderId = snapshotData.orderId;
     payment.amount = snapshotData.amount;
