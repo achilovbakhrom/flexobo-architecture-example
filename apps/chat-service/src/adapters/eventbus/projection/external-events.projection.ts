@@ -29,6 +29,7 @@ import {
   ChatRoomStatus,
 } from '../../../ports';
 import { SendMessageCommand } from '../../../application/commands';
+import { SendMessageResult } from '../../../application/commands/message.handlers';
 import { ROUTING_KEYS, EVENT_TYPES, QUEUES } from '../../../domain/events/event.constants';
 
 /**
@@ -154,13 +155,15 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     // Verify the room exists and user is a participant
     const room = await this.roomRepository.findById(data.chatId);
     if (!room) {
-      this.logger.warn(`Room not found for file upload: ${data.chatId}`);
-      return;
+      // Room not found - this could be a timing issue, throw to retry
+      this.logger.error(`Room not found for file upload: ${data.chatId}`);
+      throw new Error(`Room not found: ${data.chatId}`);
     }
 
     if (!room.participants.includes(data.userId)) {
-      this.logger.warn(
-        `User ${data.userId} is not a participant of room ${data.chatId}`
+      // User not a participant - this is a validation error, log and skip
+      this.logger.error(
+        `User ${data.userId} is not a participant of room ${data.chatId}. Skipping file message.`
       );
       return;
     }
@@ -172,7 +175,7 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     const command = new SendMessageCommand(
       data.chatId,
       data.userId,
-      SenderType.USER,
+      SenderType.User,
       undefined, // content (files don't need text content)
       messageType,
       [data.url], // fileUrls
@@ -186,24 +189,34 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
       undefined // replyToId
     );
 
-    const result = await this.commandBus.execute<{
-      message: { id: string; roomId: string };
-    }>(command);
+    const result = await this.commandBus.execute<SendMessageResult>(command);
 
     if (result.isFailure) {
       this.logger.error(
         `Failed to create file message: ${result.error?.message}`
       );
-      return;
+      throw new Error(`Failed to create file message: ${result.error?.message}`);
     }
 
     this.logger.log(
       `File message created: ${result.value.message.id} in room ${data.chatId}`
     );
 
-    // Note: The SendMessageCommand handler should emit the receive_message event
-    // through the normal message flow. If not, we would emit it here:
-    // this.realtimeService.notifyRoom(data.chatId, ChatEvents.RECEIVE_MESSAGE, result.value.message);
+    // Emit WebSocket event to notify room participants about the new file message
+    this.realtimeService.notifyRoom(data.chatId, ChatEvents.ReceiveMessage, {
+      message: result.value.message,
+      roomId: data.chatId,
+    });
+
+    // Emit unread count updates for participants
+    for (const [participantId, count] of Object.entries(result.value.unreadCounts)) {
+      if (participantId !== data.userId) {
+        this.realtimeService.notifyUser(participantId, ChatEvents.UnreadCountUpdated, {
+          roomId: data.chatId,
+          unreadCount: count,
+        });
+      }
+    }
   }
 
   // ============================================================
@@ -231,9 +244,9 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     const command = new SendMessageCommand(
       data.chatRoomId,
       data.bidderId, // The bidder sends the initial offer
-      SenderType.USER,
+      SenderType.User,
       priceContent,
-      MessageType.STATUS,
+      MessageType.Status,
       undefined,
       undefined,
       {
@@ -249,7 +262,7 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     await this.commandBus.execute(command);
 
     // Emit WebSocket event to room participants
-    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BID_CREATED, {
+    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BidCreated, {
       bidId: data.bidId,
       chatRoomId: data.chatRoomId,
       bidderId: data.bidderId,
@@ -283,9 +296,9 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     const command = new SendMessageCommand(
       data.chatRoomId,
       data.userId,
-      SenderType.USER,
+      SenderType.User,
       statusContent,
-      MessageType.STATUS,
+      MessageType.Status,
       undefined,
       undefined,
       {
@@ -302,7 +315,7 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     await this.commandBus.execute(command);
 
     // Emit WebSocket event to room participants
-    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BID_UPDATED, {
+    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BidUpdated, {
       bidId: data.bidId,
       chatRoomId: data.chatRoomId,
       action: data.action,
@@ -339,9 +352,9 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     const command = new SendMessageCommand(
       data.chatRoomId,
       data.cancelledBy,
-      SenderType.USER,
+      SenderType.User,
       statusContent,
-      MessageType.STATUS,
+      MessageType.Status,
       undefined,
       undefined,
       {
@@ -357,11 +370,11 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
 
     // Archive the room
     await this.roomRepository.update(data.chatRoomId, {
-      status: ChatRoomStatus.ARCHIVED,
+      status: ChatRoomStatus.Archived,
     });
 
     // Emit WebSocket event to room participants
-    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BID_CANCELLED, {
+    this.realtimeService.notifyRoom(data.chatRoomId, ChatEvents.BidCancelled, {
       bidId: data.bidId,
       chatRoomId: data.chatRoomId,
       cancelledBy: data.cancelledBy,
@@ -391,9 +404,9 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     const command = new SendMessageCommand(
       data.chatRoomId,
       'SYSTEM',
-      SenderType.ADMIN,
+      SenderType.Admin,
       'Bid has expired',
-      MessageType.STATUS,
+      MessageType.Status,
       undefined,
       undefined,
       {
@@ -408,7 +421,7 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
 
     // Archive the room
     await this.roomRepository.update(data.chatRoomId, {
-      status: ChatRoomStatus.ARCHIVED,
+      status: ChatRoomStatus.Archived,
     });
 
     this.logger.log(`Bid expired notification sent to room ${data.chatRoomId}`);
@@ -423,15 +436,15 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
    */
   private getMessageTypeFromMime(mimeType: string): MessageType {
     if (mimeType.startsWith('image/')) {
-      return mimeType === 'image/gif' ? MessageType.GIF : MessageType.IMAGE;
+      return mimeType === 'image/gif' ? MessageType.Gif : MessageType.Image;
     }
     if (mimeType.startsWith('video/')) {
-      return MessageType.VIDEO;
+      return MessageType.Video;
     }
     if (mimeType.startsWith('audio/')) {
-      return MessageType.AUDIO;
+      return MessageType.Audio;
     }
-    return MessageType.FILE;
+    return MessageType.File;
   }
 
   /**

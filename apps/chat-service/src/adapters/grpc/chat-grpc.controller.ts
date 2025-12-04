@@ -262,7 +262,7 @@ export class ChatGrpcController {
       const command = new SendMessageCommand(
         request.roomId,
         'SYSTEM', // System sender ID
-        SenderType.ADMIN,
+        SenderType.Admin,
         request.content,
         messageType,
         undefined, // fileUrls
@@ -360,7 +360,7 @@ export class ChatGrpcController {
     if (Object.values(MessageType).includes(upperType as MessageType)) {
       return upperType as MessageType;
     }
-    return MessageType.STATUS;
+    return MessageType.Status;
   }
 
   private parseRoomStatus(status: string): ChatRoomStatus {
@@ -368,6 +368,6 @@ export class ChatGrpcController {
     if (Object.values(ChatRoomStatus).includes(upperStatus as ChatRoomStatus)) {
       return upperStatus as ChatRoomStatus;
     }
-    return ChatRoomStatus.ACTIVE;
+    return ChatRoomStatus.Active;
   }
 }

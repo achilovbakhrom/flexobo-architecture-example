@@ -21,6 +21,18 @@ export enum OrderStatus {
   CANCELLED = 'CANCELLED',
 }
 
+export interface OrderSnapshotData {
+  id: string;
+  userId: string;
+  items: OrderItem[];
+  status: OrderStatus;
+  totalAmount: number;
+  currency: string;
+  trackingNumber?: string;
+  paymentId?: string;
+  failedPaymentCount?: number;
+}
+
 export class Order extends AggregateRoot {
   private userId!: string;
   private items: OrderItem[] = [];
@@ -55,30 +67,27 @@ export class Order extends AggregateRoot {
     return order;
   }
 
-  /**
-   * Restore an Order from a snapshot and subsequent events
-   * @param snapshotData The snapshot data containing aggregate state
-   * @param snapshotVersion The version at which the snapshot was taken
-   * @param subsequentEvents Events that occurred after the snapshot
-   */
+  toSnapshot(): OrderSnapshotData {
+    return {
+      id: this._id,
+      userId: this.userId,
+      items: this.items,
+      status: this.status,
+      totalAmount: this.totalAmount,
+      currency: this.currency,
+      trackingNumber: this.trackingNumber,
+      paymentId: this.paymentId,
+      failedPaymentCount: this.failedPaymentCount,
+    };
+  }
+
   static fromSnapshot(
-    snapshotData: {
-      _id: string;
-      userId: string;
-      items: OrderItem[];
-      status: OrderStatus;
-      totalAmount: number;
-      currency: string;
-      trackingNumber?: string;
-      paymentId?: string;
-      failedPaymentCount?: number;
-    },
+    snapshotData: OrderSnapshotData,
     snapshotVersion: number,
     subsequentEvents: DomainEvent[]
   ): Order {
-    const order = new Order(snapshotData._id);
+    const order = new Order(snapshotData.id);
 
-    // Restore state from snapshot
     order.userId = snapshotData.userId;
     order.items = snapshotData.items || [];
     order.status = snapshotData.status;
@@ -89,7 +98,6 @@ export class Order extends AggregateRoot {
     order.failedPaymentCount = snapshotData.failedPaymentCount ?? 0;
     order._version = snapshotVersion;
 
-    // Apply any events that occurred after the snapshot
     if (subsequentEvents.length > 0) {
       order.loadFromHistory(subsequentEvents);
     }
