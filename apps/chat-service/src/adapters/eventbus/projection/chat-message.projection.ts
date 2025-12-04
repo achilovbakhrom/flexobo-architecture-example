@@ -1,18 +1,16 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
 } from '@flexobo/core';
 import {
   IChatMessageRepository,
   CHAT_MESSAGE_REPOSITORY,
+  ChatMessageReadModelDto,
   MessageType,
   SenderType,
   MessageStatus,
@@ -23,61 +21,83 @@ import {
   QUEUES,
 } from '../../../domain/events/event.constants';
 
-interface ChatMessageEventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+// ============================================================
+// Typed Event Data Interfaces
+// ============================================================
+
+interface MessageSentData {
+  roomId: string;
+  senderId: string;
+  senderType: string;
+  messageType: string;
+  content?: string;
+  fileUrls?: string[];
+  fileName?: string;
+  fileMetadata?: Record<string, unknown>;
+  voiceDuration?: number;
+  replyToId?: string;
+  sentAt: Date;
 }
 
-@Injectable()
-export class ChatMessageProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ChatMessageProjection.name);
-  private isSubscribed = false;
+interface MessageEditedData {
+  previousContent: string;
+  newContent: string;
+  editedBy: string;
+  editedAt: Date;
+}
 
+interface MessageDeletedData {
+  deletedBy: string;
+  deletedAt: Date;
+}
+
+interface MessageReadData {
+  readBy: string;
+  readAt: Date;
+}
+
+interface TranslationAddedData {
+  language: string;
+  translatedContent: string;
+  translatedAt: Date;
+}
+
+// Union type for all message event data
+type ChatMessageEventData =
+  | MessageSentData
+  | MessageEditedData
+  | MessageDeletedData
+  | MessageReadData
+  | TranslationAddedData;
+
+// Typed event payload
+type ChatMessageEventPayload = EventPayload<ChatMessageEventData>;
+
+@Injectable()
+export class ChatMessageProjection extends BaseProjection<
+  ChatMessageReadModelDto,
+  ChatMessageEventPayload
+> {
   constructor(
     @Inject(CHAT_MESSAGE_REPOSITORY)
     private readonly messageRepository: IChatMessageRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer
+  ) {
+    super(rabbitMQConsumer, ChatMessageProjection.name);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.CHAT_MESSAGE.PROJECTION);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: QUEUES.CHAT_MESSAGE.PROJECTION,
+      routingKeys: [ROUTING_KEYS.CHAT.MESSAGE.ALL],
+      durable: true,
+      prefetchCount: 20,
+      maxRetries: 10,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping chat message projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.CHAT_MESSAGE.PROJECTION,
-      [ROUTING_KEYS.CHAT.MESSAGE.ALL],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      {
-        durable: true,
-        maxRetries: 3,
-      }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUES.CHAT_MESSAGE.PROJECTION}`);
-  }
-
-  private async handleEvent(message: IncomingMessage): Promise<void> {
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as ChatMessageEventPayload;
 
     this.logger.debug(
@@ -86,23 +106,29 @@ export class ChatMessageProjection implements OnModuleInit, OnModuleDestroy {
 
     switch (payload.type) {
       case EVENT_TYPES.CHAT.MESSAGE.SENT:
-        await this.onMessageSent(payload);
+        await this.onMessageSent(payload as EventPayload<MessageSentData>);
         break;
 
       case EVENT_TYPES.CHAT.MESSAGE.EDITED:
-        await this.onMessageEdited(payload);
+        await this.onMessageEdited(payload as EventPayload<MessageEditedData>);
         break;
 
       case EVENT_TYPES.CHAT.MESSAGE.DELETED:
-        await this.onMessageDeleted(payload);
+        await this.onMessageDeleted(
+          payload as EventPayload<MessageDeletedData>
+        );
         break;
 
       case EVENT_TYPES.CHAT.MESSAGE.MARKED_AS_READ:
-        await this.onMessageMarkedAsRead(payload);
+        await this.onMessageMarkedAsRead(
+          payload as EventPayload<MessageReadData>
+        );
         break;
 
       case EVENT_TYPES.CHAT.MESSAGE.TRANSLATION_ADDED:
-        await this.onTranslationAdded(payload);
+        await this.onTranslationAdded(
+          payload as EventPayload<TranslationAddedData>
+        );
         break;
 
       default:
@@ -110,18 +136,26 @@ export class ChatMessageProjection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async onMessageSent(event: ChatMessageEventPayload): Promise<void> {
+  private async onMessageSent(
+    event: EventPayload<MessageSentData>
+  ): Promise<void> {
+    const existingMessage = await this.messageRepository.findById(
+      event.aggregateId
+    );
+    this.checkCreateIdempotency(existingMessage, event);
+
+    const { data } = event;
     await this.messageRepository.create({
       id: event.aggregateId,
-      roomId: event.data['roomId'] as string,
-      senderId: event.data['senderId'] as string,
-      senderType: event.data['senderType'] as SenderType,
-      type: (event.data['type'] as MessageType) ?? MessageType.Text,
-      content: event.data['content'] as string | undefined,
-      fileUrls: (event.data['fileUrls'] as string[]) ?? [],
-      fileName: event.data['fileName'] as string | undefined,
-      voiceDuration: event.data['voiceDuration'] as number | undefined,
-      replyToId: event.data['replyToId'] as string | undefined,
+      roomId: data.roomId,
+      senderId: data.senderId,
+      senderType: data.senderType as SenderType,
+      type: (data.messageType as MessageType) ?? MessageType.Text,
+      content: data.content,
+      fileUrls: data.fileUrls ?? [],
+      fileName: data.fileName,
+      voiceDuration: data.voiceDuration,
+      replyToId: data.replyToId,
       status: MessageStatus.Sent,
       isRead: false,
       isDeleted: false,
@@ -131,13 +165,15 @@ export class ChatMessageProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onMessageEdited(event: ChatMessageEventPayload): Promise<void> {
-    const message = await this.messageRepository.findById(event.aggregateId);
-    if (!message) return;
+  private async onMessageEdited(
+    event: EventPayload<MessageEditedData>
+  ): Promise<void> {
+    const existingMessage = await this.messageRepository.findById(
+      event.aggregateId
+    );
+    const message = this.checkVersion(existingMessage, event);
 
-    const newContent = event.data['newContent'] as string;
-    const previousContent = event.data['previousContent'] as string;
-    const editedBy = event.data['editedBy'] as string;
+    const { newContent, previousContent, editedBy } = event.data;
 
     // Add to edit history
     const editHistory = [
@@ -156,30 +192,60 @@ export class ChatMessageProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onMessageDeleted(event: ChatMessageEventPayload): Promise<void> {
+  private async onMessageDeleted(
+    event: EventPayload<MessageDeletedData>
+  ): Promise<void> {
+    const existingMessage = await this.messageRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingMessage, event);
+
     await this.messageRepository.softDelete(event.aggregateId);
   }
 
-  private async onMessageMarkedAsRead(event: ChatMessageEventPayload): Promise<void> {
-    await this.messageRepository.markAsRead(event.aggregateId, new Date(event.occurredAt));
+  private async onMessageMarkedAsRead(
+    event: EventPayload<MessageReadData>
+  ): Promise<void> {
+    const existingMessage = await this.messageRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingMessage, event);
+
+    await this.messageRepository.markAsRead(
+      event.aggregateId,
+      new Date(event.occurredAt)
+    );
   }
 
-  private async onTranslationAdded(event: ChatMessageEventPayload): Promise<void> {
-    const message = await this.messageRepository.findById(event.aggregateId);
-    if (!message) return;
+  private async onTranslationAdded(
+    event: EventPayload<TranslationAddedData>
+  ): Promise<void> {
+    const existingMessage = await this.messageRepository.findById(
+      event.aggregateId
+    );
+    const message = this.checkVersion(existingMessage, event);
 
-    const language = event.data['language'] as string;
-    const content = event.data['content'] as string;
+    const { language, translatedContent } = event.data;
     const translatedAt = new Date(event.occurredAt);
 
     // Check if translation for this language already exists
-    const existingIndex = message.translations.findIndex(t => t.language === language);
+    const existingIndex = message.translations.findIndex(
+      (t) => t.language === language
+    );
 
     const newTranslations = [...message.translations];
     if (existingIndex >= 0) {
-      newTranslations[existingIndex] = { language, content, translatedAt };
+      newTranslations[existingIndex] = {
+        language,
+        content: translatedContent,
+        translatedAt,
+      };
     } else {
-      newTranslations.push({ language, content, translatedAt });
+      newTranslations.push({
+        language,
+        content: translatedContent,
+        translatedAt,
+      });
     }
 
     await this.messageRepository.update(event.aggregateId, {

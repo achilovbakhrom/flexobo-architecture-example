@@ -12,6 +12,10 @@ import {
   IncomingMessage,
 } from './message-publisher.interface';
 import { RabbitMQConfig, DEFAULT_RABBITMQ_CONFIG } from './rabbitmq.config';
+import {
+  EventVersionMismatchException,
+  EventAlreadyAppliedException,
+} from '../../domain/exceptions';
 
 /**
  * Configuration for consumer-specific settings
@@ -92,7 +96,9 @@ export class RabbitMQConsumer
   async connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       const url = this.config.url || DEFAULT_RABBITMQ_CONFIG.url!;
-      this.logger.log(`Connecting consumer to RabbitMQ: ${this.sanitizeUrl(url)}`);
+      this.logger.log(
+        `Connecting consumer to RabbitMQ: ${this.sanitizeUrl(url)}`
+      );
 
       amqp.connect(url, (err, connection) => {
         if (err) {
@@ -350,6 +356,58 @@ export class RabbitMQConsumer
         `Message processed successfully: ${msg.properties.messageId}`
       );
     } catch (error) {
+      // Don't retry/reject if already acknowledged
+      if (acknowledged) {
+        return;
+      }
+
+      // Handle EventAlreadyAppliedException - idempotency, just ack
+      if (error instanceof EventAlreadyAppliedException) {
+        this.logger.debug(
+          `Event already applied (idempotent skip): ${error.message}`
+        );
+        if (!options.noAck && !acknowledged) {
+          acknowledged = true;
+          channel.ack(msg);
+        }
+        return;
+      }
+
+      // Handle EventVersionMismatchException - version gap, retry with minimal delay
+      // Use fast retry (50ms) instead of exponential backoff since the correct
+      // version event may be processed at any moment
+      if (error instanceof EventVersionMismatchException) {
+        const versionMismatchMaxRetries = Math.max(maxRetries * 100, 1000); // Allow more retries for version mismatches (1000 × 50ms = 50s window)
+        this.logger.warn(
+          `Version mismatch for aggregate ${error.aggregateId}: ` +
+            `read model v${error.actualVersion}, event v${error.eventVersion}, ` +
+            `expected v${error.expectedVersion}. Retry ${
+              retryCount + 1
+            }/${versionMismatchMaxRetries}`
+        );
+
+        if (retryCount < versionMismatchMaxRetries) {
+          const delay = 50; // Fixed 50ms delay for version mismatches
+          setTimeout(() => {
+            this.republishForRetry(msg, queue, retryCount + 1);
+            if (!acknowledged) {
+              acknowledged = true;
+              channel.ack(msg);
+            }
+          }, delay);
+        } else {
+          this.logger.error(
+            `Version mismatch exceeded max retries for aggregate ${error.aggregateId}, sending to DLQ`
+          );
+          if (!options.noAck && !acknowledged) {
+            acknowledged = true;
+            channel.reject(msg, false);
+          }
+        }
+        return;
+      }
+
+      // Handle other errors
       const errorMessage =
         error instanceof Error ? error.message : String(error);
 
@@ -358,16 +416,13 @@ export class RabbitMQConsumer
         error instanceof Error ? error.stack : undefined
       );
 
-      // Don't retry/reject if already acknowledged
-      if (acknowledged) {
-        return;
-      }
-
       if (retryCount < maxRetries) {
         // Retry with delay
         const delay = this.calculateBackoff(retryCount);
         this.logger.warn(
-          `Retrying message (attempt ${retryCount + 1}/${maxRetries}) after ${delay}ms`
+          `Retrying message (attempt ${
+            retryCount + 1
+          }/${maxRetries}) after ${delay}ms`
         );
 
         setTimeout(() => {
@@ -469,6 +524,7 @@ export class RabbitMQConsumer
         queueName,
         {
           durable: opts.durable,
+
           arguments: {
             'x-dead-letter-exchange': opts.deadLetterExchange,
             'x-dead-letter-routing-key': `dlq.${queueName}`,
@@ -583,7 +639,9 @@ export class RabbitMQConsumer
         this.logger.log(`Resubscribed to queue: ${sub.queue}`);
       } catch (err) {
         this.logger.error(
-          `Failed to resubscribe to ${sub.queue}: ${err instanceof Error ? err.message : err}`
+          `Failed to resubscribe to ${sub.queue}: ${
+            err instanceof Error ? err.message : err
+          }`
         );
       }
     }

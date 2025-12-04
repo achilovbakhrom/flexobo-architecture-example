@@ -1,18 +1,16 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
 } from '@flexobo/core';
 import {
   IUserReadModelRepository,
   USER_READ_MODEL_REPOSITORY,
+  UserReadModelDto,
   UserStatus,
   UserRole,
 } from '../../../ports';
@@ -22,63 +20,105 @@ import {
   QUEUES,
 } from '../../../domain/events/event.constants';
 
-interface UserEventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+// ============================================================
+// Typed Event Data Interfaces
+// ============================================================
+
+interface UserRegisteredData {
+  uniqueId: string;
+  email?: string | null;
+  phoneNumber?: string | null;
+  telegramId?: string | null;
+  googleId?: string | null;
+  passwordHash: string;
+  fio: string;
+  userType?: string | null;
+  isPrivacyPolicyAccepted?: boolean;
+  isSubscribedNewsletter?: boolean;
+  platform?: string | null;
 }
 
-@Injectable()
-export class UserProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(UserProjection.name);
-  private isSubscribed = false;
+interface UserLoggedInData {
+  loginAt: Date;
+}
 
+interface UserProfileUpdatedData {
+  fio?: string;
+  phoneNumber?: string;
+  language?: string;
+  avatar?: string;
+}
+
+interface UserPasswordChangedData {
+  passwordHash: string;
+}
+
+interface UserTelegramLinkedData {
+  telegramId: string;
+}
+
+interface UserGoogleLinkedData {
+  googleId: string;
+}
+
+interface UserActivatedData {
+  activatedAt: Date;
+}
+
+interface UserDeactivatedData {
+  deactivatedAt: Date;
+}
+
+interface UserOTPUsedData {
+  otpId: string;
+}
+
+// Events that only update version, no other data
+interface VersionOnlyData {
+  [key: string]: unknown;
+}
+
+// Union type for all user event data
+type UserEventData =
+  | UserRegisteredData
+  | UserLoggedInData
+  | UserProfileUpdatedData
+  | UserPasswordChangedData
+  | UserTelegramLinkedData
+  | UserGoogleLinkedData
+  | UserActivatedData
+  | UserDeactivatedData
+  | UserOTPUsedData
+  | VersionOnlyData;
+
+// Typed event payload
+type UserEventPayload = EventPayload<UserEventData>;
+
+@Injectable()
+export class UserProjection extends BaseProjection<
+  UserReadModelDto,
+  UserEventPayload
+> {
   constructor(
     @Inject(USER_READ_MODEL_REPOSITORY)
     private readonly readModelRepository: IUserReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer
+  ) {
+    super(rabbitMQConsumer, UserProjection.name);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.USER.PROJECTION);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: QUEUES.USER.PROJECTION,
+      routingKeys: [ROUTING_KEYS.USER.ALL],
+      durable: true,
+      prefetchCount: 10,
+      maxRetries: 10,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      throw new Error(
-        'RabbitMQ is not connected. Cannot start user projection.'
-      );
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.USER.PROJECTION,
-      [ROUTING_KEYS.USER.ALL],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      {
-        durable: true,
-        maxRetries: 3,
-        prefetchCount: 1,
-      }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUES.USER.PROJECTION}`);
-  }
-
-  private async handleEvent(message: IncomingMessage): Promise<void> {
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as UserEventPayload;
 
     this.logger.debug(
@@ -87,11 +127,13 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
 
     switch (payload.type) {
       case EVENT_TYPES.USER.REGISTERED:
-        await this.onUserRegistered(payload);
+        await this.onUserRegistered(
+          payload as EventPayload<UserRegisteredData>
+        );
         break;
 
       case EVENT_TYPES.USER.LOGGED_IN:
-        await this.onUserLoggedIn(payload);
+        await this.onUserLoggedIn(payload as EventPayload<UserLoggedInData>);
         break;
 
       case EVENT_TYPES.USER.LOGGED_OUT:
@@ -99,42 +141,46 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         break;
 
       case EVENT_TYPES.USER.PROFILE_UPDATED:
-        await this.onUserProfileUpdated(payload);
+        await this.onUserProfileUpdated(
+          payload as EventPayload<UserProfileUpdatedData>
+        );
         break;
 
       case EVENT_TYPES.USER.PASSWORD_CHANGED:
       case EVENT_TYPES.USER.PASSWORD_RESET:
-        await this.onUserPasswordChanged(payload);
+        await this.onUserPasswordChanged(
+          payload as EventPayload<UserPasswordChangedData>
+        );
         break;
 
       case EVENT_TYPES.USER.TELEGRAM_LINKED:
-        await this.onUserTelegramLinked(payload);
+        await this.onUserTelegramLinked(
+          payload as EventPayload<UserTelegramLinkedData>
+        );
         break;
 
       case EVENT_TYPES.USER.GOOGLE_LINKED:
-        await this.onUserGoogleLinked(payload);
+        await this.onUserGoogleLinked(
+          payload as EventPayload<UserGoogleLinkedData>
+        );
         break;
 
       case EVENT_TYPES.USER.ACTIVATED:
-        await this.onUserActivated(payload);
+        await this.onUserActivated(payload as EventPayload<UserActivatedData>);
         break;
 
       case EVENT_TYPES.USER.DEACTIVATED:
-        await this.onUserDeactivated(payload);
+        await this.onUserDeactivated(
+          payload as EventPayload<UserDeactivatedData>
+        );
         break;
 
       case EVENT_TYPES.USER.OTP_USED:
-        await this.onUserOTPUsed(payload);
+        await this.onUserOTPUsed(payload as EventPayload<UserOTPUsedData>);
         break;
 
       case EVENT_TYPES.USER.OTP_REQUESTED:
-        await this.onVersionOnlyUpdate(payload);
-        break;
-
       case EVENT_TYPES.USER.ACCESS_TOKEN_ISSUED:
-        await this.onVersionOnlyUpdate(payload);
-        break;
-
       case EVENT_TYPES.USER.ACCESS_TOKEN_REVOKED:
         await this.onVersionOnlyUpdate(payload);
         break;
@@ -144,27 +190,33 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async onUserRegistered(event: UserEventPayload): Promise<void> {
+  private async onUserRegistered(
+    event: EventPayload<UserRegisteredData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkCreateIdempotency(existingUser, event);
+
+    const { data } = event;
     await this.readModelRepository.upsert(
       {
         id: event.aggregateId,
-        uniqueId: event.data['uniqueId'] as string,
-        email: event.data['email'] as string | null,
-        phoneNumber: event.data['phoneNumber'] as string | null,
-        telegramId: event.data['telegramId'] as string | null,
-        googleId: event.data['googleId'] as string | null,
-        passwordHash: event.data['passwordHash'] as string,
-        fio: event.data['fio'] as string,
+        uniqueId: data.uniqueId,
+        email: data.email,
+        phoneNumber: data.phoneNumber,
+        telegramId: data.telegramId,
+        googleId: data.googleId,
+        passwordHash: data.passwordHash,
+        fio: data.fio,
         avatar: null,
         role: UserRole.User,
-        userType: event.data['userType'] as any,
+        userType: data.userType as any,
         status: UserStatus.Active,
         language: 'en',
-        isPrivacyPolicyAccepted:
-          (event.data['isPrivacyPolicyAccepted'] as boolean) ?? false,
-        isSubscribedNewsletter:
-          (event.data['isSubscribedNewsletter'] as boolean) ?? false,
-        platform: event.data['platform'] as any,
+        isPrivacyPolicyAccepted: data.isPrivacyPolicyAccepted ?? false,
+        isSubscribedNewsletter: data.isSubscribedNewsletter ?? false,
+        platform: data.platform as any,
         isVerified: false,
         lastLoginAt: null,
         updatedAt: new Date(),
@@ -173,51 +225,94 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async onUserLoggedIn(event: UserEventPayload): Promise<void> {
+  private async onUserLoggedIn(
+    event: EventPayload<UserLoggedInData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateLastLogin(
       event.aggregateId,
       event.version
     );
   }
 
-  private async onUserProfileUpdated(event: UserEventPayload): Promise<void> {
+  private async onUserProfileUpdated(
+    event: EventPayload<UserProfileUpdatedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
+    const { data } = event;
     await this.readModelRepository.updateProfile(
       event.aggregateId,
       {
-        fio: event.data['fio'] as string | undefined,
-        phoneNumber: event.data['phoneNumber'] as string | undefined,
-        language: event.data['language'] as string | undefined,
-        avatar: event.data['avatar'] as string | undefined,
+        fio: data.fio,
+        phoneNumber: data.phoneNumber,
+        language: data.language,
+        avatar: data.avatar,
       },
       event.version
     );
   }
 
-  private async onUserPasswordChanged(event: UserEventPayload): Promise<void> {
+  private async onUserPasswordChanged(
+    event: EventPayload<UserPasswordChangedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updatePassword(
       event.aggregateId,
-      event.data['passwordHash'] as string,
+      event.data.passwordHash,
       event.version
     );
   }
 
-  private async onUserTelegramLinked(event: UserEventPayload): Promise<void> {
+  private async onUserTelegramLinked(
+    event: EventPayload<UserTelegramLinkedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateTelegramId(
       event.aggregateId,
-      event.data['telegramId'] as string,
+      event.data.telegramId,
       event.version
     );
   }
 
-  private async onUserGoogleLinked(event: UserEventPayload): Promise<void> {
+  private async onUserGoogleLinked(
+    event: EventPayload<UserGoogleLinkedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateGoogleId(
       event.aggregateId,
-      event.data['googleId'] as string,
+      event.data.googleId,
       event.version
     );
   }
 
-  private async onUserActivated(event: UserEventPayload): Promise<void> {
+  private async onUserActivated(
+    event: EventPayload<UserActivatedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateStatus(
       event.aggregateId,
       UserStatus.Active,
@@ -225,7 +320,14 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async onUserDeactivated(event: UserEventPayload): Promise<void> {
+  private async onUserDeactivated(
+    event: EventPayload<UserDeactivatedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateStatus(
       event.aggregateId,
       UserStatus.Inactive,
@@ -233,7 +335,14 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
     );
   }
 
-  private async onUserOTPUsed(event: UserEventPayload): Promise<void> {
+  private async onUserOTPUsed(
+    event: EventPayload<UserOTPUsedData>
+  ): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateIsVerified(
       event.aggregateId,
       true,
@@ -246,6 +355,11 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
    * This ensures version tracking stays in sync with the aggregate.
    */
   private async onVersionOnlyUpdate(event: UserEventPayload): Promise<void> {
+    const existingUser = await this.readModelRepository.findById(
+      event.aggregateId
+    );
+    this.checkVersion(existingUser, event);
+
     await this.readModelRepository.updateVersion(
       event.aggregateId,
       event.version
