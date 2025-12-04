@@ -10,8 +10,19 @@ async function bootstrap() {
   const app = await NestFactory.create(UsersModule);
   const logger = new Logger('UsersService');
 
+  const isDev = process.env.MODE !== 'prod';
+
   // Enable CORS
-  app.enableCors();
+  app.enableCors(
+    isDev
+      ? {
+          origin: '*',
+          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+          preflightContinue: false,
+          optionsSuccessStatus: 204,
+        }
+      : undefined
+  );
 
   // Validation pipe
   app.useGlobalPipes(
@@ -41,7 +52,7 @@ async function bootstrap() {
       package: 'users',
       protoPath: join(
         process.cwd(),
-        'libs/core/src/lib/infrastructure/grpc/proto/users.proto'
+        'libs/shared-kernel/src/lib/grpc/proto/users.proto'
       ),
       url: `0.0.0.0:${grpcPort}`,
     },

@@ -5,30 +5,15 @@ import {
   IRefreshToken,
   ITokenBlacklist,
 } from '../../ports';
-
-interface TokenPrismaClient {
-  refreshToken: {
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-    updateMany: (args: any) => Promise<any>;
-  };
-  tokenBlacklist: {
-    findUnique: (args: any) => Promise<any>;
-    create: (args: any) => Promise<any>;
-  };
-}
+import { TokenPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaTokenRepository implements ITokenRepository {
   constructor(@Inject('PrismaClient') private readonly prisma: TokenPrismaClient) {}
 
-  async findRefreshToken(
-    token: string
-  ): Promise<(IRefreshToken & { user: { id: string; email: string; role: string } }) | null> {
+  async findRefreshToken(token: string): Promise<IRefreshToken | null> {
     const refreshToken = await this.prisma.refreshToken.findUnique({
       where: { token },
-      include: { user: true },
     });
 
     if (!refreshToken) return null;
@@ -41,11 +26,6 @@ export class PrismaTokenRepository implements ITokenRepository {
       expiresAt: refreshToken.expiresAt,
       revokedAt: refreshToken.revokedAt,
       createdAt: refreshToken.createdAt,
-      user: {
-        id: refreshToken.user.id,
-        email: refreshToken.user.email || '',
-        role: refreshToken.user.role,
-      },
     };
   }
 

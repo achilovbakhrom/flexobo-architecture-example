@@ -30,7 +30,8 @@ export class RefreshTokenHandler
   constructor(
     @Inject(TOKEN_REPOSITORY)
     private readonly tokenRepository: ITokenRepository,
-    @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService
+    @Inject(TOKEN_SERVICE) private readonly tokenService: ITokenService,
+    @Inject(USER_AGGREGATE_STORE) private readonly store: IUserAggregateStore
   ) {}
 
   async execute(
@@ -76,6 +77,22 @@ export class RefreshTokenHandler
         payload.role
       );
 
+      // Track new access token in User aggregate
+      const user = await this.store.load(payload.sub);
+      if (user) {
+        // Revoke old access token if jti is available from the old token
+        if (payload.jti) {
+          try {
+            user.revokeAccessToken(payload.jti, 'Token refreshed');
+          } catch {
+            // Token might not exist in aggregate, ignore
+          }
+        }
+        // Issue new access token
+        user.issueAccessToken(tokens.jti);
+        await this.store.save(user);
+      }
+
       return new Success(tokens);
     } catch (error) {
       return new Failure(error as Error);
@@ -98,6 +115,14 @@ export class LogoutUserHandler
 
       if (user) {
         user.logout();
+        // Revoke access token in User aggregate
+        if (command.jti) {
+          try {
+            user.revokeAccessToken(command.jti, 'User logged out');
+          } catch {
+            // Token might not exist in aggregate, ignore
+          }
+        }
         await this.store.save(user);
       }
 

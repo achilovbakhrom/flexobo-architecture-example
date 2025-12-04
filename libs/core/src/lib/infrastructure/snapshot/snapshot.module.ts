@@ -19,10 +19,6 @@ export class SnapshotModule {
 
     const providers: Provider[] = [
       {
-        provide: SNAPSHOT_PRISMA_CLIENT,
-        useValue: prismaClient,
-      },
-      {
         provide: 'ISnapshotRepository',
         useClass: PrismaSnapshotRepository,
       },
@@ -35,15 +31,25 @@ export class SnapshotModule {
       },
     ];
 
+    // Only provide SNAPSHOT_PRISMA_CLIENT if prismaClient is passed
+    // This allows the consuming module to provide it externally
+    if (prismaClient) {
+      providers.unshift({
+        provide: SNAPSHOT_PRISMA_CLIENT,
+        useValue: prismaClient,
+      });
+    }
+
     return {
       module: SnapshotModule,
       providers,
-      exports: [SnapshotService, 'ISnapshotRepository'],
+      exports: [SnapshotService, 'ISnapshotRepository', SNAPSHOT_PRISMA_CLIENT],
       global: true,
     };
   }
 
   static forRootAsync(options: {
+    imports?: any[];
     useFactory: (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ...args: any[]
@@ -53,6 +59,7 @@ export class SnapshotModule {
   }): DynamicModule {
     return {
       module: SnapshotModule,
+      imports: options.imports || [],
       providers: [
         {
           provide: 'SNAPSHOT_OPTIONS',
@@ -60,12 +67,23 @@ export class SnapshotModule {
           inject: options.inject || [],
         },
         {
+          provide: SNAPSHOT_PRISMA_CLIENT,
+          useFactory: (opts: SnapshotModuleOptions) => opts.prismaClient,
+          inject: ['SNAPSHOT_OPTIONS'],
+        },
+        {
           provide: 'ISnapshotRepository',
           useClass: PrismaSnapshotRepository,
         },
-        SnapshotService,
+        {
+          provide: SnapshotService,
+          useFactory: (repository: ISnapshotRepository, opts: SnapshotModuleOptions) => {
+            return new SnapshotService(repository, opts.strategy);
+          },
+          inject: ['ISnapshotRepository', 'SNAPSHOT_OPTIONS'],
+        },
       ],
-      exports: [SnapshotService, 'ISnapshotRepository'],
+      exports: [SnapshotService, 'ISnapshotRepository', SNAPSHOT_PRISMA_CLIENT],
       global: true,
     };
   }

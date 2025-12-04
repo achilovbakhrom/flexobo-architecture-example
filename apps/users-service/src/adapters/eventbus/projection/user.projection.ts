@@ -70,6 +70,7 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
       {
         durable: true,
         maxRetries: 3,
+        prefetchCount: 1,
       }
     );
 
@@ -94,7 +95,7 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         break;
 
       case EVENT_TYPES.USER.LOGGED_OUT:
-        // No read model update needed for logout
+        await this.onVersionOnlyUpdate(payload);
         break;
 
       case EVENT_TYPES.USER.PROFILE_UPDATED:
@@ -110,12 +111,32 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         await this.onUserTelegramLinked(payload);
         break;
 
+      case EVENT_TYPES.USER.GOOGLE_LINKED:
+        await this.onUserGoogleLinked(payload);
+        break;
+
       case EVENT_TYPES.USER.ACTIVATED:
         await this.onUserActivated(payload);
         break;
 
       case EVENT_TYPES.USER.DEACTIVATED:
         await this.onUserDeactivated(payload);
+        break;
+
+      case EVENT_TYPES.USER.OTP_USED:
+        await this.onUserOTPUsed(payload);
+        break;
+
+      case EVENT_TYPES.USER.OTP_REQUESTED:
+        await this.onVersionOnlyUpdate(payload);
+        break;
+
+      case EVENT_TYPES.USER.ACCESS_TOKEN_ISSUED:
+        await this.onVersionOnlyUpdate(payload);
+        break;
+
+      case EVENT_TYPES.USER.ACCESS_TOKEN_REVOKED:
+        await this.onVersionOnlyUpdate(payload);
         break;
 
       default:
@@ -131,15 +152,18 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
         email: event.data['email'] as string | null,
         phoneNumber: event.data['phoneNumber'] as string | null,
         telegramId: event.data['telegramId'] as string | null,
+        googleId: event.data['googleId'] as string | null,
         passwordHash: event.data['passwordHash'] as string,
         fio: event.data['fio'] as string,
         avatar: null,
-        role: UserRole.USER,
+        role: UserRole.User,
         userType: event.data['userType'] as any,
-        status: UserStatus.ACTIVE,
+        status: UserStatus.Active,
         language: 'en',
-        isPrivacyPolicyAccepted: (event.data['isPrivacyPolicyAccepted'] as boolean) ?? false,
-        isSubscribedNewsletter: (event.data['isSubscribedNewsletter'] as boolean) ?? false,
+        isPrivacyPolicyAccepted:
+          (event.data['isPrivacyPolicyAccepted'] as boolean) ?? false,
+        isSubscribedNewsletter:
+          (event.data['isSubscribedNewsletter'] as boolean) ?? false,
         platform: event.data['platform'] as any,
         isVerified: false,
         lastLoginAt: null,
@@ -150,43 +174,81 @@ export class UserProjection implements OnModuleInit, OnModuleDestroy {
   }
 
   private async onUserLoggedIn(event: UserEventPayload): Promise<void> {
-    await this.readModelRepository.updateLastLogin(event.aggregateId);
+    await this.readModelRepository.updateLastLogin(
+      event.aggregateId,
+      event.version
+    );
   }
 
   private async onUserProfileUpdated(event: UserEventPayload): Promise<void> {
-    await this.readModelRepository.updateProfile(event.aggregateId, {
-      fio: event.data['fio'] as string | undefined,
-      phoneNumber: event.data['phoneNumber'] as string | undefined,
-      language: event.data['language'] as string | undefined,
-      avatar: event.data['avatar'] as string | undefined,
-    });
+    await this.readModelRepository.updateProfile(
+      event.aggregateId,
+      {
+        fio: event.data['fio'] as string | undefined,
+        phoneNumber: event.data['phoneNumber'] as string | undefined,
+        language: event.data['language'] as string | undefined,
+        avatar: event.data['avatar'] as string | undefined,
+      },
+      event.version
+    );
   }
 
   private async onUserPasswordChanged(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updatePassword(
       event.aggregateId,
-      event.data['passwordHash'] as string
+      event.data['passwordHash'] as string,
+      event.version
     );
   }
 
   private async onUserTelegramLinked(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateTelegramId(
       event.aggregateId,
-      event.data['telegramId'] as string
+      event.data['telegramId'] as string,
+      event.version
+    );
+  }
+
+  private async onUserGoogleLinked(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateGoogleId(
+      event.aggregateId,
+      event.data['googleId'] as string,
+      event.version
     );
   }
 
   private async onUserActivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.ACTIVE
+      UserStatus.Active,
+      event.version
     );
   }
 
   private async onUserDeactivated(event: UserEventPayload): Promise<void> {
     await this.readModelRepository.updateStatus(
       event.aggregateId,
-      UserStatus.INACTIVE
+      UserStatus.Inactive,
+      event.version
+    );
+  }
+
+  private async onUserOTPUsed(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateIsVerified(
+      event.aggregateId,
+      true,
+      event.version
+    );
+  }
+
+  /**
+   * Updates only the version for events that don't change other read model data.
+   * This ensures version tracking stays in sync with the aggregate.
+   */
+  private async onVersionOnlyUpdate(event: UserEventPayload): Promise<void> {
+    await this.readModelRepository.updateVersion(
+      event.aggregateId,
+      event.version
     );
   }
 }

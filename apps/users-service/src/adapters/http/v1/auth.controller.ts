@@ -36,7 +36,9 @@ import {
   LinkTelegramDto,
   RegisterWithTelegramDto,
   LoginWithTelegramDto,
-} from '../dto/auth.dto';
+  AuthWithGoogleDto,
+  GoogleAuthResponseDto,
+} from '../dto';
 import {
   RegisterUserCommand,
   RegisterWithTelegramCommand,
@@ -51,6 +53,8 @@ import {
   ResetPasswordCommand,
   ChangePasswordCommand,
   LinkTelegramCommand,
+  AuthWithGoogleCommand,
+  GoogleAuthResult,
 } from '../../../application/commands';
 import { GetUserByIdQuery } from '../../../application/queries';
 import { JwtAuthGuard, AuthenticatedRequest } from '../guards';
@@ -78,8 +82,8 @@ export class AuthController {
       dto.email,
       dto.is_privacy_policy_accepted,
       dto.is_subscribed_newsletter,
-      dto.platform ? (dto.platform.toUpperCase() as AuthPlatform) : undefined,
-      dto.user_type ? (dto.user_type.toUpperCase() as UserType) : undefined
+      dto.platform,
+      dto.user_type
     );
 
     const result = await this.commandBus.execute<TokenResponseDto>(command);
@@ -165,6 +169,38 @@ export class AuthController {
   }
 
   @Public()
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Authenticate with Google',
+    description:
+      'Sign in or sign up using Google ID token. Creates new user if not exists.',
+  })
+  @ApiResponse({ status: 200, type: GoogleAuthResponseDto })
+  async authWithGoogle(
+    @Body() dto: AuthWithGoogleDto
+  ): Promise<GoogleAuthResponseDto> {
+    const command = new AuthWithGoogleCommand(
+      dto.idToken,
+      dto.isPrivacyPolicyAccepted,
+      dto.isSubscribedNewsletter,
+      dto.userType ? (dto.userType.toUpperCase() as UserType) : undefined
+    );
+
+    const result = await this.commandBus.execute<GoogleAuthResult>(command);
+
+    if (result.isFailure) {
+      throw result.error;
+    }
+
+    return {
+      user: this.mapToUserResponse(result.value.user),
+      tokens: result.value.tokens,
+      isNewUser: result.value.isNewUser,
+    };
+  }
+
+  @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
@@ -210,6 +246,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Send OTP code' })
   @ApiResponse({ status: 200, type: OTPResponseDto })
   async sendOTP(@Body() dto: SendOTPDto): Promise<OTPResponseDto> {
+    console.log('DTO received in sendOTP:', dto);
     const command = new SendOTPCommand(
       dto.authMethod as AuthMethod,
       dto.phoneNumber,
@@ -235,6 +272,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Verify OTP code' })
   @ApiResponse({ status: 200, type: VerifyOTPResponseDto })
   async verifyOTP(@Body() dto: VerifyOTPDto): Promise<VerifyOTPResponseDto> {
+    console.log('DTO received in verifyOTP:', dto);
     const command = new VerifyOTPCommand(
       dto.code,
       dto.codeHash,
@@ -258,7 +296,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Request password reset OTP' })
   @ApiResponse({ status: 200, type: OTPResponseDto })
-  async forgotPassword(@Body() dto: ForgotPasswordDto): Promise<OTPResponseDto> {
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto
+  ): Promise<OTPResponseDto> {
     const command = new ForgotPasswordCommand(
       dto.authMethod as AuthMethod,
       dto.phoneNumber,

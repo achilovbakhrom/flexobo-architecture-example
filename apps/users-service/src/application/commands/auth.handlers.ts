@@ -5,7 +5,12 @@ import {
   Success,
   Failure,
 } from '@flexobo/core';
-import { Inject, HttpException, UnauthorizedException } from '@nestjs/common';
+import {
+  Inject,
+  HttpException,
+  UnauthorizedException,
+  BadRequestException,
+} from '@nestjs/common';
 import {
   RegisterUserCommand,
   RegisterWithTelegramCommand,
@@ -60,14 +65,10 @@ export class RegisterUserHandler
         );
         if (existingByPhone) {
           return new Failure(
-            new HttpException(
-              {
-                statusCode: 400,
-                error: ErrorCodes.PHONE_EXISTS,
-                message: ErrorMessages[ErrorCodes.PHONE_EXISTS],
-              },
-              400
-            )
+            new BadRequestException({
+              error: ErrorCodes.PHONE_EXISTS,
+              message: ErrorMessages[ErrorCodes.PHONE_EXISTS],
+            })
           );
         }
       }
@@ -78,14 +79,10 @@ export class RegisterUserHandler
         );
         if (existingByEmail) {
           return new Failure(
-            new HttpException(
-              {
-                statusCode: 400,
-                error: ErrorCodes.EMAIL_EXISTS,
-                message: ErrorMessages[ErrorCodes.EMAIL_EXISTS],
-              },
-              400
-            )
+            new BadRequestException({
+              error: ErrorCodes.EMAIL_EXISTS,
+              message: ErrorMessages[ErrorCodes.EMAIL_EXISTS],
+            })
           );
         }
       }
@@ -108,13 +105,14 @@ export class RegisterUserHandler
         userType: command.userType,
       });
 
-      await this.store.save(user);
-
       const tokens = await this.tokenService.generateTokens(
         user.id,
         user.email || user.phoneNumber || user.uniqueId || '',
-        user.role || UserRole.USER
+        user.role || UserRole.User
       );
+
+      user.issueAccessToken(tokens.jti);
+      await this.store.save(user);
 
       return new Success(tokens);
     } catch (error) {
@@ -181,17 +179,18 @@ export class RegisterWithTelegramHandler
         telegramId: command.telegramId,
         isPrivacyPolicyAccepted: command.isPrivacyPolicyAccepted,
         isSubscribedNewsletter: command.isSubscribedNewsletter,
-        platform: AuthPlatform.TELEGRAM,
+        platform: AuthPlatform.Telegram,
         userType: command.userType,
       });
-
-      await this.store.save(user);
 
       const tokens = await this.tokenService.generateTokens(
         user.id,
         user.phoneNumber || user.uniqueId || '',
-        user.role || UserRole.USER
+        user.role || UserRole.User
       );
+
+      user.issueAccessToken(tokens.jti);
+      await this.store.save(user);
 
       return new Success(tokens);
     } catch (error) {
@@ -245,7 +244,7 @@ export class LoginUserHandler
 
       const isPasswordValid = await this.passwordService.compare(
         command.password,
-        user.passwordHashSafe
+        user.passwordHash
       );
 
       if (!isPasswordValid) {
@@ -257,13 +256,15 @@ export class LoginUserHandler
       }
 
       user.login();
-      await this.store.save(user);
 
       const tokens = await this.tokenService.generateTokens(
         user.id,
-        user.loginSafe,
-        user.roleSafe
+        user.loginIdentifier,
+        user.role
       );
+
+      user.issueAccessToken(tokens.jti);
+      await this.store.save(user);
 
       return new Success({ user: repoUser, tokens });
     } catch (error) {
@@ -309,13 +310,16 @@ export class LoginWithTelegramHandler
       }
 
       user.login();
-      await this.store.save(user);
 
       const tokens = await this.tokenService.generateTokens(
         user.id,
-        user.loginSafe,
-        user.roleSafe
+        user.loginIdentifier,
+        user.role
       );
+
+      // Track access token in User aggregate
+      user.issueAccessToken(tokens.jti);
+      await this.store.save(user);
 
       return new Success({ user: repoUser, tokens });
     } catch (error) {

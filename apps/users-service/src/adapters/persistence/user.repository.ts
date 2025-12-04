@@ -9,15 +9,7 @@ import {
   AuthPlatform,
 } from '../../ports';
 import { IUser } from '../../ports/user.interface';
-
-interface UserPrismaClient {
-  user: {
-    findUnique: (args: any) => Promise<any>;
-    findMany: (args: any) => Promise<any[]>;
-    create: (args: any) => Promise<any>;
-    update: (args: any) => Promise<any>;
-  };
-}
+import { UserRecord, UserPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
@@ -55,6 +47,14 @@ export class PrismaUserRepository implements IUserRepository {
     return user ? this.mapToUser(user) : null;
   }
 
+  async findByGoogleId(googleId: string): Promise<IUser | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { googleId },
+    });
+
+    return user ? this.mapToUser(user) : null;
+  }
+
   async findByIds(ids: string[]): Promise<IUser[]> {
     const users = await this.prisma.user.findMany({
       where: { id: { in: ids } },
@@ -71,6 +71,7 @@ export class PrismaUserRepository implements IUserRepository {
         passwordHash: data.passwordHash,
         phoneNumber: data.phoneNumber,
         telegramId: data.telegramId,
+        googleId: data.googleId,
         email: data.email,
         isPrivacyPolicyAccepted: data.isPrivacyPolicyAccepted ?? false,
         isSubscribedNewsletter: data.isSubscribedNewsletter ?? false,
@@ -209,13 +210,14 @@ export class PrismaUserRepository implements IUserRepository {
       .join('');
   }
 
-  private mapToUser(user: any): IUser {
+  private mapToUser(user: UserRecord): IUser {
     return {
       id: user.id,
       uniqueId: user.uniqueId,
       email: user.email,
       phoneNumber: user.phoneNumber,
       telegramId: user.telegramId,
+      googleId: user.googleId,
       passwordHash: user.passwordHash,
       fio: user.fio,
       avatar: user.avatar,
