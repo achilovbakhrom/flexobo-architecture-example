@@ -1,6 +1,6 @@
 const http = require('http');
 
-const TOTAL_REQUESTS = 500;
+const TOTAL_REQUESTS = 10000;
 // const API_URL = 'http://localhost:3005/api/v1/auth/me';
 const TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxNmU0OTNmMy00OWNjLTRhYjEtOTY2Mi04ODE5ZDdjOTczMDUiLCJlbWFpbCI6ImpvaG4uZG9lQGV4YW1wbGUuY29tIiwicm9sZSI6InVzZXIiLCJqdGkiOiJiNDFlOGQ5OS0xNmY4LTQ0MjgtOTA3Yi02YmJmNGQxMzJjZGQiLCJpYXQiOjE3NjQ4NzM5NzQsImV4cCI6MjM2OTY3Mzk3NH0.hStt03pHCcgDpTdTsBy8Q2WONXllCwj6kqB5bByjl80';
@@ -71,7 +71,7 @@ async function runStressTest() {
       console.log(`Dispatched ${i} requests...`);
       await Promise.all(promises);
       promises.length = 0; // reset the array
-      await sleep(500); // slight delay to avoid overwhelming the server instantly
+      await sleep(50); // slight delay to avoid overwhelming the server instantly
     }
   }
 

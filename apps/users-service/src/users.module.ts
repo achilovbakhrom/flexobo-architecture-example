@@ -8,6 +8,7 @@ import {
   OutboxModule,
   MESSAGE_PUBLISHER,
   SnapshotModule,
+  EventBufferModule,
 } from '@flexobo/core';
 import { PrismaModule } from './prisma.module';
 import { AuthController } from './adapters/http/v1/auth.controller';
@@ -155,6 +156,17 @@ const QueryHandlers = [
         },
       }),
       inject: ['PrismaClient'],
+    }),
+    EventBufferModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        redis: configService.get('redis.url', 'redis://localhost:6379'),
+        config: {
+          prefix: 'users:evtbuf',
+          eventTtl: 600, // 10 minutes
+          lockTtlMs: 5000,
+        },
+      }),
+      inject: [ConfigService],
     }),
   ],
   controllers: [AuthController, UsersGrpcController],
