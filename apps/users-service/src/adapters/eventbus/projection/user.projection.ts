@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
@@ -6,6 +6,8 @@ import {
   BaseProjection,
   ProjectionConfig,
   EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IUserReadModelRepository,
@@ -103,9 +105,12 @@ export class UserProjection extends BaseProjection<
     @Inject(USER_READ_MODEL_REPOSITORY)
     private readonly readModelRepository: IUserReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
-    rabbitMQConsumer: RabbitMQConsumer
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
   ) {
-    super(rabbitMQConsumer, UserProjection.name);
+    super(rabbitMQConsumer, UserProjection.name, eventBuffer);
   }
 
   protected getConfig(): ProjectionConfig {
@@ -115,79 +120,95 @@ export class UserProjection extends BaseProjection<
       durable: true,
       prefetchCount: 10,
       maxRetries: 10,
+      lockTtlMs: 5000,
     };
   }
 
-  protected async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as UserEventPayload;
+  /**
+   * Get current version of read model from database (for buffered mode)
+   */
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.readModelRepository.findById(aggregateId);
+    return entity?.version ?? 0;
+  }
 
-    this.logger.debug(
-      `[Projection] User event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  /**
+   * Apply an event to the read model (for buffered mode)
+   */
+  protected override async applyEvent(event: UserEventPayload): Promise<void> {
+    switch (event.type) {
       case EVENT_TYPES.USER.REGISTERED:
         await this.onUserRegistered(
-          payload as EventPayload<UserRegisteredData>
+          event as EventPayload<UserRegisteredData>
         );
         break;
 
       case EVENT_TYPES.USER.LOGGED_IN:
-        await this.onUserLoggedIn(payload as EventPayload<UserLoggedInData>);
+        await this.onUserLoggedIn(event as EventPayload<UserLoggedInData>);
         break;
 
       case EVENT_TYPES.USER.LOGGED_OUT:
-        await this.onVersionOnlyUpdate(payload);
+        await this.onVersionOnlyUpdate(event);
         break;
 
       case EVENT_TYPES.USER.PROFILE_UPDATED:
         await this.onUserProfileUpdated(
-          payload as EventPayload<UserProfileUpdatedData>
+          event as EventPayload<UserProfileUpdatedData>
         );
         break;
 
       case EVENT_TYPES.USER.PASSWORD_CHANGED:
       case EVENT_TYPES.USER.PASSWORD_RESET:
         await this.onUserPasswordChanged(
-          payload as EventPayload<UserPasswordChangedData>
+          event as EventPayload<UserPasswordChangedData>
         );
         break;
 
       case EVENT_TYPES.USER.TELEGRAM_LINKED:
         await this.onUserTelegramLinked(
-          payload as EventPayload<UserTelegramLinkedData>
+          event as EventPayload<UserTelegramLinkedData>
         );
         break;
 
       case EVENT_TYPES.USER.GOOGLE_LINKED:
         await this.onUserGoogleLinked(
-          payload as EventPayload<UserGoogleLinkedData>
+          event as EventPayload<UserGoogleLinkedData>
         );
         break;
 
       case EVENT_TYPES.USER.ACTIVATED:
-        await this.onUserActivated(payload as EventPayload<UserActivatedData>);
+        await this.onUserActivated(event as EventPayload<UserActivatedData>);
         break;
 
       case EVENT_TYPES.USER.DEACTIVATED:
         await this.onUserDeactivated(
-          payload as EventPayload<UserDeactivatedData>
+          event as EventPayload<UserDeactivatedData>
         );
         break;
 
       case EVENT_TYPES.USER.OTP_USED:
-        await this.onUserOTPUsed(payload as EventPayload<UserOTPUsedData>);
+        await this.onUserOTPUsed(event as EventPayload<UserOTPUsedData>);
         break;
 
       case EVENT_TYPES.USER.OTP_REQUESTED:
       case EVENT_TYPES.USER.ACCESS_TOKEN_ISSUED:
       case EVENT_TYPES.USER.ACCESS_TOKEN_REVOKED:
-        await this.onVersionOnlyUpdate(payload);
+        await this.onVersionOnlyUpdate(event);
         break;
 
       default:
-        this.logger.warn(`Unknown user event type: ${payload.type}`);
+        this.logger.warn(`Unknown user event type: ${event.type}`);
     }
+  }
+
+  /**
+   * Handle an event (for non-buffered mode, delegates to applyEvent)
+   */
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as UserEventPayload;
+    await this.applyEvent(payload);
   }
 
   private async onUserRegistered(
