@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -34,6 +33,7 @@ import { DeleteLoadCommand } from '../../../application/commands/load/delete-loa
 import { GetLoadQuery } from '../../../application/queries/load/get-load.query';
 import { ListLoadsQuery } from '../../../application/queries/load/list-loads.query';
 import { SearchLoadsQuery } from '../../../application/queries/load/search-loads.query';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Loads')
 @ApiBearerAuth()
@@ -51,7 +51,7 @@ export class LoadController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateLoadDto
-  ): Promise<{ id: string }> {
+  ) {
     // TODO: Get companyId from user's company membership
     const companyId = 'default-company';
 

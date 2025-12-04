@@ -1,4 +1,4 @@
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import { Inject } from '@nestjs/common';
 import {
   TRANSPORT_READ_REPOSITORY,
@@ -15,8 +15,8 @@ export class ListTransportsQuery implements IQuery {
   constructor(
     public readonly userId: string,
     public readonly filters?: ListTransportsFilters,
-    public readonly page: number = 1,
-    public readonly limit: number = 20
+    public readonly page = 1,
+    public readonly limit = 20
   ) {}
 }
 

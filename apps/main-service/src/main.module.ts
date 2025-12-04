@@ -16,6 +16,7 @@ import { TripController } from './adapters/http/v1/trip.controller';
 import { BidController } from './adapters/http/v1/bid.controller';
 import { BookingController } from './adapters/http/v1/booking.controller';
 import { BoardController } from './adapters/http/v1/board.controller';
+import { LanguageController } from './adapters/http/v1/language.controller';
 
 // Guards
 import { JwtAuthGuard } from './adapters/http/guards/jwt-auth.guard';
@@ -49,6 +50,7 @@ import {
   BOARD_AGGREGATE_STORE,
   BOARD_READ_REPOSITORY,
 } from './ports/board.repository';
+import { LANGUAGE_REPOSITORY } from './ports/language.repository';
 import { CHAT_SERVICE_CLIENT } from './ports/chat-service.client';
 
 // Aggregate Stores
@@ -70,6 +72,7 @@ import {
   PrismaBookingReadRepository,
   PrismaBoardReadRepository,
 } from './adapters/persistence/read-model';
+import { PrismaLanguageRepository } from './adapters/persistence/read-model/language.repository';
 
 // Projections
 import {
@@ -130,6 +133,11 @@ import {
   RemoveBoardMemberHandler,
   DeleteBoardHandler,
 } from './application/commands/board';
+import {
+  CreateLanguageHandler,
+  UpdateLanguageHandler,
+  DeleteLanguageHandler,
+} from './application/commands/language';
 
 // Transport Query Handlers
 import {
@@ -170,6 +178,10 @@ import {
   GetBoardHandler,
   ListBoardsHandler,
 } from './application/queries/board';
+import {
+  GetLanguageHandler,
+  ListLanguagesHandler,
+} from './application/queries/language';
 
 const CommandHandlers = [
   // Transport
@@ -204,6 +216,10 @@ const CommandHandlers = [
   AddBoardMemberHandler,
   RemoveBoardMemberHandler,
   DeleteBoardHandler,
+  // Language
+  CreateLanguageHandler,
+  UpdateLanguageHandler,
+  DeleteLanguageHandler,
 ];
 
 const QueryHandlers = [
@@ -229,6 +245,9 @@ const QueryHandlers = [
   // Board
   GetBoardHandler,
   ListBoardsHandler,
+  // Language
+  GetLanguageHandler,
+  ListLanguagesHandler,
 ];
 
 @Module({
@@ -266,6 +285,7 @@ const QueryHandlers = [
     BidController,
     BookingController,
     BoardController,
+    LanguageController
   ],
   providers: [
     // Guards
@@ -329,6 +349,10 @@ const QueryHandlers = [
     {
       provide: BOARD_READ_REPOSITORY,
       useClass: PrismaBoardReadRepository,
+    },
+    {
+      provide: LANGUAGE_REPOSITORY,
+      useClass: PrismaLanguageRepository,
     },
 
     // Projections

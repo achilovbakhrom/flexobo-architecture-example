@@ -9,7 +9,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -26,21 +25,16 @@ import {
   ListMyBidsQueryDto,
   ListReceivedBidsQueryDto,
 } from '../dto/bid.dto';
-import {
-  CreateBidCommand,
-  CreateBidResult,
-} from '../../../application/commands/bid/create-bid.command';
+import { CreateBidCommand } from '../../../application/commands/bid/create-bid.command';
 import { CounterBidCommand } from '../../../application/commands/bid/counter-bid.command';
-import {
-  AcceptBidCommand,
-  AcceptBidResult,
-} from '../../../application/commands/bid/accept-bid.command';
+import { AcceptBidCommand } from '../../../application/commands/bid/accept-bid.command';
 import { RejectBidCommand } from '../../../application/commands/bid/reject-bid.command';
 import { CancelBidCommand } from '../../../application/commands/bid/cancel-bid.command';
 import { GetBidQuery } from '../../../application/queries/bid/get-bid.query';
 import { ListBidsByPostQuery } from '../../../application/queries/bid/list-bids-by-post.query';
 import { ListMyBidsQuery } from '../../../application/queries/bid/list-my-bids.query';
 import { ListReceivedBidsQuery } from '../../../application/queries/bid/list-received-bids.query';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Bids')
 @ApiBearerAuth()
@@ -58,7 +52,7 @@ export class BidController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateBidDto
-  ): Promise<CreateBidResult> {
+  ) {
     return this.commandBus.execute(
       new CreateBidCommand(
         user.userId,
@@ -130,7 +124,10 @@ export class BidController {
   @Get(':id')
   @ApiOperation({ summary: 'Get bid with negotiation history' })
   @ApiParam({ name: 'id', description: 'Bid ID' })
-  @ApiResponse({ status: 200, description: 'Bid details with negotiation history' })
+  @ApiResponse({
+    status: 200,
+    description: 'Bid details with negotiation history',
+  })
   @ApiResponse({ status: 404, description: 'Bid not found' })
   async getById(@Param('id') id: string) {
     return this.queryBus.execute(new GetBidQuery(id));
@@ -159,7 +156,7 @@ export class BidController {
   async accept(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser
-  ): Promise<AcceptBidResult> {
+  ) {
     return this.commandBus.execute(new AcceptBidCommand(id, user.userId));
   }
 

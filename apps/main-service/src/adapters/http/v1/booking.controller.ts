@@ -9,7 +9,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -27,6 +26,7 @@ import { CancelBookingCommand } from '../../../application/commands/booking/canc
 import { RateBookingCommand } from '../../../application/commands/booking/rate-booking.command';
 import { GetBookingQuery } from '../../../application/queries/booking/get-booking.query';
 import { ListBookingsQuery } from '../../../application/queries/booking/list-bookings.query';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Bookings')
 @ApiBearerAuth()
