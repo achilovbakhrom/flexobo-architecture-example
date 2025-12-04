@@ -305,10 +305,6 @@ export class ChatGateway
     await this.emitUserUnreadChatsCount(userId, client);
   }
 
-  // ============================================================
-  // IRealtimeService Implementation
-  // ============================================================
-
   notifyRoom(roomId: string, event: string, data: unknown): void {
     this.server.to(roomId).emit(event, data);
   }
@@ -351,10 +347,6 @@ export class ChatGateway
   getOnlineUsers(): string[] {
     return Array.from(this.userSockets.keys());
   }
-
-  // ============================================================
-  // Helper Methods
-  // ============================================================
 
   private emitUnreadCountUpdate(roomId: string, unreadCounts: Record<string, number>) {
     this.server.to(roomId).emit(ChatEvents.UnreadCountUpdated, {

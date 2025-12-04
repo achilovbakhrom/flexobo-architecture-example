@@ -1,18 +1,18 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   ITransportReadRepository,
   TRANSPORT_READ_REPOSITORY,
+  TransportReadDto,
 } from '../../../ports/transport.repository';
 import {
   TRANSPORT_EVENT_TYPES,
@@ -20,84 +20,75 @@ import {
   TransportUpdatedEventData,
 } from '../../../domain/events/transport.events';
 
-interface EventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-const QUEUE_NAME = 'main-service.transport.projection';
+type TransportEventPayload = EventPayload<
+  TransportCreatedEventData | TransportUpdatedEventData | Record<string, unknown>
+>;
 
 @Injectable()
-export class TransportProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TransportProjection.name);
-  private isSubscribed = false;
-
+export class TransportProjection extends BaseProjection<
+  TransportReadDto,
+  TransportEventPayload
+> {
   constructor(
     @Inject(TRANSPORT_READ_REPOSITORY)
     private readonly transportRepo: ITransportReadRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, TransportProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: 'main-service.transport.projection',
+      routingKeys: ['transport.#'],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping transport projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
-      ['transport.#'],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      { durable: true, maxRetries: 3 }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUE_NAME}`);
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.transportRepo.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as EventPayload;
-
-    this.logger.debug(
-      `[Projection] Transport event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(
+    event: TransportEventPayload
+  ): Promise<void> {
+    switch (event.type) {
       case TRANSPORT_EVENT_TYPES.CREATED:
-        await this.onTransportCreated(payload);
+        await this.onTransportCreated(event as EventPayload<TransportCreatedEventData>);
         break;
       case TRANSPORT_EVENT_TYPES.UPDATED:
-        await this.onTransportUpdated(payload);
+        await this.onTransportUpdated(event as EventPayload<TransportUpdatedEventData>);
         break;
       case TRANSPORT_EVENT_TYPES.DELETED:
-        await this.onTransportDeleted(payload);
+        await this.onTransportDeleted(event);
         break;
       default:
-        this.logger.warn(`Unknown transport event type: ${payload.type}`);
+        this.logger.warn(`Unknown transport event type: ${event.type}`);
     }
   }
 
-  private async onTransportCreated(event: EventPayload): Promise<void> {
-    const data = event.data as unknown as TransportCreatedEventData;
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as TransportEventPayload;
+    await this.applyEvent(payload);
+  }
 
+  private async onTransportCreated(
+    event: EventPayload<TransportCreatedEventData>
+  ): Promise<void> {
+    const existing = await this.transportRepo.findById(event.aggregateId);
+    this.checkCreateIdempotency(existing, event);
+
+    const { data } = event;
     await this.transportRepo.save({
       id: event.aggregateId,
       ownerId: data.ownerId,
@@ -119,14 +110,15 @@ export class TransportProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onTransportUpdated(event: EventPayload): Promise<void> {
+  private async onTransportUpdated(
+    event: EventPayload<TransportUpdatedEventData>
+  ): Promise<void> {
     const existing = await this.transportRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
-    const data = event.data as unknown as TransportUpdatedEventData;
-
+    const { data } = event;
     await this.transportRepo.save({
-      ...existing,
+      ...existing!,
       ...(data.transportType !== undefined && { transportType: data.transportType }),
       ...(data.loadingTypes !== undefined && { loadingTypes: data.loadingTypes }),
       ...(data.capacityTons !== undefined && { capacityTons: data.capacityTons }),
@@ -143,7 +135,7 @@ export class TransportProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onTransportDeleted(event: EventPayload): Promise<void> {
+  private async onTransportDeleted(event: TransportEventPayload): Promise<void> {
     await this.transportRepo.delete(event.aggregateId);
   }
 }

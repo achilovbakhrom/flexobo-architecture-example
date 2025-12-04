@@ -1,9 +1,5 @@
 import { IQuery } from '@flexobo/core';
 
-// ============================================================
-// Chat Room Queries
-// ============================================================
-
 export class GetRoomByIdQuery implements IQuery {
   constructor(public readonly roomId: string) {}
 }
@@ -35,10 +31,6 @@ export class CountUserRoomsQuery implements IQuery {
   ) {}
 }
 
-// ============================================================
-// Chat Message Queries
-// ============================================================
-
 export class GetMessageByIdQuery implements IQuery {
   constructor(public readonly messageId: string) {}
 }
@@ -63,10 +55,6 @@ export class CountUnreadMessagesQuery implements IQuery {
     public readonly userId: string
   ) {}
 }
-
-// ============================================================
-// Unread Stats Queries
-// ============================================================
 
 export class GetUserUnreadStatsQuery implements IQuery {
   constructor(public readonly userId: string) {}

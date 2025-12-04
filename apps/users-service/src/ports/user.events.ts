@@ -1,27 +1,15 @@
 import { AuthPlatform, UserType } from './user.enums';
 import { AuthMethod } from './user.interface';
 
-// ============================================================
-// OTP Status Enum
-// ============================================================
-
 export enum OTPStatus {
   Requested = 'REQUESTED',
   Used = 'USED',
 }
 
-// ============================================================
-// Access Token Status Enum
-// ============================================================
-
 export enum AccessTokenStatus {
   Active = 'ACTIVE',
   Revoked = 'REVOKED',
 }
-
-// ============================================================
-// User Event Types
-// ============================================================
 
 export enum UserEventType {
   Registered = 'user.registered',
@@ -34,17 +22,11 @@ export enum UserEventType {
   GoogleLinked = 'user.google_linked',
   Activated = 'user.activated',
   Deactivated = 'user.deactivated',
-  // OTP events
   OTPRequested = 'user.otp_requested',
   OTPUsed = 'user.otp_used',
-  // Access Token events
   AccessTokenIssued = 'user.access_token_issued',
   AccessTokenRevoked = 'user.access_token_revoked',
 }
-
-// ============================================================
-// User Profile Events
-// ============================================================
 
 export interface UserRegisteredEvent {
   type: UserEventType.Registered;
@@ -135,10 +117,6 @@ export interface UserDeactivatedEvent {
   };
 }
 
-// ============================================================
-// OTP Events
-// ============================================================
-
 export interface UserOTPRequestedEvent {
   type: UserEventType.OTPRequested;
   data: {
@@ -160,10 +138,6 @@ export interface UserOTPUsedEvent {
   };
 }
 
-// ============================================================
-// Access Token Events
-// ============================================================
-
 export interface UserAccessTokenIssuedEvent {
   type: UserEventType.AccessTokenIssued;
   data: {
@@ -180,10 +154,6 @@ export interface UserAccessTokenRevokedEvent {
     reason?: string;
   };
 }
-
-// ============================================================
-// Union Type
-// ============================================================
 
 export type UserEvent =
   | UserRegisteredEvent

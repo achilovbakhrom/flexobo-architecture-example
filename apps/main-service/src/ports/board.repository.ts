@@ -15,6 +15,7 @@ export interface BoardReadDto {
   description?: string;
   members: BoardMemberData[];
   isActive: boolean;
+  version: number;
   createdAt: Date;
   updatedAt: Date;
 }

@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
@@ -6,6 +6,8 @@ import {
   BaseProjection,
   ProjectionConfig,
   EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IChatMessageRepository,
@@ -20,10 +22,6 @@ import {
   EVENT_TYPES,
   QUEUES,
 } from '../../../domain/events/event.constants';
-
-// ============================================================
-// Typed Event Data Interfaces
-// ============================================================
 
 interface MessageSentData {
   roomId: string;
@@ -82,9 +80,12 @@ export class ChatMessageProjection extends BaseProjection<
     @Inject(CHAT_MESSAGE_REPOSITORY)
     private readonly messageRepository: IChatMessageRepository,
     @Inject(MESSAGE_CONSUMER)
-    rabbitMQConsumer: RabbitMQConsumer
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
   ) {
-    super(rabbitMQConsumer, ChatMessageProjection.name);
+    super(rabbitMQConsumer, ChatMessageProjection.name, eventBuffer);
   }
 
   protected getConfig(): ProjectionConfig {
@@ -94,46 +95,40 @@ export class ChatMessageProjection extends BaseProjection<
       durable: true,
       prefetchCount: 20,
       maxRetries: 10,
+      lockTtlMs: 5000,
     };
+  }
+
+  protected override async getCurrentModelVersion(aggregateId: string): Promise<number> {
+    const entity = await this.messageRepository.findById(aggregateId);
+    return entity?.version ?? 0;
+  }
+
+  protected override async applyEvent(event: ChatMessageEventPayload): Promise<void> {
+    switch (event.type) {
+      case EVENT_TYPES.CHAT.MESSAGE.SENT:
+        await this.onMessageSent(event as EventPayload<MessageSentData>);
+        break;
+      case EVENT_TYPES.CHAT.MESSAGE.EDITED:
+        await this.onMessageEdited(event as EventPayload<MessageEditedData>);
+        break;
+      case EVENT_TYPES.CHAT.MESSAGE.DELETED:
+        await this.onMessageDeleted(event as EventPayload<MessageDeletedData>);
+        break;
+      case EVENT_TYPES.CHAT.MESSAGE.MARKED_AS_READ:
+        await this.onMessageMarkedAsRead(event as EventPayload<MessageReadData>);
+        break;
+      case EVENT_TYPES.CHAT.MESSAGE.TRANSLATION_ADDED:
+        await this.onTranslationAdded(event as EventPayload<TranslationAddedData>);
+        break;
+      default:
+        this.logger.warn(`Unknown chat message event type: ${event.type}`);
+    }
   }
 
   protected async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as ChatMessageEventPayload;
-
-    this.logger.debug(
-      `[Projection] ChatMessage event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
-      case EVENT_TYPES.CHAT.MESSAGE.SENT:
-        await this.onMessageSent(payload as EventPayload<MessageSentData>);
-        break;
-
-      case EVENT_TYPES.CHAT.MESSAGE.EDITED:
-        await this.onMessageEdited(payload as EventPayload<MessageEditedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.MESSAGE.DELETED:
-        await this.onMessageDeleted(
-          payload as EventPayload<MessageDeletedData>
-        );
-        break;
-
-      case EVENT_TYPES.CHAT.MESSAGE.MARKED_AS_READ:
-        await this.onMessageMarkedAsRead(
-          payload as EventPayload<MessageReadData>
-        );
-        break;
-
-      case EVENT_TYPES.CHAT.MESSAGE.TRANSLATION_ADDED:
-        await this.onTranslationAdded(
-          payload as EventPayload<TranslationAddedData>
-        );
-        break;
-
-      default:
-        this.logger.warn(`Unknown chat message event type: ${payload.type}`);
-    }
+    await this.applyEvent(payload);
   }
 
   private async onMessageSent(

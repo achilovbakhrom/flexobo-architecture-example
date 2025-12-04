@@ -1,4 +1,4 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
@@ -6,6 +6,8 @@ import {
   BaseProjection,
   ProjectionConfig,
   EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IChatRoomRepository,
@@ -18,10 +20,6 @@ import {
   EVENT_TYPES,
   QUEUES,
 } from '../../../domain/events/event.constants';
-
-// ============================================================
-// Typed Event Data Interfaces
-// ============================================================
 
 interface RoomCreatedData {
   participants: string[];
@@ -97,9 +95,12 @@ export class ChatRoomProjection extends BaseProjection<ChatRoomReadModelDto, Cha
     @Inject(CHAT_ROOM_REPOSITORY)
     private readonly roomRepository: IChatRoomRepository,
     @Inject(MESSAGE_CONSUMER)
-    rabbitMQConsumer: RabbitMQConsumer
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
   ) {
-    super(rabbitMQConsumer, ChatRoomProjection.name);
+    super(rabbitMQConsumer, ChatRoomProjection.name, eventBuffer);
   }
 
   protected getConfig(): ProjectionConfig {
@@ -108,52 +109,50 @@ export class ChatRoomProjection extends BaseProjection<ChatRoomReadModelDto, Cha
       routingKeys: [ROUTING_KEYS.CHAT.ROOM.ALL],
       durable: true,
       maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
     };
+  }
+
+  protected override async getCurrentModelVersion(aggregateId: string): Promise<number> {
+    const entity = await this.roomRepository.findById(aggregateId);
+    return entity?.version ?? 0;
+  }
+
+  protected override async applyEvent(event: ChatRoomEventPayload): Promise<void> {
+    switch (event.type) {
+      case EVENT_TYPES.CHAT.ROOM.CREATED:
+        await this.onRoomCreated(event as EventPayload<RoomCreatedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_ADDED:
+        await this.onParticipantAdded(event as EventPayload<ParticipantAddedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_REMOVED:
+        await this.onParticipantRemoved(event as EventPayload<ParticipantRemovedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.MESSAGE_ADDED:
+        await this.onMessageAdded(event as EventPayload<MessageAddedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.MARKED_AS_READ:
+        await this.onRoomMarkedAsRead(event as EventPayload<UnreadCountUpdatedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.ARCHIVED:
+        await this.onRoomArchived(event as EventPayload<RoomArchivedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.DELETED:
+        await this.onRoomDeleted(event as EventPayload<RoomDeletedData>);
+        break;
+      case EVENT_TYPES.CHAT.ROOM.TRANSLATION_SETTINGS_UPDATED:
+        await this.onTranslationSettingsUpdated(event as EventPayload<TranslationSettingsUpdatedData>);
+        break;
+      default:
+        this.logger.warn(`Unknown chat room event type: ${event.type}`);
+    }
   }
 
   protected async handleEvent(message: IncomingMessage): Promise<void> {
     const payload = message.content as ChatRoomEventPayload;
-
-    this.logger.debug(
-      `[Projection] ChatRoom event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
-      case EVENT_TYPES.CHAT.ROOM.CREATED:
-        await this.onRoomCreated(payload as EventPayload<RoomCreatedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_ADDED:
-        await this.onParticipantAdded(payload as EventPayload<ParticipantAddedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_REMOVED:
-        await this.onParticipantRemoved(payload as EventPayload<ParticipantRemovedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.MESSAGE_ADDED:
-        await this.onMessageAdded(payload as EventPayload<MessageAddedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.MARKED_AS_READ:
-        await this.onRoomMarkedAsRead(payload as EventPayload<UnreadCountUpdatedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.ARCHIVED:
-        await this.onRoomArchived(payload as EventPayload<RoomArchivedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.DELETED:
-        await this.onRoomDeleted(payload as EventPayload<RoomDeletedData>);
-        break;
-
-      case EVENT_TYPES.CHAT.ROOM.TRANSLATION_SETTINGS_UPDATED:
-        await this.onTranslationSettingsUpdated(payload as EventPayload<TranslationSettingsUpdatedData>);
-        break;
-
-      default:
-        this.logger.warn(`Unknown chat room event type: ${payload.type}`);
-    }
+    await this.applyEvent(payload);
   }
 
   private async onRoomCreated(event: EventPayload<RoomCreatedData>): Promise<void> {

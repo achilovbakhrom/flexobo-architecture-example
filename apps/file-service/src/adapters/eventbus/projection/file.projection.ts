@@ -1,18 +1,18 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IFileReadModelRepository,
   FILE_READ_MODEL_REPOSITORY,
+  FileReadModelDto,
 } from '../../../ports/file-read-model.port';
 import {
   FILE_EVENT_TYPES,
@@ -20,126 +20,111 @@ import {
   QUEUES,
 } from '../../../domain/events/event.constants';
 
-interface FileEventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+interface FileUploadedData {
+  userId: string;
+  companyId?: string;
+  fileName: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  s3Key: string;
+  s3Bucket: string;
+  uploadedAt: string;
 }
 
-/**
- * File Projection
- *
- * Subscribes to file events and updates the read model.
- */
-@Injectable()
-export class FileProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(FileProjection.name);
-  private isSubscribed = false;
+interface FileDeletedData {
+  deletedBy: string;
+  deletedAt: string;
+}
 
+type FileEventData = FileUploadedData | FileDeletedData;
+type FileEventPayload = EventPayload<FileEventData>;
+
+@Injectable()
+export class FileProjection extends BaseProjection<FileReadModelDto, FileEventPayload> {
   constructor(
     @Inject(FILE_READ_MODEL_REPOSITORY)
     private readonly repository: IFileReadModelRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, FileProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.FILE.PROJECTION);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: QUEUES.FILE.PROJECTION,
+      routingKeys: [FILE_ROUTING_KEYS.ALL],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn(
-        'RabbitMQ is not connected. File projection will not start.'
-      );
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.FILE.PROJECTION,
-      [FILE_ROUTING_KEYS.ALL],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      {
-        durable: true,
-        maxRetries: 3,
-      }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUES.FILE.PROJECTION}`);
+  protected override async getCurrentModelVersion(aggregateId: string): Promise<number> {
+    const entity = await this.repository.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as FileEventPayload;
-
-    this.logger.debug(
-      `[Projection] File event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(event: FileEventPayload): Promise<void> {
+    switch (event.type) {
       case FILE_EVENT_TYPES.UPLOADED:
-        await this.onFileUploaded(payload);
+        await this.onFileUploaded(event as EventPayload<FileUploadedData>);
         break;
-
       case FILE_EVENT_TYPES.DELETED:
-        await this.onFileDeleted(payload);
+        await this.onFileDeleted(event as EventPayload<FileDeletedData>);
         break;
-
       default:
-        this.logger.warn(`Unknown file event type: ${payload.type}`);
+        this.logger.warn(`Unknown file event type: ${event.type}`);
     }
   }
 
-  private async onFileUploaded(event: FileEventPayload): Promise<void> {
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as FileEventPayload;
+    await this.applyEvent(payload);
+  }
+
+  private async onFileUploaded(event: EventPayload<FileUploadedData>): Promise<void> {
+    const existingFile = await this.repository.findById(event.aggregateId);
+    this.checkCreateIdempotency(existingFile, event);
+
+    const { data } = event;
     await this.repository.upsert(
       {
         id: event.aggregateId,
-        userId: event.data['userId'] as string,
-        companyId: event.data['companyId'] as string | undefined,
-        fileName: event.data['fileName'] as string,
-        originalName: event.data['originalName'] as string,
-        mimeType: event.data['mimeType'] as string,
-        size: event.data['size'] as number,
-        s3Key: event.data['s3Key'] as string,
-        s3Bucket: event.data['s3Bucket'] as string,
+        userId: data.userId,
+        companyId: data.companyId,
+        fileName: data.fileName,
+        originalName: data.originalName,
+        mimeType: data.mimeType,
+        size: data.size,
+        s3Key: data.s3Key,
+        s3Bucket: data.s3Bucket,
         status: 'ACTIVE',
-        uploadedAt: new Date(event.data['uploadedAt'] as string),
+        version: event.version,
+        uploadedAt: new Date(data.uploadedAt),
         updatedAt: new Date(),
       },
       { version: event.version }
     );
-
-    this.logger.log(
-      `File read model created/updated: ${event.aggregateId}`
-    );
   }
 
-  private async onFileDeleted(event: FileEventPayload): Promise<void> {
-    const file = await this.repository.findById(event.aggregateId);
+  private async onFileDeleted(event: EventPayload<FileDeletedData>): Promise<void> {
+    const existingFile = await this.repository.findById(event.aggregateId);
+    this.checkVersion(existingFile, event);
 
-    if (file) {
-      await this.repository.upsert(
-        {
-          ...file,
-          status: 'DELETED',
-          updatedAt: new Date(),
-        },
-        { version: event.version }
-      );
-
-      this.logger.log(`File marked as deleted: ${event.aggregateId}`);
-    }
+    await this.repository.upsert(
+      {
+        ...existingFile!,
+        status: 'DELETED',
+        version: event.version,
+        updatedAt: new Date(),
+      },
+      { version: event.version }
+    );
   }
 }

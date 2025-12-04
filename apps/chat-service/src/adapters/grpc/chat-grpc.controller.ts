@@ -18,10 +18,6 @@ import {
   ChatRoomStatus,
 } from '../../ports';
 
-// ============================================================
-// Request/Response Interfaces (match chat.proto)
-// ============================================================
-
 interface CreateChatRoomRequest {
   participantIds: string[];
   createdBy: string;
@@ -90,10 +86,6 @@ interface UpdateRoomStatusResponse {
   success: boolean;
   error: string;
 }
-
-// ============================================================
-// gRPC Controller
-// ============================================================
 
 @Controller()
 export class ChatGrpcController {
@@ -334,10 +326,6 @@ export class ChatGrpcController {
       };
     }
   }
-
-  // ============================================================
-  // Private Helpers
-  // ============================================================
 
   private mapToRoomInfo(room: ChatRoomReadModelDto): ChatRoomInfo {
     return {

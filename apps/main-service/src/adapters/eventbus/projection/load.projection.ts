@@ -1,18 +1,18 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   ILoadReadRepository,
   LOAD_READ_REPOSITORY,
+  LoadReadDto,
 } from '../../../ports/load.repository';
 import {
   LOAD_EVENT_TYPES,
@@ -22,87 +22,73 @@ import {
 } from '../../../domain/events/load.events';
 import { LoadStatus } from '../../../domain/constants/enums';
 
-interface EventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-const QUEUE_NAME = 'main-service.load.projection';
+type LoadEventPayload = EventPayload<
+  LoadCreatedEventData | LoadUpdatedEventData | LoadStatusChangedEventData | Record<string, unknown>
+>;
 
 @Injectable()
-export class LoadProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(LoadProjection.name);
-  private isSubscribed = false;
-
+export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload> {
   constructor(
     @Inject(LOAD_READ_REPOSITORY)
     private readonly loadRepo: ILoadReadRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, LoadProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: 'main-service.load.projection',
+      routingKeys: ['load.#'],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping load projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
-      ['load.#'],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      { durable: true, maxRetries: 3 }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUE_NAME}`);
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.loadRepo.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as EventPayload;
-
-    this.logger.debug(
-      `[Projection] Load event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(event: LoadEventPayload): Promise<void> {
+    switch (event.type) {
       case LOAD_EVENT_TYPES.CREATED:
-        await this.onLoadCreated(payload);
+        await this.onLoadCreated(event as EventPayload<LoadCreatedEventData>);
         break;
       case LOAD_EVENT_TYPES.UPDATED:
-        await this.onLoadUpdated(payload);
+        await this.onLoadUpdated(event as EventPayload<LoadUpdatedEventData>);
         break;
       case LOAD_EVENT_TYPES.STATUS_CHANGED:
-        await this.onLoadStatusChanged(payload);
+        await this.onLoadStatusChanged(event as EventPayload<LoadStatusChangedEventData>);
         break;
       case LOAD_EVENT_TYPES.DELETED:
-        await this.onLoadDeleted(payload);
+        await this.onLoadDeleted(event);
         break;
       default:
-        this.logger.warn(`Unknown load event type: ${payload.type}`);
+        this.logger.warn(`Unknown load event type: ${event.type}`);
     }
   }
 
-  private async onLoadCreated(event: EventPayload): Promise<void> {
-    const data = event.data as unknown as LoadCreatedEventData;
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as LoadEventPayload;
+    await this.applyEvent(payload);
+  }
 
+  private async onLoadCreated(
+    event: EventPayload<LoadCreatedEventData>
+  ): Promise<void> {
+    const existing = await this.loadRepo.findById(event.aggregateId);
+    this.checkCreateIdempotency(existing, event);
+
+    const { data } = event;
     await this.loadRepo.save({
       id: event.aggregateId,
       ownerId: data.ownerId,
@@ -141,30 +127,30 @@ export class LoadProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onLoadUpdated(event: EventPayload): Promise<void> {
+  private async onLoadUpdated(
+    event: EventPayload<LoadUpdatedEventData>
+  ): Promise<void> {
     const existing = await this.loadRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
-    const data = event.data as unknown as LoadUpdatedEventData;
-    const updated = { ...existing };
+    const { data } = event;
+    const updated = { ...existing! };
 
-    // Handle location changes
     if (data.from) {
-      updated.fromCountry = data.from.country ?? existing.fromCountry;
-      updated.fromCity = data.from.city ?? existing.fromCity;
-      updated.fromAddress = data.from.address ?? existing.fromAddress;
-      updated.fromLat = data.from.lat ?? existing.fromLat;
-      updated.fromLng = data.from.lng ?? existing.fromLng;
+      updated.fromCountry = data.from.country ?? existing!.fromCountry;
+      updated.fromCity = data.from.city ?? existing!.fromCity;
+      updated.fromAddress = data.from.address ?? existing!.fromAddress;
+      updated.fromLat = data.from.lat ?? existing!.fromLat;
+      updated.fromLng = data.from.lng ?? existing!.fromLng;
     }
     if (data.to) {
-      updated.toCountry = data.to.country ?? existing.toCountry;
-      updated.toCity = data.to.city ?? existing.toCity;
-      updated.toAddress = data.to.address ?? existing.toAddress;
-      updated.toLat = data.to.lat ?? existing.toLat;
-      updated.toLng = data.to.lng ?? existing.toLng;
+      updated.toCountry = data.to.country ?? existing!.toCountry;
+      updated.toCity = data.to.city ?? existing!.toCity;
+      updated.toAddress = data.to.address ?? existing!.toAddress;
+      updated.toLat = data.to.lat ?? existing!.toLat;
+      updated.toLng = data.to.lng ?? existing!.toLng;
     }
 
-    // Handle other changes
     if (data.transportType !== undefined) updated.transportType = data.transportType;
     if (data.loadingTypes !== undefined) updated.loadingTypes = data.loadingTypes;
     if (data.cargos !== undefined) updated.cargos = data.cargos;
@@ -191,21 +177,21 @@ export class LoadProjection implements OnModuleInit, OnModuleDestroy {
     await this.loadRepo.save(updated);
   }
 
-  private async onLoadStatusChanged(event: EventPayload): Promise<void> {
+  private async onLoadStatusChanged(
+    event: EventPayload<LoadStatusChangedEventData>
+  ): Promise<void> {
     const existing = await this.loadRepo.findById(event.aggregateId);
-    if (!existing) return;
-
-    const data = event.data as unknown as LoadStatusChangedEventData;
+    this.checkVersion(existing, event);
 
     await this.loadRepo.save({
-      ...existing,
-      status: data.newStatus,
+      ...existing!,
+      status: event.data.newStatus,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onLoadDeleted(event: EventPayload): Promise<void> {
+  private async onLoadDeleted(event: LoadEventPayload): Promise<void> {
     await this.loadRepo.delete(event.aggregateId);
   }
 }

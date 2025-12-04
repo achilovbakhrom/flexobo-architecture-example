@@ -1,10 +1,6 @@
 import { DomainEvent } from '@flexobo/core';
 import { ChatMessage, MessageType, MessageStatus, SenderType } from '../domain/aggregates/chat-message.aggregate';
 
-// ============================================================
-// Chat Message Read Model DTO
-// ============================================================
-
 export interface ChatMessageReadModelDto {
   id: string;
   roomId: string;
@@ -30,10 +26,6 @@ export interface ChatMessageReadModelDto {
   updatedAt: Date;
 }
 
-// ============================================================
-// Chat Message Repository Port (Read Model)
-// ============================================================
-
 export interface IChatMessageRepository {
   findById(id: string): Promise<ChatMessageReadModelDto | null>;
   findByRoomId(roomId: string, options?: {
@@ -52,10 +44,6 @@ export interface IChatMessageRepository {
 }
 
 export const CHAT_MESSAGE_REPOSITORY = Symbol('IChatMessageRepository');
-
-// ============================================================
-// Chat Message Aggregate Store Port (Event Sourcing)
-// ============================================================
 
 export interface IChatMessageAggregateStore {
   load(messageId: string): Promise<ChatMessage | null>;

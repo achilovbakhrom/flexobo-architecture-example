@@ -22,10 +22,6 @@ import {
   QUEUES,
 } from '../../../domain/events/event.constants';
 
-// ============================================================
-// Typed Event Data Interfaces
-// ============================================================
-
 interface UserRegisteredData {
   uniqueId: string;
   email?: string | null;

@@ -1,14 +1,3 @@
-/**
- * Event Payload Types
- *
- * Shared interfaces for event payloads across microservices.
- * These define the structure of data published with each event type.
- */
-
-// ============================================================
-// Enums
-// ============================================================
-
 export enum BidPostType {
   LOAD = 'LOAD',
   TRANSPORT = 'TRANSPORT',
@@ -46,10 +35,6 @@ export enum BookingStatus {
   COMPLETED = 'COMPLETED',
   CANCELLED = 'CANCELLED',
 }
-
-// ============================================================
-// Bid Event Payloads
-// ============================================================
 
 export interface BidCreatedPayload {
   bidId: string;
@@ -92,10 +77,6 @@ export interface BidExpiredPayload {
   chatRoomId: string;
   expiredAt: string;
 }
-
-// ============================================================
-// Load Event Payloads
-// ============================================================
 
 export interface LoadCreatedPayload {
   loadId: string;
@@ -150,10 +131,6 @@ export interface LoadStatusChangedPayload {
   changedAt: string;
 }
 
-// ============================================================
-// Transport Event Payloads
-// ============================================================
-
 export interface TransportCreatedPayload {
   transportId: string;
   ownerId: string;
@@ -183,10 +160,6 @@ export interface TransportDeletedPayload {
   deletedBy: string;
   deletedAt: string;
 }
-
-// ============================================================
-// Booking Event Payloads
-// ============================================================
 
 export interface BookingCreatedPayload {
   bookingId: string;
@@ -226,10 +199,6 @@ export interface BookingCompletedPayload {
   completedAt: string;
 }
 
-// ============================================================
-// File Event Payloads
-// ============================================================
-
 export interface ChatFileUploadedPayload {
   fileId: string;
   chatId: string;
@@ -242,10 +211,6 @@ export interface ChatFileUploadedPayload {
   companyId?: string;
   uploadedAt: string;
 }
-
-// ============================================================
-// Generic Event Wrapper
-// ============================================================
 
 export interface DomainEventPayload<T = unknown> {
   aggregateId: string;
