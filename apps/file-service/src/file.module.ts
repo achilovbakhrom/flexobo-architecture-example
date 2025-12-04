@@ -6,6 +6,7 @@ import {
   OutboxModule,
   MessagingModule,
   MESSAGE_PUBLISHER,
+  EventBufferModule,
 } from '@flexobo/core';
 import {
   HealthModule,
@@ -95,6 +96,15 @@ const QueryHandlers = [
       messagePublisher: {
         provide: 'IMessagePublisher',
         useExisting: MESSAGE_PUBLISHER,
+      },
+    }),
+
+    EventBufferModule.forRoot({
+      redis: process.env['REDIS_URL'] || 'redis://localhost:6379',
+      config: {
+        prefix: 'file:evtbuf',
+        eventTtl: 600,
+        lockTtlMs: 5000,
       },
     }),
 

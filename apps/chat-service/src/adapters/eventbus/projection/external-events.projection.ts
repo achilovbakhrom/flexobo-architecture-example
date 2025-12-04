@@ -139,10 +139,6 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // ============================================================
-  // File Service Event Handlers
-  // ============================================================
-
   /**
    * Handle file uploaded event from File Service.
    * Creates a file message in the chat room.
@@ -218,10 +214,6 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
       }
     }
   }
-
-  // ============================================================
-  // Bid Event Handlers (from Main Service)
-  // ============================================================
 
   /**
    * Handle bid created event.
@@ -426,10 +418,6 @@ export class ExternalEventsProjection implements OnModuleInit, OnModuleDestroy {
 
     this.logger.log(`Bid expired notification sent to room ${data.chatRoomId}`);
   }
-
-  // ============================================================
-  // Private Helpers
-  // ============================================================
 
   /**
    * Determine MessageType from MIME type.

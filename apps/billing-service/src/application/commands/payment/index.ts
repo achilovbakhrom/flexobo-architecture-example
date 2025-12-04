@@ -5,8 +5,6 @@ import { PaymentAggregate } from '../../../domain/aggregates/payment.aggregate';
 import { PaymentProvider, PaymentType } from '../../../domain/constants/enums';
 import { PAYMENT_AGGREGATE_STORE } from '../../../ports/payment.repository';
 
-// ============ Commands ============
-
 export class InitiatePaymentCommand implements ICommand {
   constructor(
     public readonly id: string,
@@ -53,8 +51,6 @@ export class RefundPaymentCommand implements ICommand {
     public readonly reason?: string,
   ) {}
 }
-
-// ============ Handlers ============
 
 @Injectable()
 @CommandHandler(InitiatePaymentCommand)

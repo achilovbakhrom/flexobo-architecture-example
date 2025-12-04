@@ -1,18 +1,18 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IBookingReadRepository,
   BOOKING_READ_REPOSITORY,
+  BookingReadDto,
 } from '../../../ports/booking.repository';
 import {
   BOOKING_EVENT_TYPES,
@@ -23,87 +23,84 @@ import {
 } from '../../../domain/events/booking.events';
 import { BookingStatus } from '../../../domain/constants/enums';
 
-interface EventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-const QUEUE_NAME = 'main-service.booking.projection';
+type BookingEventPayload = EventPayload<
+  | BookingCreatedEventData
+  | BookingStatusChangedEventData
+  | CustomerRatedEventData
+  | OwnerRatedEventData
+  | Record<string, unknown>
+>;
 
 @Injectable()
-export class BookingProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(BookingProjection.name);
-  private isSubscribed = false;
-
+export class BookingProjection extends BaseProjection<
+  BookingReadDto,
+  BookingEventPayload
+> {
   constructor(
     @Inject(BOOKING_READ_REPOSITORY)
     private readonly bookingRepo: IBookingReadRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, BookingProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: 'main-service.booking.projection',
+      routingKeys: ['booking.#'],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping booking projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
-      ['booking.#'],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      { durable: true, maxRetries: 3 }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUE_NAME}`);
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.bookingRepo.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as EventPayload;
-
-    this.logger.debug(
-      `[Projection] Booking event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(
+    event: BookingEventPayload
+  ): Promise<void> {
+    switch (event.type) {
       case BOOKING_EVENT_TYPES.CREATED:
-        await this.onBookingCreated(payload);
+        await this.onBookingCreated(event as EventPayload<BookingCreatedEventData>);
         break;
       case BOOKING_EVENT_TYPES.STATUS_CHANGED:
-        await this.onBookingStatusChanged(payload);
+        await this.onBookingStatusChanged(
+          event as EventPayload<BookingStatusChangedEventData>
+        );
         break;
       case BOOKING_EVENT_TYPES.CUSTOMER_RATED:
-        await this.onCustomerRated(payload);
+        await this.onCustomerRated(event as EventPayload<CustomerRatedEventData>);
         break;
       case BOOKING_EVENT_TYPES.OWNER_RATED:
-        await this.onOwnerRated(payload);
+        await this.onOwnerRated(event as EventPayload<OwnerRatedEventData>);
         break;
       default:
-        this.logger.warn(`Unknown booking event type: ${payload.type}`);
+        this.logger.warn(`Unknown booking event type: ${event.type}`);
     }
   }
 
-  private async onBookingCreated(event: EventPayload): Promise<void> {
-    const data = event.data as unknown as BookingCreatedEventData;
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as BookingEventPayload;
+    await this.applyEvent(payload);
+  }
 
+  private async onBookingCreated(
+    event: EventPayload<BookingCreatedEventData>
+  ): Promise<void> {
+    const existing = await this.bookingRepo.findById(event.aggregateId);
+    this.checkCreateIdempotency(existing, event);
+
+    const { data } = event;
     await this.bookingRepo.save({
       id: event.aggregateId,
       customerId: data.customerId,
@@ -120,48 +117,51 @@ export class BookingProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onBookingStatusChanged(event: EventPayload): Promise<void> {
+  private async onBookingStatusChanged(
+    event: EventPayload<BookingStatusChangedEventData>
+  ): Promise<void> {
     const existing = await this.bookingRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
-    const data = event.data as unknown as BookingStatusChangedEventData;
     const completedAt =
-      data.newStatus === 'COMPLETED' ? new Date(event.occurredAt) : existing.completedAt;
+      event.data.newStatus === 'COMPLETED'
+        ? new Date(event.occurredAt)
+        : existing!.completedAt;
 
     await this.bookingRepo.save({
-      ...existing,
-      status: data.newStatus,
+      ...existing!,
+      status: event.data.newStatus,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
       completedAt,
     });
   }
 
-  private async onCustomerRated(event: EventPayload): Promise<void> {
+  private async onCustomerRated(
+    event: EventPayload<CustomerRatedEventData>
+  ): Promise<void> {
     const existing = await this.bookingRepo.findById(event.aggregateId);
-    if (!existing) return;
-
-    const data = event.data as unknown as CustomerRatedEventData;
+    this.checkVersion(existing, event);
 
     await this.bookingRepo.save({
-      ...existing,
-      customerRating: data.rating,
-      customerComment: data.comment,
+      ...existing!,
+      customerRating: event.data.rating,
+      customerComment: event.data.comment,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onOwnerRated(event: EventPayload): Promise<void> {
+  private async onOwnerRated(
+    event: EventPayload<OwnerRatedEventData>
+  ): Promise<void> {
     const existing = await this.bookingRepo.findById(event.aggregateId);
-    if (!existing) return;
-
-    const data = event.data as unknown as OwnerRatedEventData;
+    this.checkVersion(existing, event);
 
     await this.bookingRepo.save({
-      ...existing,
-      ownerRating: data.rating,
-      ownerComment: data.comment,
+      ...existing!,
+      ownerRating: event.data.rating,
+      ownerComment: event.data.comment,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });

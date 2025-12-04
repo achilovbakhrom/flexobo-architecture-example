@@ -7,8 +7,6 @@ import {
   PaymentReadData,
 } from '../../../ports/payment.repository';
 
-// ============ DTOs ============
-
 export type PaymentDto = PaymentReadData;
 
 export interface PaymentListResult {
@@ -20,8 +18,6 @@ export interface PaymentListResult {
 
 // Re-export for consumers
 export { PAYMENT_READ_REPOSITORY, IPaymentReadRepository };
-
-// ============ Queries ============
 
 export class GetPaymentQuery implements IQuery {
   constructor(public readonly paymentId: string) {}
@@ -47,8 +43,6 @@ export class ListPaymentsByCompanyQuery implements IQuery {
     public readonly limit?: number,
   ) {}
 }
-
-// ============ Handlers ============
 
 @Injectable()
 @QueryHandler(GetPaymentQuery)

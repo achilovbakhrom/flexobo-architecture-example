@@ -34,9 +34,26 @@ services:
     networks:
       - file-service-network
 
+  redis-file:
+    image: redis:7-alpine
+    container_name: file-service-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6384:6379"
+    volumes:
+      - redis_file_data:/data
+    networks:
+      - file-service-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_file_data:
   localstack_data:
+  redis_file_data:
 
 networks:
   file-service-network:

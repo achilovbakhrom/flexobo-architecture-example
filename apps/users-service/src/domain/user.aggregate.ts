@@ -22,10 +22,6 @@ import {
 } from '../ports/user.events';
 import { v4 as uuid } from 'uuid';
 
-// ============================================================
-// OTP State Interface
-// ============================================================
-
 export interface UserOTPState {
   code: number;
   codeHash: string;
@@ -38,10 +34,6 @@ export interface UserOTPState {
   usedAt?: Date;
 }
 
-// ============================================================
-// Access Token State Interface
-// ============================================================
-
 export interface AccessTokenState {
   jti: string;
   status: AccessTokenStatus;
@@ -49,10 +41,6 @@ export interface AccessTokenState {
   revokedAt?: Date;
   revokeReason?: string;
 }
-
-// ============================================================
-// OTP Request Data
-// ============================================================
 
 export interface RequestOTPData {
   code: number;
@@ -62,10 +50,6 @@ export interface RequestOTPData {
   email?: string;
   expiresAt: Date;
 }
-
-// ============================================================
-// Snapshot Data Interface
-// ============================================================
 
 export interface UserSnapshotData {
   id: string;
@@ -90,10 +74,6 @@ export interface UserSnapshotData {
   currentOTP?: UserOTPState;
   accessTokens?: Array<[string, AccessTokenState]>;
 }
-
-// ============================================================
-// User Aggregate
-// ============================================================
 
 export class User extends AggregateRoot {
   // Private properties with _ prefix
@@ -121,10 +101,6 @@ export class User extends AggregateRoot {
 
   // Access Tokens - Map of jti -> AccessTokenState
   private _accessTokens: Map<string, AccessTokenState> = new Map();
-
-  // ============================================================
-  // Getters - Basic User Info
-  // ============================================================
 
   get uniqueId(): string | undefined {
     return this._uniqueId;
@@ -198,10 +174,6 @@ export class User extends AggregateRoot {
     return this._isLoggedIn;
   }
 
-  // ============================================================
-  // Getters - Computed/Safe Values
-  // ============================================================
-
   get loginIdentifier(): string {
     return this._email || this._phoneNumber || this._uniqueId || '';
   }
@@ -209,10 +181,6 @@ export class User extends AggregateRoot {
   get isActive(): boolean {
     return this._status === UserStatus.Active;
   }
-
-  // ============================================================
-  // Getters - OTP
-  // ============================================================
 
   get currentOTP(): UserOTPState | undefined {
     return this._currentOTP;
@@ -224,10 +192,6 @@ export class User extends AggregateRoot {
     return new Date() < this._currentOTP.expiresAt;
   }
 
-  // ============================================================
-  // Getters - Access Tokens
-  // ============================================================
-
   get accessTokens(): Map<string, AccessTokenState> {
     return new Map(this._accessTokens);
   }
@@ -236,10 +200,6 @@ export class User extends AggregateRoot {
     const token = this._accessTokens.get(jti);
     return token?.status === AccessTokenStatus.Active;
   }
-
-  // ============================================================
-  // Factory Methods
-  // ============================================================
 
   static create(): User {
     const id = uuid();
@@ -255,10 +215,6 @@ export class User extends AggregateRoot {
   private generateUniqueId(): string {
     return `user_${uuid()}`;
   }
-
-  // ============================================================
-  // Commands - User Profile
-  // ============================================================
 
   register(data: UserRegisteredEvent['data']): void {
     const event = this.createEvent(UserEventType.Registered, data);
@@ -346,10 +302,6 @@ export class User extends AggregateRoot {
     this.apply(event);
   }
 
-  // ============================================================
-  // Commands - OTP
-  // ============================================================
-
   requestOTP(data: RequestOTPData): void {
     const event = this.createEvent(UserEventType.OTPRequested, {
       code: data.code,
@@ -386,10 +338,6 @@ export class User extends AggregateRoot {
     this.apply(event);
   }
 
-  // ============================================================
-  // Commands - Access Tokens
-  // ============================================================
-
   issueAccessToken(jti: string): void {
     const event = this.createEvent(UserEventType.AccessTokenIssued, {
       jti,
@@ -424,10 +372,6 @@ export class User extends AggregateRoot {
       }
     }
   }
-
-  // ============================================================
-  // Event Application
-  // ============================================================
 
   protected apply(event: DomainEvent<UserEvent>): void {
     switch (event.type) {
@@ -540,13 +484,6 @@ export class User extends AggregateRoot {
     }
   }
 
-  // ============================================================
-  // Snapshot Support
-  // ============================================================
-
-  /**
-   * Serialize aggregate state for snapshot storage
-   */
   toSnapshot(): UserSnapshotData {
     return {
       id: this._id,

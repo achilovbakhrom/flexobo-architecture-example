@@ -1,7 +1,3 @@
-// ============================================================
-// Google User Info Interface
-// ============================================================
-
 export interface GoogleUserInfo {
   googleId: string;
   email: string;
@@ -9,10 +5,6 @@ export interface GoogleUserInfo {
   lastName: string;
   picture?: string;
 }
-
-// ============================================================
-// Google Auth Service Interface
-// ============================================================
 
 export interface IGoogleAuthService {
   /**
