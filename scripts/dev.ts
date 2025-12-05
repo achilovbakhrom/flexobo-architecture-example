@@ -2,19 +2,18 @@
  * Development Runner Script
  *
  * Usage:
- *   npx tsx scripts/dev.ts order    # Run order-service
  *   npx tsx scripts/dev.ts gateway  # Run api-gateway
- *   npx tsx scripts/dev.ts admin    # Run admin-panel
  *   npx tsx scripts/dev.ts users    # Run users-service
  *   npx tsx scripts/dev.ts chat     # Run chat-service
  *   npx tsx scripts/dev.ts file     # Run file-service
+ *   npx tsx scripts/dev.ts main     # Run main-service
  *   npx tsx scripts/dev.ts all      # Run all services
  *   npx tsx scripts/dev.ts stop     # Stop all services and containers
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'order' | 'gateway' | 'admin' | 'users' | 'chat' | 'file';
+type ServiceName = 'gateway' | 'users' | 'chat' | 'file' | 'main';
 
 interface ServiceConfig {
   name: string;
@@ -24,23 +23,11 @@ interface ServiceConfig {
 }
 
 const SERVICES: Record<ServiceName, ServiceConfig> = {
-  order: {
-    name: 'order-service',
-    nxProject: 'order-service',
-    dockerCompose: 'apps/order-service/docker-compose.yml',
-    color: '\x1b[36m', // cyan
-  },
   gateway: {
     name: 'api-gateway',
     nxProject: 'api-gateway',
     dockerCompose: 'apps/api-gateway/docker-compose.yml',
     color: '\x1b[33m', // yellow
-  },
-  admin: {
-    name: 'admin-panel',
-    nxProject: 'admin-panel',
-    dockerCompose: 'apps/admin-panel/docker-compose.yml',
-    color: '\x1b[35m', // magenta
   },
   users: {
     name: 'users-service',
@@ -59,6 +46,12 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'file-service',
     dockerCompose: 'apps/file-service/docker-compose.yml',
     color: '\x1b[91m', // light red
+  },
+  main: {
+    name: 'main-service',
+    nxProject: 'main-service',
+    dockerCompose: 'apps/main-service/docker-compose.yml',
+    color: '\x1b[36m', // cyan
   },
 };
 
@@ -192,17 +185,16 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['order', 'gateway', 'admin', 'users', 'chat', 'file', 'all', 'stop'].includes(arg)) {
+  if (!arg || !['gateway', 'users', 'chat', 'file', 'main', 'all', 'stop'].includes(arg)) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 
 Commands:
-  order    - Run order-service (port 3001)
   gateway  - Run api-gateway (port 3000)
-  admin    - Run admin-panel (port 3002)
   users    - Run users-service (port 3003)
   chat     - Run chat-service (port 3004)
   file     - Run file-service (port 3005)
+  main     - Run main-service (port 3006)
   all      - Run all services
   stop     - Stop all services and containers
 `);

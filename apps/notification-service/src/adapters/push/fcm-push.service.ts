@@ -50,19 +50,16 @@ export class FCMPushService implements IPushService, OnModuleInit {
       return;
     }
 
-    const allTokens: string[] = [];
+    // Batch query - single DB call instead of N calls
+    const tokens = await this.deviceTokenRepository.findByUserIds(userIds);
+    const tokenStrings = tokens.map((t) => t.token);
 
-    for (const userId of userIds) {
-      const tokens = await this.deviceTokenRepository.findByUserId(userId);
-      allTokens.push(...tokens.map((t) => t.token));
-    }
-
-    if (allTokens.length === 0) {
+    if (tokenStrings.length === 0) {
       this.logger.debug('No device tokens found for any user');
       return;
     }
 
-    await this.sendToTokens(allTokens, payload);
+    await this.sendToTokens(tokenStrings, payload);
   }
 
   async sendToAll(payload: PushNotificationPayload): Promise<void> {
@@ -71,17 +68,33 @@ export class FCMPushService implements IPushService, OnModuleInit {
       return;
     }
 
-    const tokens = await this.deviceTokenRepository.findAll();
+    // Paginate to avoid loading all tokens into memory
+    const batchSize = 500; // FCM limit per request
+    let offset = 0;
+    let totalSent = 0;
 
-    if (tokens.length === 0) {
-      this.logger.debug('No device tokens found for broadcast');
-      return;
+    while (true) {
+      const tokens = await this.deviceTokenRepository.findPaginated(offset, batchSize);
+
+      if (tokens.length === 0) {
+        break;
+      }
+
+      await this.sendToTokens(tokens.map((t) => t.token), payload);
+      totalSent += tokens.length;
+      offset += batchSize;
+
+      // If we got fewer than batchSize, we've reached the end
+      if (tokens.length < batchSize) {
+        break;
+      }
     }
 
-    await this.sendToTokens(
-      tokens.map((t) => t.token),
-      payload
-    );
+    if (totalSent === 0) {
+      this.logger.debug('No device tokens found for broadcast');
+    } else {
+      this.logger.log(`Broadcast sent to ${totalSent} device tokens`);
+    }
   }
 
   async sendToTokens(

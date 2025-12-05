@@ -127,7 +127,7 @@ const QueryHandlers = [
     }),
     EventStoreModule.forRoot({ enableUpcasting: false }),
     OutboxModule.forRoot({
-      workerConfig: { pollingIntervalMs: 5000, batchSize: 100, enabled: true },
+      workerConfig: { pollingIntervalMs: 500, batchSize: 500, enabled: true },
       messagePublisher: { provide: 'IMessagePublisher', useExisting: MESSAGE_PUBLISHER },
     }),
     EventBufferModule.forRootAsync({

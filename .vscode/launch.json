@@ -2,28 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug: Order Service",
-      "type": "node",
-      "request": "attach",
-      "port": 9229,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/order-service/**/*.js"],
-      "preLaunchTask": "start:order"
-    },
-    {
-      "name": "Debug: Admin Panel",
-      "type": "node",
-      "request": "attach",
-      "port": 9230,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/admin-panel/**/*.js"],
-      "preLaunchTask": "start:admin"
-    },
-    {
       "name": "Debug: API Gateway",
       "type": "node",
       "request": "attach",
@@ -33,26 +11,6 @@
       "skipFiles": ["<node_internals>/**"],
       "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"],
       "preLaunchTask": "start:gateway"
-    },
-    {
-      "name": "Attach: Order Service (9229)",
-      "type": "node",
-      "request": "attach",
-      "port": 9229,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/order-service/**/*.js"]
-    },
-    {
-      "name": "Attach: Admin Panel (9230)",
-      "type": "node",
-      "request": "attach",
-      "port": 9230,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/admin-panel/**/*.js"]
     },
     {
       "name": "Attach: API Gateway (9231)",
@@ -159,8 +117,6 @@
     {
       "name": "Debug: All Services",
       "configurations": [
-        "Debug: Order Service",
-        "Debug: Admin Panel",
         "Debug: API Gateway"
       ],
       "stopAll": true
