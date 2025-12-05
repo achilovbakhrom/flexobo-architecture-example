@@ -1,0 +1,108 @@
+// Notification Service Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/notification-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// Event Sourcing Infrastructure
+// ============================================================
+
+model EventStore {
+  id            String   @id @default(uuid())
+  aggregateId   String   @map("aggregate_id")
+  aggregateType String   @map("aggregate_type")
+  eventType     String   @map("event_type")
+  eventData     Json     @map("event_data")
+  version       Int
+  occurredAt    DateTime @default(now()) @map("occurred_at")
+  metadata      Json?
+
+  @@unique([aggregateId, version])
+  @@index([aggregateId])
+  @@index([aggregateType, occurredAt])
+  @@index([eventType])
+  @@map("event_store")
+}
+
+model OutboxMessage {
+  id            String    @id @default(uuid())
+  aggregateId   String    @map("aggregate_id")
+  aggregateType String    @map("aggregate_type")
+  eventType     String    @map("event_type")
+  payload       Json
+  status        String    @default("PENDING")
+  retryCount    Int       @default(0) @map("retry_count")
+  maxRetries    Int       @default(5) @map("max_retries")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  processedAt   DateTime? @map("processed_at")
+  publishedAt   DateTime? @map("published_at")
+  error         String?
+  metadata      Json?
+
+  @@index([status, createdAt])
+  @@index([aggregateId])
+  @@map("outbox_messages")
+}
+
+model Snapshot {
+  id            String    @id @default(uuid())
+  aggregateId   String    @unique @map("aggregate_id")
+  aggregateType String    @map("aggregate_type")
+  snapshotData  Json      @map("snapshot_data")
+  version       Int
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime? @map("expires_at")
+
+  @@index([aggregateType])
+  @@map("snapshots")
+}
+
+model ProjectionPosition {
+  id              String   @id @default(uuid())
+  projectionName  String   @unique @map("projection_name")
+  lastEventId     String   @map("last_event_id")
+  lastProcessedAt DateTime @default(now()) @map("last_processed_at")
+
+  @@map("projection_positions")
+}
+
+// ============================================================
+// Notification Read Models
+// ============================================================
+
+model Notification {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  type      String
+  category  String
+  title     String
+  body      String
+  data      Json?
+  channels  String[]
+  isRead    Boolean   @default(false) @map("is_read")
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  version   Int       @default(1)
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+model DeviceToken {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  token      String   @unique
+  platform   String
+  createdAt  DateTime @default(now()) @map("created_at")
+  lastUsedAt DateTime @default(now()) @map("last_used_at")
+
+  @@index([userId])
+  @@map("device_tokens")
+}
