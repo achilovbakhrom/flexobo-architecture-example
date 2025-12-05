@@ -50,6 +50,14 @@ export class PrismaDeviceTokenRepository implements IDeviceTokenRepository {
     return tokens.map(this.mapToEntity);
   }
 
+  async findPaginated(offset: number, limit: number): Promise<DeviceTokenEntity[]> {
+    const tokens = await this.prisma.deviceToken.findMany({
+      skip: offset,
+      take: limit,
+    });
+    return tokens.map(this.mapToEntity);
+  }
+
   async save(
     deviceToken: Omit<DeviceTokenEntity, 'id' | 'createdAt' | 'lastUsedAt'>
   ): Promise<DeviceTokenEntity> {

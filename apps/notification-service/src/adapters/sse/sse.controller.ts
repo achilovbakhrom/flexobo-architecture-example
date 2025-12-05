@@ -38,37 +38,34 @@ export class SSEController {
       if (!userId) {
         throw new UnauthorizedException('Invalid token');
       }
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
 
     this.logger.log(`SSE connection established for user ${userId}`);
 
+    // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('X-Accel-Buffering', 'no');
 
-    this.sseManager.addConnection(userId, res);
+    // Add connection to manager (handles heartbeat and cleanup internally)
+    // If user had an existing connection, it will be closed gracefully
+    const replacedExisting = this.sseManager.addConnection(userId, res);
 
+    // Send connected event
     res.write(
       `event: connected\ndata: ${JSON.stringify({
         userId,
         connectedAt: new Date().toISOString(),
+        replacedExisting,
       })}\n\n`
     );
 
-    const heartbeatInterval = setInterval(() => {
-      res.write(
-        `event: heartbeat\ndata: ${JSON.stringify({
-          timestamp: Date.now(),
-        })}\n\n`
-      );
-    }, 30000);
-
+    // Handle connection close
     res.on('close', () => {
       this.logger.log(`SSE connection closed for user ${userId}`);
-      clearInterval(heartbeatInterval);
       this.sseManager.removeConnection(userId, res);
     });
   }

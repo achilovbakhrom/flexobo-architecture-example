@@ -16,6 +16,7 @@ export interface IDeviceTokenRepository {
   findByUserIds(userIds: string[]): Promise<DeviceTokenEntity[]>;
   findByToken(token: string): Promise<DeviceTokenEntity | null>;
   findAll(): Promise<DeviceTokenEntity[]>;
+  findPaginated(offset: number, limit: number): Promise<DeviceTokenEntity[]>;
   save(deviceToken: Omit<DeviceTokenEntity, 'id' | 'createdAt' | 'lastUsedAt'>): Promise<DeviceTokenEntity>;
   updateLastUsed(token: string): Promise<void>;
   deleteByToken(token: string): Promise<void>;

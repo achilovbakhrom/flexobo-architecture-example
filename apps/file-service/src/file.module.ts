@@ -89,8 +89,8 @@ const QueryHandlers = [
 
     OutboxModule.forRoot({
       workerConfig: {
-        pollingIntervalMs: 5000,
-        batchSize: 100,
+        pollingIntervalMs: 500,
+        batchSize: 500,
         enabled: true,
       },
       messagePublisher: {
