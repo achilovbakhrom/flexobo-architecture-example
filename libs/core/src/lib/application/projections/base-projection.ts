@@ -6,8 +6,24 @@ import {
 import {
   RabbitMQConsumer,
   IncomingMessage,
+  IMessagePublisher,
 } from '../../infrastructure/messaging';
 import { IEventBuffer } from '../../infrastructure/event-buffer/event-buffer.interface';
+
+/**
+ * Projection completion notification payload
+ * Published to notification-service for real-time frontend updates
+ */
+export interface ProjectionCompletedPayload {
+  type: 'SYSTEM';
+  category: 'PROJECTION';
+  userId: string;
+  correlationId?: string;
+  aggregateId: string;
+  aggregateType: string;
+  eventType: string;
+  version: number;
+}
 
 /**
  * Base interface for versioned read models
@@ -72,7 +88,8 @@ export abstract class BaseProjection<
   constructor(
     protected readonly rabbitMQConsumer: RabbitMQConsumer,
     loggerContext: string,
-    protected readonly eventBuffer?: IEventBuffer | null
+    protected readonly eventBuffer?: IEventBuffer | null,
+    protected readonly messagePublisher?: IMessagePublisher | null
   ) {
     this.logger = new Logger(loggerContext);
   }
@@ -351,6 +368,69 @@ export abstract class BaseProjection<
         event.aggregateId,
         event.version,
         existingEntity.version
+      );
+    }
+  }
+
+  /**
+   * Extract the user ID from the event for notification purposes.
+   * Override this method to enable projection completion notifications.
+   * Return null to skip notification for specific events.
+   *
+   * @param event The event being processed
+   * @returns The user ID to notify, or null to skip notification
+   */
+  protected getUserIdFromEvent(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _event: TEventPayload
+  ): string | null {
+    // Default implementation - subclasses should override to enable notifications
+    return null;
+  }
+
+  /**
+   * Notify the notification-service that a projection has completed.
+   * This allows the frontend to receive real-time SSE updates when data is ready.
+   *
+   * Call this method after successfully applying an event in your projection.
+   *
+   * @param event The event that was applied
+   */
+  protected async notifyProjectionCompleted(event: TEventPayload): Promise<void> {
+    if (!this.messagePublisher) {
+      return;
+    }
+
+    const userId = this.getUserIdFromEvent(event);
+    if (!userId) {
+      return;
+    }
+
+    const correlationId = event.metadata?.['correlationId'] as string | undefined;
+
+    const payload: ProjectionCompletedPayload = {
+      type: 'SYSTEM',
+      category: 'PROJECTION',
+      userId,
+      correlationId,
+      aggregateId: event.aggregateId,
+      aggregateType: event.aggregateType,
+      eventType: event.type,
+      version: event.version,
+    };
+
+    try {
+      await this.messagePublisher.publish('flexobo.events', payload, {
+        routingKey: `projection.completed.${event.aggregateType.toLowerCase()}`,
+        correlationId,
+      });
+      this.logger.debug(
+        `Published projection.completed for ${event.aggregateType}:${event.aggregateId} v${event.version}`
+      );
+    } catch (error) {
+      // Log but don't fail the projection - notification is best-effort
+      this.logger.warn(
+        `Failed to publish projection.completed for ${event.aggregateType}:${event.aggregateId}: ${error}`
       );
     }
   }
