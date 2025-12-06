@@ -13,9 +13,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RolesGuard, Roles } from '../guards/roles.guard';
-import { Public } from '../guards/public.decorator';
+import { JwtAuthGuard, RolesGuard, Roles, Public } from '@flexobo/shared-kernel';
 import {
   CreatePlanDto,
   UpdatePlanDto,

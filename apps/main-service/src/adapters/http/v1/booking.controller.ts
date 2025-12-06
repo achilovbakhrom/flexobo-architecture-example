@@ -16,8 +16,7 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, AuthenticatedUser } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { JwtAuthGuard, AuthenticatedUser, CurrentUser } from '@flexobo/shared-kernel';
 import { RateBookingDto, ListBookingsQueryDto } from '../dto/booking.dto';
 import { ConfirmBookingCommand } from '../../../application/commands/booking/confirm-booking.command';
 import { StartProgressCommand } from '../../../application/commands/booking/start-progress.command';

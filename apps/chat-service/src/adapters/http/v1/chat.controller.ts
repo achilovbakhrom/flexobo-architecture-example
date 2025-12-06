@@ -23,7 +23,7 @@ import {
   MessageResponseDto,
   PaginatedResponseDto,
 } from '../dto';
-import { HttpJwtAuthGuard } from '../guards';
+import { JwtAuthGuard as HttpJwtAuthGuard } from '@flexobo/shared-kernel';
 import {
   ChatEvents,
   ChatRoomReadModelDto,

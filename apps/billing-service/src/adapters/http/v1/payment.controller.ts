@@ -12,8 +12,7 @@ import {
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { v4 as uuidv4 } from 'uuid';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { CurrentUser, CurrentUserData } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@flexobo/shared-kernel';
 import { PaymentProvider, PaymentType, BillingCycle } from '../../../domain/constants/enums';
 import {
   InitiatePaymentCommand,
@@ -55,7 +54,7 @@ export class PaymentController {
   @Post('create-checkout')
   async createCheckoutSession(
     @Body() dto: CreateCheckoutSessionDto,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<CheckoutSessionResponseDto> {
     if (!user.companyId) {
       throw new BadRequestException('User must have a company');
@@ -129,7 +128,7 @@ export class PaymentController {
   @Post('create-click-order')
   async createClickOrder(
     @Body() dto: CreateClickOrderDto,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<ClickOrderResponseDto> {
     if (!user.companyId) {
       throw new BadRequestException('User must have a company');
@@ -181,7 +180,7 @@ export class PaymentController {
 
   @Get()
   async listPayments(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('limit') limit?: number,
   ): Promise<PaymentResponseDto[]> {
     if (!user.companyId) {
@@ -199,7 +198,7 @@ export class PaymentController {
   @Get(':id')
   async getPayment(
     @Param('id') id: string,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaymentResponseDto> {
     const payment = await this.queryBus.execute<GetPaymentQuery, PaymentDto | null>(
       new GetPaymentQuery(id),
@@ -220,7 +219,7 @@ export class PaymentController {
   async refundPayment(
     @Param('id') id: string,
     @Body() dto: RefundPaymentDto,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaymentResponseDto> {
     const payment = await this.queryBus.execute<GetPaymentQuery, PaymentDto | null>(
       new GetPaymentQuery(id),

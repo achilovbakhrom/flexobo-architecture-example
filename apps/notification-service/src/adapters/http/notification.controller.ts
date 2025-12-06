@@ -13,7 +13,7 @@ import {
 } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from './guards';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@flexobo/shared-kernel';
 import {
   MarkNotificationReadCommand,
   MarkAllNotificationsReadCommand,

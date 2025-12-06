@@ -9,90 +9,111 @@ import {
   Min,
   Max,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Type } from 'class-transformer';
 
 export class RoutePointDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'UZ', description: 'Country code (ISO 2-letter)' })
   @IsString()
   country!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'Tashkent', description: 'City name' })
   @IsString()
   city!: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Industrial Zone 3', description: 'Street address' })
   @IsOptional()
   @IsString()
   address?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 41.2995, description: 'Latitude coordinate' })
   @IsOptional()
   @IsNumber()
   lat?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 69.2401, description: 'Longitude coordinate' })
   @IsOptional()
   @IsNumber()
   lng?: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2024-03-15', description: 'Date at this point (ISO 8601)' })
   @IsString()
   date!: string;
 
-  @ApiPropertyOptional({ description: 'Search radius in km (for matching)' })
+  @ApiPropertyOptional({ example: 50, description: 'Search radius in km (for matching)' })
   @IsOptional()
   @IsNumber()
   radius?: number;
 }
 
 export class DimensionsDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 13.6, description: 'Length in meters' })
   @IsOptional()
   @IsNumber()
   lengthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 2.45, description: 'Width in meters' })
   @IsOptional()
   @IsNumber()
   widthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 2.7, description: 'Height in meters' })
   @IsOptional()
   @IsNumber()
   heightM?: number;
 }
 
 export class TransportSnapshotDto {
-  @ApiProperty()
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Transport ID',
+  })
   @IsString()
   id!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'TENT', description: 'Transport type' })
   @IsString()
   type!: string;
 
-  @ApiProperty({ description: 'Capacity in tons' })
+  @ApiProperty({ example: 22, description: 'Capacity in tons' })
   @IsNumber()
   capacity!: number;
 
-  @ApiPropertyOptional({ type: DimensionsDto })
+  @ApiPropertyOptional({
+    type: DimensionsDto,
+    example: { lengthM: 13.6, widthM: 2.45, heightM: 2.7 },
+    description: 'Cargo area dimensions',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => DimensionsDto)
   dimensions?: DimensionsDto;
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({
+    type: [String],
+    example: ['TOP', 'SIDE'],
+    description: 'Available loading methods',
+  })
   @IsArray()
   @IsString({ each: true })
   loadingTypes!: string[];
 
-  @ApiPropertyOptional({ type: [String], default: [] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['GPS', 'TIR'],
+    default: [],
+    description: 'Available features',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
 
-  @ApiPropertyOptional({ type: [String], default: [] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['ECMT'],
+    default: [],
+    description: 'Available permits',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -100,112 +121,151 @@ export class TransportSnapshotDto {
 }
 
 export class CreateTripDto {
-  @ApiProperty({ type: TransportSnapshotDto })
+  @ApiProperty({
+    type: TransportSnapshotDto,
+    example: {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      type: 'TENT',
+      capacity: 22,
+      loadingTypes: ['TOP', 'SIDE'],
+      features: ['GPS'],
+    },
+    description: 'Transport information snapshot',
+  })
   @ValidateNested()
   @Type(() => TransportSnapshotDto)
   transport!: TransportSnapshotDto;
 
-  @ApiProperty({ type: [RoutePointDto] })
+  @ApiProperty({
+    type: [RoutePointDto],
+    example: [{ country: 'UZ', city: 'Tashkent', date: '2024-03-15' }],
+    description: 'Loading points on the route',
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RoutePointDto)
   loadingPoints!: RoutePointDto[];
 
-  @ApiProperty({ type: [RoutePointDto] })
+  @ApiProperty({
+    type: [RoutePointDto],
+    example: [{ country: 'RU', city: 'Moscow', date: '2024-03-20' }],
+    description: 'Unloading points on the route',
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RoutePointDto)
   unloadingPoints!: RoutePointDto[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1500, description: 'Requested price' })
   @IsOptional()
   @IsNumber()
   price?: number;
 
-  @ApiPropertyOptional({ default: 'USD' })
+  @ApiPropertyOptional({ example: 'USD', default: 'USD', description: 'Currency code' })
   @IsOptional()
   @IsString()
   currency?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Upon delivery', description: 'Payment terms' })
   @IsOptional()
   @IsString()
   paymentTerms?: string;
 
-  @ApiPropertyOptional({ type: [String], description: 'Board IDs for private visibility' })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['550e8400-e29b-41d4-a716-446655440001'],
+    description: 'Board IDs for private visibility',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   boardIds?: string[];
 
-  @ApiPropertyOptional({ default: true })
+  @ApiPropertyOptional({ example: true, default: true, description: 'Whether trip is publicly visible' })
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
 }
 
 export class UpdateTripDto {
-  @ApiPropertyOptional({ type: TransportSnapshotDto })
+  @ApiPropertyOptional({
+    type: TransportSnapshotDto,
+    example: {
+      id: '550e8400-e29b-41d4-a716-446655440000',
+      type: 'REFRIGERATOR',
+      capacity: 20,
+      loadingTypes: ['REAR'],
+    },
+    description: 'Transport information snapshot',
+  })
   @IsOptional()
   @ValidateNested()
   @Type(() => TransportSnapshotDto)
   transport?: TransportSnapshotDto;
 
-  @ApiPropertyOptional({ type: [RoutePointDto] })
+  @ApiPropertyOptional({
+    type: [RoutePointDto],
+    example: [{ country: 'UZ', city: 'Samarkand', date: '2024-03-16' }],
+    description: 'Loading points',
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RoutePointDto)
   loadingPoints?: RoutePointDto[];
 
-  @ApiPropertyOptional({ type: [RoutePointDto] })
+  @ApiPropertyOptional({
+    type: [RoutePointDto],
+    example: [{ country: 'KZ', city: 'Almaty', date: '2024-03-21' }],
+    description: 'Unloading points',
+  })
   @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RoutePointDto)
   unloadingPoints?: RoutePointDto[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1800, description: 'Requested price' })
   @IsOptional()
   @IsNumber()
   price?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'EUR', description: 'Currency code' })
   @IsOptional()
   @IsString()
   currency?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Prepayment 30%', description: 'Payment terms' })
   @IsOptional()
   @IsString()
   paymentTerms?: string;
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({ type: [String], description: 'Board IDs' })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   boardIds?: string[];
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: false, description: 'Whether trip is publicly visible' })
   @IsOptional()
   @IsBoolean()
   isPublic?: boolean;
 }
 
 export class ListTripsQueryDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'ACTIVE', description: 'Filter by status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -215,44 +275,44 @@ export class ListTripsQueryDto {
 }
 
 export class SearchTripsQueryDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'ACTIVE', description: 'Filter by status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'TENT', description: 'Filter by transport type' })
   @IsOptional()
   @IsString()
   transportType?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'UZ', description: 'Filter by origin country' })
   @IsOptional()
   @IsString()
   fromCountry?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'RU', description: 'Filter by destination country' })
   @IsOptional()
   @IsString()
   toCountry?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2024-03-01', description: 'Filter by date from' })
   @IsOptional()
   @IsString()
   dateFrom?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2024-03-31', description: 'Filter by date to' })
   @IsOptional()
   @IsString()
   dateTo?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

@@ -1,1 +1,1 @@
-export * from './jwt-auth.guard';
+// JWT auth guards now imported directly from @flexobo/shared-kernel
