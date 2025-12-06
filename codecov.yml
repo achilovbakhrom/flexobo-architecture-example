@@ -8,21 +8,41 @@ coverage:
         target: 50%
 
 flags:
-  order-service:
+  users-service:
     paths:
-      - apps/order-service/
+      - apps/users-service/
     carryforward: true
-  admin-panel:
+  chat-service:
     paths:
-      - apps/admin-panel/
+      - apps/chat-service/
     carryforward: true
-  api-gateway:
+  file-service:
     paths:
-      - apps/api-gateway/
+      - apps/file-service/
+    carryforward: true
+  main-service:
+    paths:
+      - apps/main-service/
+    carryforward: true
+  billing-service:
+    paths:
+      - apps/billing-service/
+    carryforward: true
+  notification-service:
+    paths:
+      - apps/notification-service/
+    carryforward: true
+  telegram-service:
+    paths:
+      - apps/telegram-service/
     carryforward: true
   core:
     paths:
       - libs/core/
+    carryforward: true
+  shared-kernel:
+    paths:
+      - libs/shared-kernel/
     carryforward: true
 
 comment:

@@ -10,3 +10,8 @@ export * from './current-user.decorator';
 export * from './auth.module';
 export * from './token-validator.interface';
 export * from './grpc-token-validator';
+export * from './permissions.decorator';
+export * from './permissions.guard';
+export * from './company-owner.guard';
+export * from './ws-jwt.guard';
+export * from './entity-permission.guard';

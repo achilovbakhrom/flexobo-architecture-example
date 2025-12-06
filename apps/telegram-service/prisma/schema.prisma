@@ -1,0 +1,108 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/telegram-service-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ EVENT SOURCING ============
+
+model Event {
+  id            String   @id @default(uuid())
+  aggregateId   String
+  aggregateType String   // TELEGRAM_SESSION, CHANNEL_PUBLICATION
+  eventType     String
+  payload       Json
+  metadata      Json?
+  version       Int
+  createdAt     DateTime @default(now())
+
+  @@index([aggregateId, aggregateType])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+model Outbox {
+  id          String    @id @default(uuid())
+  eventType   String
+  payload     Json
+  routingKey  String
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  publishedAt DateTime?
+
+  @@index([published, createdAt])
+}
+
+// ============ READ MODELS ============
+
+// Stores Telegram user sessions (linked to platform users)
+model TelegramUserReadModel {
+  id           String   @id @default(uuid())
+  telegramId   String   @unique // Telegram user ID
+  userId       String?  // Linked platform user ID (null if not linked)
+  username     String?
+  firstName    String?
+  lastName     String?
+  languageCode String?  @default("en")
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([telegramId])
+}
+
+// OTP requests sent via Telegram
+model OtpRequestReadModel {
+  id           String   @id @default(uuid())
+  phone        String
+  telegramId   String?  // If sent via Telegram bot
+  code         String
+  type         String   // REGISTRATION, LOGIN, RESET_PASSWORD
+  status       String   @default("PENDING") // PENDING, VERIFIED, EXPIRED
+  attempts     Int      @default(0)
+  expiresAt    DateTime
+  verifiedAt   DateTime?
+  createdAt    DateTime @default(now())
+
+  @@index([phone])
+  @@index([telegramId])
+  @@index([status])
+}
+
+// Publications to Telegram channels
+model ChannelPublicationReadModel {
+  id            String   @id @default(uuid())
+  channelId     String   // Telegram channel ID
+  messageId     String?  // Telegram message ID after publish
+  contentType   String   // LOAD, TRIP
+  contentId     String   // Reference to load/trip ID
+  status        String   @default("PENDING") // PENDING, PUBLISHED, FAILED, DELETED
+  errorMessage  String?
+  publishedAt   DateTime?
+  deletedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([channelId])
+  @@index([contentType, contentId])
+  @@index([status])
+}
+
+// WebApp validation tokens (short-lived)
+model WebAppTokenReadModel {
+  id          String   @id @default(uuid())
+  telegramId  String
+  initData    String   // Raw initData from Telegram
+  hash        String   // Validated hash
+  userId      String?  // Linked platform user ID
+  isValid     Boolean  @default(true)
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([telegramId])
+  @@index([hash])
+}

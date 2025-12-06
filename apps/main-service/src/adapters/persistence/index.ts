@@ -4,3 +4,5 @@ export * from './trip-aggregate.store';
 export * from './bid-aggregate.store';
 export * from './booking-aggregate.store';
 export * from './board-aggregate.store';
+export * from './company-aggregate.store';
+export * from './saved-search-aggregate.store';

@@ -17,6 +17,10 @@ import { TripController } from './adapters/http/v1/trip.controller';
 import { BidController } from './adapters/http/v1/bid.controller';
 import { BookingController } from './adapters/http/v1/booking.controller';
 import { BoardController } from './adapters/http/v1/board.controller';
+import { CompanyController } from './adapters/http/v1/company.controller';
+import { ReferenceDataController } from './adapters/http/v1/reference-data.controller';
+import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
+import { StatisticsController } from './adapters/http/v1/statistics.controller';
 
 // Guards
 import { JwtAuthGuard } from './adapters/http/guards/jwt-auth.guard';
@@ -50,6 +54,15 @@ import {
   BOARD_AGGREGATE_STORE,
   BOARD_READ_REPOSITORY,
 } from './ports/board.repository';
+import {
+  COMPANY_AGGREGATE_STORE,
+  COMPANY_READ_REPOSITORY,
+} from './ports/company.repository';
+import { REFERENCE_DATA_REPOSITORY } from './ports/reference-data.repository';
+import {
+  SAVED_SEARCH_AGGREGATE_STORE,
+  SAVED_SEARCH_READ_REPOSITORY,
+} from './ports/saved-search.repository';
 import { CHAT_SERVICE_CLIENT } from './ports/chat-service.client';
 
 // Aggregate Stores
@@ -60,6 +73,8 @@ import {
   BidAggregateStore,
   BookingAggregateStore,
   BoardAggregateStore,
+  CompanyAggregateStore,
+  SavedSearchAggregateStore,
 } from './adapters/persistence';
 
 // Read Repositories
@@ -70,6 +85,9 @@ import {
   PrismaBidReadRepository,
   PrismaBookingReadRepository,
   PrismaBoardReadRepository,
+  PrismaCompanyReadRepository,
+  PrismaReferenceDataRepository,
+  PrismaSavedSearchReadRepository,
 } from './adapters/persistence/read-model';
 
 // Projections
@@ -80,6 +98,8 @@ import {
   BidProjection,
   BookingProjection,
   BoardProjection,
+  CompanyProjection,
+  SavedSearchProjection,
 } from './adapters/eventbus/projection';
 
 // Transport Command Handlers
@@ -132,6 +152,27 @@ import {
   DeleteBoardHandler,
 } from './application/commands/board';
 
+// Company Command Handlers
+import {
+  CreateCompanyHandler,
+  UpdateCompanyHandler,
+  DeleteCompanyHandler,
+  VerifyCompanyHandler,
+  RejectCompanyHandler,
+  SuspendCompanyHandler,
+  ReactivateCompanyHandler,
+  AddCompanyMemberHandler,
+  UpdateCompanyMemberHandler,
+  RemoveCompanyMemberHandler,
+} from './application/commands/company';
+
+// Saved Search Command Handlers
+import {
+  CreateSavedSearchHandler,
+  UpdateSavedSearchHandler,
+  DeleteSavedSearchHandler,
+} from './application/commands/saved-search';
+
 // Transport Query Handlers
 import {
   GetTransportHandler,
@@ -172,6 +213,28 @@ import {
   ListBoardsHandler,
 } from './application/queries/board';
 
+// Company Query Handlers
+import {
+  GetCompanyHandler,
+  GetMyCompanyHandler,
+  ListCompaniesHandler,
+  GetCompanyMembersHandler,
+  GetUserCompaniesHandler,
+} from './application/queries/company';
+
+// Saved Search Query Handlers
+import {
+  GetSavedSearchHandler,
+  ListSavedSearchesHandler,
+} from './application/queries/saved-search';
+
+// Statistics Query Handlers
+import {
+  GetDashboardStatsHandler,
+  GetMarketStatsHandler,
+  GetRouteAnalyticsHandler,
+} from './application/queries/statistics';
+
 const CommandHandlers = [
   // Transport
   CreateTransportHandler,
@@ -205,6 +268,21 @@ const CommandHandlers = [
   AddBoardMemberHandler,
   RemoveBoardMemberHandler,
   DeleteBoardHandler,
+  // Company
+  CreateCompanyHandler,
+  UpdateCompanyHandler,
+  DeleteCompanyHandler,
+  VerifyCompanyHandler,
+  RejectCompanyHandler,
+  SuspendCompanyHandler,
+  ReactivateCompanyHandler,
+  AddCompanyMemberHandler,
+  UpdateCompanyMemberHandler,
+  RemoveCompanyMemberHandler,
+  // Saved Search
+  CreateSavedSearchHandler,
+  UpdateSavedSearchHandler,
+  DeleteSavedSearchHandler,
 ];
 
 const QueryHandlers = [
@@ -230,6 +308,19 @@ const QueryHandlers = [
   // Board
   GetBoardHandler,
   ListBoardsHandler,
+  // Company
+  GetCompanyHandler,
+  GetMyCompanyHandler,
+  ListCompaniesHandler,
+  GetCompanyMembersHandler,
+  GetUserCompaniesHandler,
+  // Saved Search
+  GetSavedSearchHandler,
+  ListSavedSearchesHandler,
+  // Statistics
+  GetDashboardStatsHandler,
+  GetMarketStatsHandler,
+  GetRouteAnalyticsHandler,
 ];
 
 @Module({
@@ -278,6 +369,10 @@ const QueryHandlers = [
     BidController,
     BookingController,
     BoardController,
+    CompanyController,
+    ReferenceDataController,
+    SavedSearchController,
+    StatisticsController,
   ],
   providers: [
     // Guards
@@ -316,6 +411,14 @@ const QueryHandlers = [
       provide: BOARD_AGGREGATE_STORE,
       useClass: BoardAggregateStore,
     },
+    {
+      provide: COMPANY_AGGREGATE_STORE,
+      useClass: CompanyAggregateStore,
+    },
+    {
+      provide: SAVED_SEARCH_AGGREGATE_STORE,
+      useClass: SavedSearchAggregateStore,
+    },
 
     // Read Repositories
     {
@@ -342,6 +445,18 @@ const QueryHandlers = [
       provide: BOARD_READ_REPOSITORY,
       useClass: PrismaBoardReadRepository,
     },
+    {
+      provide: COMPANY_READ_REPOSITORY,
+      useClass: PrismaCompanyReadRepository,
+    },
+    {
+      provide: REFERENCE_DATA_REPOSITORY,
+      useClass: PrismaReferenceDataRepository,
+    },
+    {
+      provide: SAVED_SEARCH_READ_REPOSITORY,
+      useClass: PrismaSavedSearchReadRepository,
+    },
 
     // Projections
     TransportProjection,
@@ -350,6 +465,8 @@ const QueryHandlers = [
     BidProjection,
     BookingProjection,
     BoardProjection,
+    CompanyProjection,
+    SavedSearchProjection,
 
     // Handlers
     ...CommandHandlers,

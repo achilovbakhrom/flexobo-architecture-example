@@ -4,3 +4,6 @@ export * from './trip.repository';
 export * from './bid.repository';
 export * from './booking.repository';
 export * from './board.repository';
+export * from './company.repository';
+export * from './reference-data.repository';
+export * from './saved-search.repository';

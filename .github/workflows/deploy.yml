@@ -19,9 +19,13 @@ on:
         type: choice
         options:
           - ''
-          - order-service
-          - api-gateway
-          - admin-panel
+          - users-service
+          - chat-service
+          - file-service
+          - main-service
+          - billing-service
+          - notification-service
+          - telegram-service
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
@@ -31,9 +35,13 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       affected: ${{ steps.affected.outputs.affected }}
-      order-service: ${{ steps.check.outputs.order-service }}
-      api-gateway: ${{ steps.check.outputs.api-gateway }}
-      admin-panel: ${{ steps.check.outputs.admin-panel }}
+      users-service: ${{ steps.check.outputs.users-service }}
+      chat-service: ${{ steps.check.outputs.chat-service }}
+      file-service: ${{ steps.check.outputs.file-service }}
+      main-service: ${{ steps.check.outputs.main-service }}
+      billing-service: ${{ steps.check.outputs.billing-service }}
+      notification-service: ${{ steps.check.outputs.notification-service }}
+      telegram-service: ${{ steps.check.outputs.telegram-service }}
 
     steps:
       - name: Checkout
@@ -44,7 +52,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
@@ -67,23 +75,13 @@ jobs:
         run: |
           AFFECTED="${{ steps.affected.outputs.affected }}"
 
-          if echo "$AFFECTED" | grep -q "order-service"; then
-            echo "order-service=true" >> $GITHUB_OUTPUT
-          else
-            echo "order-service=false" >> $GITHUB_OUTPUT
-          fi
-
-          if echo "$AFFECTED" | grep -q "api-gateway"; then
-            echo "api-gateway=true" >> $GITHUB_OUTPUT
-          else
-            echo "api-gateway=false" >> $GITHUB_OUTPUT
-          fi
-
-          if echo "$AFFECTED" | grep -q "admin-panel"; then
-            echo "admin-panel=true" >> $GITHUB_OUTPUT
-          else
-            echo "admin-panel=false" >> $GITHUB_OUTPUT
-          fi
+          for service in users-service chat-service file-service main-service billing-service notification-service telegram-service; do
+            if echo "$AFFECTED" | grep -q "$service"; then
+              echo "$service=true" >> $GITHUB_OUTPUT
+            else
+              echo "$service=false" >> $GITHUB_OUTPUT
+            fi
+          done
 
   build-and-push:
     needs: detect-affected
@@ -94,12 +92,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: order-service
-            affected: ${{ needs.detect-affected.outputs.order-service }}
-          - name: api-gateway
-            affected: ${{ needs.detect-affected.outputs.api-gateway }}
-          - name: admin-panel
-            affected: ${{ needs.detect-affected.outputs.admin-panel }}
+          - name: users-service
+            affected: ${{ needs.detect-affected.outputs.users-service }}
+          - name: chat-service
+            affected: ${{ needs.detect-affected.outputs.chat-service }}
+          - name: file-service
+            affected: ${{ needs.detect-affected.outputs.file-service }}
+          - name: main-service
+            affected: ${{ needs.detect-affected.outputs.main-service }}
+          - name: billing-service
+            affected: ${{ needs.detect-affected.outputs.billing-service }}
+          - name: notification-service
+            affected: ${{ needs.detect-affected.outputs.notification-service }}
+          - name: telegram-service
+            affected: ${{ needs.detect-affected.outputs.telegram-service }}
 
     steps:
       - name: Checkout
@@ -140,7 +146,6 @@ jobs:
   deploy-development:
     needs: [detect-affected, build-and-push]
     runs-on: ubuntu-latest
-    # Development deploys automatically on push to dev branch only (no manual trigger)
     if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
     environment: development
 
@@ -158,31 +163,58 @@ jobs:
       - name: Update kubeconfig for EKS
         run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_DEV }} --region ${{ env.AWS_REGION }}
 
-      - name: Deploy order-service
-        if: needs.detect-affected.outputs.order-service == 'true'
+      - name: Deploy users-service
+        if: needs.detect-affected.outputs.users-service == 'true'
         run: |
-          kubectl apply -k apps/order-service/k8s/overlays/development
-          kubectl set image deployment/order-service order-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/order-service:${{ github.sha }} -n order-service
-          kubectl rollout status deployment/order-service -n order-service --timeout=300s
+          kubectl apply -k apps/users-service/k8s/overlays/development
+          kubectl set image deployment/users-service users-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/users-service:${{ github.sha }} -n users-service
+          kubectl rollout status deployment/users-service -n users-service --timeout=300s
 
-      - name: Deploy api-gateway
-        if: needs.detect-affected.outputs.api-gateway == 'true'
+      - name: Deploy chat-service
+        if: needs.detect-affected.outputs.chat-service == 'true'
         run: |
-          kubectl apply -k apps/api-gateway/k8s/overlays/development
-          kubectl set image deployment/api-gateway api-gateway=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/api-gateway:${{ github.sha }} -n api-gateway
-          kubectl rollout status deployment/api-gateway -n api-gateway --timeout=300s
+          kubectl apply -k apps/chat-service/k8s/overlays/development
+          kubectl set image deployment/chat-service chat-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/chat-service:${{ github.sha }} -n chat-service
+          kubectl rollout status deployment/chat-service -n chat-service --timeout=300s
 
-      - name: Deploy admin-panel
-        if: needs.detect-affected.outputs.admin-panel == 'true'
+      - name: Deploy file-service
+        if: needs.detect-affected.outputs.file-service == 'true'
         run: |
-          kubectl apply -k apps/admin-panel/k8s/overlays/development
-          kubectl set image deployment/admin-panel admin-panel=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/admin-panel:${{ github.sha }} -n admin-panel
-          kubectl rollout status deployment/admin-panel -n admin-panel --timeout=300s
+          kubectl apply -k apps/file-service/k8s/overlays/development
+          kubectl set image deployment/file-service file-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/file-service:${{ github.sha }} -n file-service
+          kubectl rollout status deployment/file-service -n file-service --timeout=300s
+
+      - name: Deploy main-service
+        if: needs.detect-affected.outputs.main-service == 'true'
+        run: |
+          kubectl apply -k apps/main-service/k8s/overlays/development
+          kubectl set image deployment/main-service main-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/main-service:${{ github.sha }} -n main-service
+          kubectl rollout status deployment/main-service -n main-service --timeout=300s
+
+      - name: Deploy billing-service
+        if: needs.detect-affected.outputs.billing-service == 'true'
+        run: |
+          kubectl apply -k apps/billing-service/k8s/overlays/development
+          kubectl set image deployment/billing-service billing-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/billing-service:${{ github.sha }} -n billing-service
+          kubectl rollout status deployment/billing-service -n billing-service --timeout=300s
+
+      - name: Deploy notification-service
+        if: needs.detect-affected.outputs.notification-service == 'true'
+        run: |
+          kubectl apply -k apps/notification-service/k8s/overlays/development
+          kubectl set image deployment/notification-service notification-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/notification-service:${{ github.sha }} -n notification-service
+          kubectl rollout status deployment/notification-service -n notification-service --timeout=300s
+
+      - name: Deploy telegram-service
+        if: needs.detect-affected.outputs.telegram-service == 'true'
+        run: |
+          kubectl apply -k apps/telegram-service/k8s/overlays/development
+          kubectl set image deployment/telegram-service telegram-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/telegram-service:${{ github.sha }} -n telegram-service
+          kubectl rollout status deployment/telegram-service -n telegram-service --timeout=300s
 
   deploy-production:
     needs: [detect-affected, build-and-push]
     runs-on: ubuntu-latest
-    # Production deploys ONLY via manual trigger (workflow_dispatch)
     if: github.event_name == 'workflow_dispatch'
     environment: production
 
@@ -200,23 +232,51 @@ jobs:
       - name: Update kubeconfig for EKS
         run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_PROD }} --region ${{ env.AWS_REGION }}
 
-      - name: Deploy order-service
-        if: needs.detect-affected.outputs.order-service == 'true'
+      - name: Deploy users-service
+        if: needs.detect-affected.outputs.users-service == 'true'
         run: |
-          kubectl apply -k apps/order-service/k8s/overlays/production
-          kubectl set image deployment/order-service order-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/order-service:${{ github.sha }} -n order-service
-          kubectl rollout status deployment/order-service -n order-service --timeout=300s
+          kubectl apply -k apps/users-service/k8s/overlays/production
+          kubectl set image deployment/users-service users-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/users-service:${{ github.sha }} -n users-service
+          kubectl rollout status deployment/users-service -n users-service --timeout=300s
 
-      - name: Deploy api-gateway
-        if: needs.detect-affected.outputs.api-gateway == 'true'
+      - name: Deploy chat-service
+        if: needs.detect-affected.outputs.chat-service == 'true'
         run: |
-          kubectl apply -k apps/api-gateway/k8s/overlays/production
-          kubectl set image deployment/api-gateway api-gateway=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/api-gateway:${{ github.sha }} -n api-gateway
-          kubectl rollout status deployment/api-gateway -n api-gateway --timeout=300s
+          kubectl apply -k apps/chat-service/k8s/overlays/production
+          kubectl set image deployment/chat-service chat-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/chat-service:${{ github.sha }} -n chat-service
+          kubectl rollout status deployment/chat-service -n chat-service --timeout=300s
 
-      - name: Deploy admin-panel
-        if: needs.detect-affected.outputs.admin-panel == 'true'
+      - name: Deploy file-service
+        if: needs.detect-affected.outputs.file-service == 'true'
         run: |
-          kubectl apply -k apps/admin-panel/k8s/overlays/production
-          kubectl set image deployment/admin-panel admin-panel=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/admin-panel:${{ github.sha }} -n admin-panel
-          kubectl rollout status deployment/admin-panel -n admin-panel --timeout=300s
+          kubectl apply -k apps/file-service/k8s/overlays/production
+          kubectl set image deployment/file-service file-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/file-service:${{ github.sha }} -n file-service
+          kubectl rollout status deployment/file-service -n file-service --timeout=300s
+
+      - name: Deploy main-service
+        if: needs.detect-affected.outputs.main-service == 'true'
+        run: |
+          kubectl apply -k apps/main-service/k8s/overlays/production
+          kubectl set image deployment/main-service main-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/main-service:${{ github.sha }} -n main-service
+          kubectl rollout status deployment/main-service -n main-service --timeout=300s
+
+      - name: Deploy billing-service
+        if: needs.detect-affected.outputs.billing-service == 'true'
+        run: |
+          kubectl apply -k apps/billing-service/k8s/overlays/production
+          kubectl set image deployment/billing-service billing-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/billing-service:${{ github.sha }} -n billing-service
+          kubectl rollout status deployment/billing-service -n billing-service --timeout=300s
+
+      - name: Deploy notification-service
+        if: needs.detect-affected.outputs.notification-service == 'true'
+        run: |
+          kubectl apply -k apps/notification-service/k8s/overlays/production
+          kubectl set image deployment/notification-service notification-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/notification-service:${{ github.sha }} -n notification-service
+          kubectl rollout status deployment/notification-service -n notification-service --timeout=300s
+
+      - name: Deploy telegram-service
+        if: needs.detect-affected.outputs.telegram-service == 'true'
+        run: |
+          kubectl apply -k apps/telegram-service/k8s/overlays/production
+          kubectl set image deployment/telegram-service telegram-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/telegram-service:${{ github.sha }} -n telegram-service
+          kubectl rollout status deployment/telegram-service -n telegram-service --timeout=300s
