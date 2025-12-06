@@ -12,17 +12,6 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: api-gateway-pdb
-  namespace: flexobo
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: api-gateway
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
   name: admin-panel-pdb
   namespace: flexobo
 spec:

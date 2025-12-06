@@ -13,10 +13,6 @@ import {
 } from '../../ports/chat-message.port';
 import { PaginatedResult } from './room.handlers';
 
-// ============================================================
-// Message Query Handlers
-// ============================================================
-
 @QueryHandler(GetMessageByIdQuery)
 export class GetMessageByIdHandler
   implements IQueryHandler<GetMessageByIdQuery, ChatMessageReadModelDto | null>

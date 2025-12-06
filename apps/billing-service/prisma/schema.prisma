@@ -1,0 +1,243 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/billing-client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============ EVENT SOURCING ============
+
+model Event {
+  id            String   @id @default(uuid())
+  aggregateId   String   @map("aggregate_id")
+  aggregateType String   @map("aggregate_type") // PLAN, SUBSCRIPTION, PAYMENT, INVOICE
+  eventType     String   @map("event_type")
+  payload       Json
+  metadata      Json?
+  version       Int
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@unique([aggregateId, version])
+  @@index([aggregateId, aggregateType])
+  @@index([eventType])
+  @@index([createdAt])
+  @@map("events")
+}
+
+model Outbox {
+  id          String    @id @default(uuid())
+  eventType   String    @map("event_type")
+  payload     Json
+  routingKey  String    @map("routing_key")
+  published   Boolean   @default(false)
+  createdAt   DateTime  @default(now()) @map("created_at")
+  publishedAt DateTime? @map("published_at")
+
+  @@index([published, createdAt])
+  @@map("outbox")
+}
+
+// ============ READ MODELS ============
+
+// Dynamic Plan/Tier Configuration
+model PlanReadModel {
+  id          String  @id
+  name        String // FREE, STARTER, PROFESSIONAL, ENTERPRISE
+  displayName String  @map("display_name")
+  description String?
+
+  // Pricing
+  priceMonthly Float  @map("price_monthly")
+  priceYearly  Float  @map("price_yearly")
+  currency     String @default("USD")
+
+  // Limits (JSON for flexibility)
+  limits Json // {loadsPerMonth, tripsPerMonth, bidsPerMonth, teamMembers, storageGb, ...}
+
+  // Features (array of feature keys)
+  features String[] // ['ANALYTICS', 'PRIORITY_SUPPORT', 'API_ACCESS', 'CUSTOM_BRANDING', ...]
+
+  // Display
+  sortOrder Int     @default(0) @map("sort_order")
+  isPopular Boolean @default(false) @map("is_popular")
+  isActive  Boolean @default(true) @map("is_active")
+
+  // Trial
+  trialDays Int @default(0) @map("trial_days")
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([isActive, sortOrder])
+  @@map("plans")
+}
+
+// Subscription per Company
+model SubscriptionReadModel {
+  id        String @id
+  companyId String @map("company_id")
+  planId    String @map("plan_id")
+
+  // Status
+  status String // TRIALING, ACTIVE, PAST_DUE, CANCELLED, EXPIRED
+
+  // Billing
+  billingCycle String @map("billing_cycle") // MONTHLY, YEARLY
+
+  // Period
+  currentPeriodStart DateTime  @map("current_period_start")
+  currentPeriodEnd   DateTime  @map("current_period_end")
+  trialEnd           DateTime? @map("trial_end")
+
+  // Payment Provider
+  paymentProvider String? @map("payment_provider") // STRIPE, CLICK
+  externalId      String? @map("external_id") // Stripe subscription ID, Click contract ID
+
+  // Cancellation
+  cancelAtPeriodEnd  Boolean   @default(false) @map("cancel_at_period_end")
+  cancelledAt        DateTime? @map("cancelled_at")
+  cancellationReason String?   @map("cancellation_reason")
+
+  // Usage tracking (current period)
+  usageData Json @default("{}") @map("usage_data") // {loadsCreated: 5, tripsPosted: 3, ...}
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([companyId])
+  @@index([status])
+  @@index([planId])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+// Payment Transaction
+model PaymentReadModel {
+  id             String @id
+  subscriptionId String @map("subscription_id")
+  companyId      String @map("company_id")
+
+  // Amount
+  amount   Float
+  currency String @default("USD")
+
+  // Status
+  status String // PENDING, PROCESSING, SUCCEEDED, FAILED, REFUNDED
+
+  // Provider
+  provider   String  @map("provider") // STRIPE, CLICK
+  externalId String? @map("external_id") // Stripe payment intent ID, Click transaction ID
+
+  // Type
+  paymentType String @map("payment_type") // SUBSCRIPTION, ONE_TIME, REFUND
+
+  // Card/Payment Method info (masked)
+  paymentMethod Json? @map("payment_method") // {type: 'card', last4: '4242', brand: 'visa'}
+
+  // Error handling
+  failureReason String? @map("failure_reason")
+  retryCount    Int     @default(0) @map("retry_count")
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([subscriptionId])
+  @@index([companyId])
+  @@index([status])
+  @@index([provider, externalId])
+  @@map("payments")
+}
+
+// Invoice
+model InvoiceReadModel {
+  id             String  @id
+  subscriptionId String  @map("subscription_id")
+  companyId      String  @map("company_id")
+  paymentId      String? @map("payment_id")
+
+  // Invoice number
+  invoiceNumber String @unique @map("invoice_number")
+
+  // Amounts
+  subtotal Float
+  tax      Float  @default(0)
+  total    Float
+  currency String @default("USD")
+
+  // Status
+  status String // DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE
+
+  // Period
+  periodStart DateTime @map("period_start")
+  periodEnd   DateTime @map("period_end")
+
+  // Due date
+  dueDate DateTime  @map("due_date")
+  paidAt  DateTime? @map("paid_at")
+
+  // Line items (JSON array)
+  lineItems Json @default("[]") @map("line_items") // [{description, quantity, unitPrice, amount}]
+
+  // PDF
+  pdfUrl String? @map("pdf_url")
+
+  // Billing info snapshot
+  billingInfo Json @map("billing_info") // {companyName, address, taxId, ...}
+
+  // Metadata
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([subscriptionId])
+  @@index([companyId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+// Usage Event Log (for audit and analytics)
+model UsageLogReadModel {
+  id             String @id @default(uuid())
+  subscriptionId String @map("subscription_id")
+  companyId      String @map("company_id")
+
+  usageType String @map("usage_type") // LOAD_CREATED, TRIP_POSTED, BID_PLACED, ...
+  quantity  Int    @default(1)
+
+  // Reference to the entity that triggered usage
+  entityType String? @map("entity_type")
+  entityId   String? @map("entity_id")
+
+  recordedAt DateTime @default(now()) @map("recorded_at")
+
+  @@index([subscriptionId, usageType])
+  @@index([companyId, recordedAt])
+  @@map("usage_logs")
+}
+
+// Webhook Event Log (idempotency)
+model WebhookEventReadModel {
+  id        String @id
+  provider  String // STRIPE, CLICK
+  eventType String @map("event_type")
+  payload   Json
+
+  processed   Boolean   @default(false)
+  processedAt DateTime? @map("processed_at")
+  error       String?
+
+  receivedAt DateTime @default(now()) @map("received_at")
+
+  @@unique([provider, id])
+  @@index([processed, receivedAt])
+  @@map("webhook_events")
+}

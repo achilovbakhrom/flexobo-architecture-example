@@ -1,0 +1,43 @@
+{
+  "name": "main-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/main-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/main-service",
+        "main": "apps/main-service/src/main.ts",
+        "tsConfig": "apps/main-service/tsconfig.app.json",
+        "assets": ["apps/main-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "main-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9232,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": ["scope:main", "type:service"]
+}

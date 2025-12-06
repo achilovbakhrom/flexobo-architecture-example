@@ -1,0 +1,43 @@
+{
+  "name": "billing-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/billing-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/billing-service",
+        "main": "apps/billing-service/src/main.ts",
+        "tsConfig": "apps/billing-service/tsconfig.app.json",
+        "assets": ["apps/billing-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "billing-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9234,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": ["scope:billing", "type:service"]
+}

@@ -27,22 +27,11 @@
         "targetName": "test"
       },
       "exclude": [
-        "e2e/flexobo-microservice-example-e2e/**/*",
-        "e2e/admin-panel-e2e/**/*",
         "apps/users-service-e2e/**/*",
-        "apps/chat-service-e2e/**/*"
+        "apps/chat-service-e2e/**/*",
+        "apps/main-service-e2e/**/*",
+        "apps/billing-service-e2e/**/*"
       ]
-    },
-    {
-      "plugin": "@nx/webpack/plugin",
-      "options": {
-        "buildTargetName": "build",
-        "serveTargetName": "serve",
-        "previewTargetName": "preview",
-        "buildDepsTargetName": "build-deps",
-        "watchDepsTargetName": "watch-deps",
-        "serveStaticTargetName": "serve-static"
-      }
     }
   ],
   "targetDefaults": {

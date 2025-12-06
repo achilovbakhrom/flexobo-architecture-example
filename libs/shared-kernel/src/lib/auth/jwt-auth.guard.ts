@@ -54,10 +54,14 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     // Attach user payload to request
-    request.user = result.payload || {
-      sub: result.userId,
-      role: result.role,
-      jti: result.jti,
+    // Include both 'sub' (JWT standard) and 'userId' (backward compatibility)
+    const userId = result.userId || result.payload?.sub || '';
+    request.user = {
+      ...result.payload,
+      sub: userId,
+      userId: userId, // Alias for backward compatibility
+      role: result.role || result.payload?.role || '',
+      jti: result.jti || result.payload?.jti || '',
     };
 
     return true;

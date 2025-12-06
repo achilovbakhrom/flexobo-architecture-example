@@ -22,15 +22,21 @@ import {
   CHAT_ROOM_AGGREGATE_STORE,
   ChatRoomReadModelDto,
 } from '../../ports/chat-room.port';
-import {
-  IChatMessageRepository,
-  CHAT_MESSAGE_REPOSITORY,
-} from '../../ports/chat-message.port';
 import { ChatRoom } from '../../domain/aggregates/chat-room.aggregate';
+
+/**
+ * Response type for room commands.
+ * Contains the room ID and version for client to poll or subscribe.
+ * The full read model will be available after projection processes the event.
+ */
+export interface RoomCommandResult {
+  id: string;
+  version: number;
+}
 
 @CommandHandler(CreateChatRoomCommand)
 export class CreateChatRoomHandler
-  implements ICommandHandler<CreateChatRoomCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<CreateChatRoomCommand, RoomCommandResult | ChatRoomReadModelDto>
 {
   constructor(
     @Inject(CHAT_ROOM_REPOSITORY)
@@ -41,7 +47,7 @@ export class CreateChatRoomHandler
 
   async execute(
     command: CreateChatRoomCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult | ChatRoomReadModelDto, Error>> {
     try {
       const sortedParticipants = [...command.participants].sort();
 
@@ -74,32 +80,14 @@ export class CreateChatRoomHandler
         createdBy: command.createdBy,
       });
 
-      // Save aggregate (persist events)
+      // Save aggregate (persist events) - projection will update read model via RabbitMQ
       await this.roomStore.save(room);
 
-      // Get state and create read model
-      const state = room.getState();
-      const readModel = await this.roomRepository.create({
+      // Return minimal result - read model will be updated by projection
+      return new Success({
         id: room.id,
-        participants: state.participants,
-        isGroup: state.isGroup,
-        groupName: state.groupName,
-        isSupportChat: state.isSupportChat,
-        status: state.status,
-        unreadCounts: state.unreadCounts,
-        translationSettings: state.translationSettings,
-        lastMessageId: state.lastMessageId,
-        lastMessagePreview: state.lastMessagePreview,
-        lastMessageAt: state.lastMessageAt,
-        identifierId: state.identifierId,
-        identifierType: state.identifierType,
-        isDeleted: state.isDeleted,
-        deletedAt: state.deletedAt,
         version: room.version,
-        lastEventId: undefined,
       });
-
-      return new Success(readModel);
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -108,18 +96,16 @@ export class CreateChatRoomHandler
 
 @CommandHandler(AddParticipantCommand)
 export class AddParticipantHandler
-  implements ICommandHandler<AddParticipantCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<AddParticipantCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
   async execute(
     command: AddParticipantCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -129,13 +115,11 @@ export class AddParticipantHandler
       room.addParticipant(command.userId, command.addedBy);
       await this.roomStore.save(room);
 
-      const state = room.getState();
-      const updatedRoom = await this.roomRepository.update(command.roomId, {
-        participants: state.participants,
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
         version: room.version,
       });
-
-      return new Success(updatedRoom);
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -144,18 +128,16 @@ export class AddParticipantHandler
 
 @CommandHandler(RemoveParticipantCommand)
 export class RemoveParticipantHandler
-  implements ICommandHandler<RemoveParticipantCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<RemoveParticipantCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
   async execute(
     command: RemoveParticipantCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -165,13 +147,11 @@ export class RemoveParticipantHandler
       room.removeParticipant(command.userId, command.removedBy);
       await this.roomStore.save(room);
 
-      const state = room.getState();
-      const updatedRoom = await this.roomRepository.update(command.roomId, {
-        participants: state.participants,
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
         version: room.version,
       });
-
-      return new Success(updatedRoom);
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -180,18 +160,16 @@ export class RemoveParticipantHandler
 
 @CommandHandler(ArchiveRoomCommand)
 export class ArchiveRoomHandler
-  implements ICommandHandler<ArchiveRoomCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<ArchiveRoomCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
   async execute(
     command: ArchiveRoomCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -206,13 +184,11 @@ export class ArchiveRoomHandler
       room.archive(command.userId);
       await this.roomStore.save(room);
 
-      const newState = room.getState();
-      const updatedRoom = await this.roomRepository.update(command.roomId, {
-        status: newState.status,
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
         version: room.version,
       });
-
-      return new Success(updatedRoom);
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -221,16 +197,14 @@ export class ArchiveRoomHandler
 
 @CommandHandler(DeleteRoomCommand)
 export class DeleteRoomHandler
-  implements ICommandHandler<DeleteRoomCommand, void>
+  implements ICommandHandler<DeleteRoomCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
-  async execute(command: DeleteRoomCommand): Promise<Result<void, Error>> {
+  async execute(command: DeleteRoomCommand): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -245,9 +219,11 @@ export class DeleteRoomHandler
       room.delete(command.userId);
       await this.roomStore.save(room);
 
-      await this.roomRepository.softDelete(command.roomId);
-
-      return new Success(undefined);
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
+        version: room.version,
+      });
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -256,18 +232,16 @@ export class DeleteRoomHandler
 
 @CommandHandler(UpdateTranslationSettingsCommand)
 export class UpdateTranslationSettingsHandler
-  implements ICommandHandler<UpdateTranslationSettingsCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<UpdateTranslationSettingsCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
   async execute(
     command: UpdateTranslationSettingsCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -282,14 +256,11 @@ export class UpdateTranslationSettingsHandler
       room.updateTranslationSettings(command.userId, command.enabled, command.targetLanguage);
       await this.roomStore.save(room);
 
-      await this.roomRepository.updateTranslationSettings(
-        command.roomId,
-        command.userId,
-        { enabled: command.enabled, targetLanguage: command.targetLanguage }
-      );
-
-      const updatedRoom = await this.roomRepository.findById(command.roomId);
-      return new Success(updatedRoom!);
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
+        version: room.version,
+      });
     } catch (error) {
       return new Failure(error as Error);
     }
@@ -298,20 +269,16 @@ export class UpdateTranslationSettingsHandler
 
 @CommandHandler(MarkRoomAsReadCommand)
 export class MarkRoomAsReadHandler
-  implements ICommandHandler<MarkRoomAsReadCommand, ChatRoomReadModelDto>
+  implements ICommandHandler<MarkRoomAsReadCommand, RoomCommandResult>
 {
   constructor(
-    @Inject(CHAT_ROOM_REPOSITORY)
-    private readonly roomRepository: IChatRoomRepository,
-    @Inject(CHAT_MESSAGE_REPOSITORY)
-    private readonly messageRepository: IChatMessageRepository,
     @Inject(CHAT_ROOM_AGGREGATE_STORE)
     private readonly roomStore: IChatRoomAggregateStore
   ) {}
 
   async execute(
     command: MarkRoomAsReadCommand
-  ): Promise<Result<ChatRoomReadModelDto, Error>> {
+  ): Promise<Result<RoomCommandResult, Error>> {
     try {
       const room = await this.roomStore.load(command.roomId);
       if (!room) {
@@ -323,18 +290,15 @@ export class MarkRoomAsReadHandler
         return new Failure(new ForbiddenException('Not a participant of this room'));
       }
 
-      // Mark all messages in room as read
-      const readAt = new Date();
-      await this.messageRepository.markAllAsReadInRoom(command.roomId, command.userId, readAt);
-
-      // Update room's unread count
+      // Update room's unread count - projection will handle the read model update
       room.markAsRead(command.userId);
       await this.roomStore.save(room);
 
-      await this.roomRepository.updateUnreadCount(command.roomId, command.userId, 0);
-
-      const updatedRoom = await this.roomRepository.findById(command.roomId);
-      return new Success(updatedRoom!);
+      // Return minimal result - read model will be updated by projection
+      return new Success({
+        id: room.id,
+        version: room.version,
+      });
     } catch (error) {
       return new Failure(error as Error);
     }

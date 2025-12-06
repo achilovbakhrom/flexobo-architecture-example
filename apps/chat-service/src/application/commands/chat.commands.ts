@@ -1,10 +1,6 @@
 import { ICommand } from '@flexobo/core';
 import { MessageType, SenderType } from '../../domain/aggregates/chat-message.aggregate';
 
-// ============================================================
-// Chat Room Commands
-// ============================================================
-
 export class CreateChatRoomCommand implements ICommand {
   constructor(
     public readonly participants: string[],
@@ -62,10 +58,6 @@ export class MarkRoomAsReadCommand implements ICommand {
     public readonly userId: string
   ) {}
 }
-
-// ============================================================
-// Chat Message Commands
-// ============================================================
 
 export class SendMessageCommand implements ICommand {
   constructor(

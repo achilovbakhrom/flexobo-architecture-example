@@ -6,6 +6,27 @@ import { OutboxService } from '../outbox/outbox.service';
 import { SnapshotService } from '../snapshot/snapshot.service';
 
 /**
+ * Interface for aggregate stores
+ * Used by command handlers to load and save aggregates
+ */
+export interface IAggregateStore<T extends AggregateRoot> {
+  /**
+   * Load an aggregate by ID from event store
+   */
+  load(aggregateId: string): Promise<T | null>;
+
+  /**
+   * Check if an aggregate exists in the event store
+   */
+  exists(aggregateId: string): Promise<boolean>;
+
+  /**
+   * Save aggregate - persists uncommitted events to event store and publishes to broker
+   */
+  save(aggregate: T): Promise<DomainEvent[]>;
+}
+
+/**
  * Configuration for aggregate snapshot restoration
  */
 export interface AggregateRestorer<T extends AggregateRoot, TSnapshot> {
@@ -132,11 +153,7 @@ export abstract class AggregateStore<
    * This method:
    * 1. Persists events to event store (source of truth)
    * 2. Saves events to outbox for reliable publishing to message broker
-   *
-   * Projections (separate event handlers) will:
-   * - Listen to events from the broker
-   * - Update read models
-   * - Create snapshots when needed
+   * 3. Creates snapshot if needed (based on snapshot strategy)
    *
    * Returns the events that were saved.
    */
@@ -169,6 +186,11 @@ export abstract class AggregateStore<
 
     // 3. Mark events as committed on the aggregate
     aggregate.markEventsAsCommitted();
+
+    // 4. Create snapshot if needed (based on snapshot frequency)
+    if (this.snapshotService) {
+      await this.snapshotService.createSnapshot(aggregate, aggregateType);
+    }
 
     return uncommittedEvents;
   }
