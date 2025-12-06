@@ -1,0 +1,43 @@
+{
+  "name": "telegram-service",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/telegram-service/src",
+  "projectType": "application",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/telegram-service",
+        "main": "apps/telegram-service/src/main.ts",
+        "tsConfig": "apps/telegram-service/tsconfig.app.json",
+        "assets": ["apps/telegram-service/src/assets"]
+      },
+      "configurations": {
+        "production": {
+          "optimization": true,
+          "extractLicenses": true,
+          "sourceMap": false
+        }
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "dependsOn": ["build"],
+      "options": {
+        "buildTarget": "telegram-service:build",
+        "watch": true,
+        "inspect": "inspect",
+        "port": 9236,
+        "debounce": 500,
+        "runtimeArgs": ["--enable-source-maps"]
+      }
+    },
+    "test": {
+      "options": {
+        "passWithNoTests": true
+      }
+    }
+  },
+  "tags": ["scope:telegram", "type:service"]
+}

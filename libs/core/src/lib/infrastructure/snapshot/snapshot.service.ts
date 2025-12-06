@@ -92,7 +92,6 @@ export class SnapshotService {
    */
   async deleteSnapshots(aggregateId: string): Promise<void> {
     await this.repository.deleteForAggregate(aggregateId);
-    this.logger.debug(`Deleted snapshots for aggregate ${aggregateId}`);
   }
 
   /**
@@ -127,11 +126,14 @@ export class SnapshotService {
 
   /**
    * Serialize aggregate to plain object
-   * Override this method if you need custom serialization
+   * Uses toSnapshot() if available, otherwise falls back to JSON serialization
    */
   protected serializeAggregate<T extends AggregateRoot>(aggregate: T): unknown {
-    // Default implementation: use JSON serialization
-    // In production, you might want to use a more sophisticated approach
+    // Use toSnapshot() if the aggregate implements it
+    if ('toSnapshot' in aggregate && typeof aggregate.toSnapshot === 'function') {
+      return aggregate.toSnapshot();
+    }
+    // Fallback to JSON serialization for aggregates without toSnapshot()
     return JSON.parse(JSON.stringify(aggregate));
   }
 

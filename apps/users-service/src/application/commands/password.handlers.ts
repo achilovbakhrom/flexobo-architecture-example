@@ -17,6 +17,7 @@ import {
   IUser,
   ErrorCodes,
   ErrorMessages,
+  AuthMethod,
 } from '../../ports';
 import {
   IUserAggregateStore,
@@ -46,7 +47,7 @@ export class ChangePasswordHandler
 
       const isOldPasswordValid = await this.passwordService.compare(
         command.oldPassword,
-        user.passwordHashSafe
+        user.passwordHash
       );
 
       if (!isOldPasswordValid) {
@@ -84,9 +85,9 @@ export class ResetPasswordHandler
     try {
       let repoUser: IUser | null = null;
 
-      if (command.authMethod === 'PHONE_NUMBER' && command.phoneNumber) {
+      if (command.authMethod === AuthMethod.PhoneNumber && command.phoneNumber) {
         repoUser = await this.userRepository.findByPhoneNumber(command.phoneNumber);
-      } else if (command.authMethod === 'EMAIL' && command.email) {
+      } else if (command.authMethod === AuthMethod.Email && command.email) {
         repoUser = await this.userRepository.findByEmail(command.email);
       }
 

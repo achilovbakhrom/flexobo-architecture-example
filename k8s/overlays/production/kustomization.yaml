@@ -25,16 +25,6 @@ patches:
   - patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/memory
-        value: 512Mi
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 1Gi
-    target:
-      kind: Deployment
-      name: api-gateway
-  - patch: |-
-      - op: replace
-        path: /spec/template/spec/containers/0/resources/requests/memory
         value: 1Gi
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
@@ -53,8 +43,6 @@ configMapGenerator:
 
 images:
   - name: flexobo/order-service
-    newTag: v1.0.0
-  - name: flexobo/api-gateway
     newTag: v1.0.0
   - name: flexobo/admin-panel
     newTag: v1.0.0

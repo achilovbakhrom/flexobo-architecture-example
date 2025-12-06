@@ -1,19 +1,19 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IChatRoomRepository,
   CHAT_ROOM_REPOSITORY,
   ChatRoomStatus,
+  ChatRoomReadModelDto,
 } from '../../../ports';
 import {
   ROUTING_KEYS,
@@ -21,143 +21,169 @@ import {
   QUEUES,
 } from '../../../domain/events/event.constants';
 
-interface ChatRoomEventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
+interface RoomCreatedData {
+  participants: string[];
+  isGroup: boolean;
+  groupName?: string;
+  isSupportChat: boolean;
+  identifierId?: string;
+  identifierType?: string;
+  createdBy: string;
 }
 
-@Injectable()
-export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(ChatRoomProjection.name);
-  private isSubscribed = false;
+interface ParticipantAddedData {
+  userId: string;
+  addedBy: string;
+  addedAt: Date;
+}
 
+interface ParticipantRemovedData {
+  userId: string;
+  removedBy: string;
+  removedAt: Date;
+}
+
+interface MessageAddedData {
+  messageId: string;
+  senderId: string;
+  preview: string;
+  sentAt: Date;
+}
+
+interface UnreadCountUpdatedData {
+  userId: string;
+  count: number;
+  updatedAt: Date;
+}
+
+interface TranslationSettingsUpdatedData {
+  userId: string;
+  settings: {
+    enabled: boolean;
+    targetLanguage: string;
+  };
+  updatedAt: Date;
+}
+
+interface RoomArchivedData {
+  archivedBy: string;
+  archivedAt: Date;
+}
+
+interface RoomDeletedData {
+  deletedBy: string;
+  deletedAt: Date;
+}
+
+// Union type for all room event data
+type ChatRoomEventData =
+  | RoomCreatedData
+  | ParticipantAddedData
+  | ParticipantRemovedData
+  | MessageAddedData
+  | UnreadCountUpdatedData
+  | TranslationSettingsUpdatedData
+  | RoomArchivedData
+  | RoomDeletedData;
+
+// Typed event payload
+type ChatRoomEventPayload = EventPayload<ChatRoomEventData>;
+
+@Injectable()
+export class ChatRoomProjection extends BaseProjection<ChatRoomReadModelDto, ChatRoomEventPayload> {
   constructor(
     @Inject(CHAT_ROOM_REPOSITORY)
     private readonly roomRepository: IChatRoomRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, ChatRoomProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUES.CHAT_ROOM.PROJECTION);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: QUEUES.CHAT_ROOM.PROJECTION,
+      routingKeys: [ROUTING_KEYS.CHAT.ROOM.ALL],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping chat room projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUES.CHAT_ROOM.PROJECTION,
-      [ROUTING_KEYS.CHAT.ROOM.ALL],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      {
-        durable: true,
-        maxRetries: 3,
-      }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUES.CHAT_ROOM.PROJECTION}`);
+  protected override async getCurrentModelVersion(aggregateId: string): Promise<number> {
+    const entity = await this.roomRepository.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as ChatRoomEventPayload;
-
-    this.logger.debug(
-      `[Projection] ChatRoom event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(event: ChatRoomEventPayload): Promise<void> {
+    switch (event.type) {
       case EVENT_TYPES.CHAT.ROOM.CREATED:
-        await this.onRoomCreated(payload);
+        await this.onRoomCreated(event as EventPayload<RoomCreatedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_ADDED:
-        await this.onParticipantAdded(payload);
+        await this.onParticipantAdded(event as EventPayload<ParticipantAddedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.PARTICIPANT_REMOVED:
-        await this.onParticipantRemoved(payload);
+        await this.onParticipantRemoved(event as EventPayload<ParticipantRemovedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.MESSAGE_ADDED:
-        await this.onMessageAdded(payload);
+        await this.onMessageAdded(event as EventPayload<MessageAddedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.MARKED_AS_READ:
-        await this.onRoomMarkedAsRead(payload);
+        await this.onRoomMarkedAsRead(event as EventPayload<UnreadCountUpdatedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.ARCHIVED:
-        await this.onRoomArchived(payload);
+        await this.onRoomArchived(event as EventPayload<RoomArchivedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.DELETED:
-        await this.onRoomDeleted(payload);
+        await this.onRoomDeleted(event as EventPayload<RoomDeletedData>);
         break;
-
       case EVENT_TYPES.CHAT.ROOM.TRANSLATION_SETTINGS_UPDATED:
-        await this.onTranslationSettingsUpdated(payload);
+        await this.onTranslationSettingsUpdated(event as EventPayload<TranslationSettingsUpdatedData>);
         break;
-
       default:
-        this.logger.warn(`Unknown chat room event type: ${payload.type}`);
+        this.logger.warn(`Unknown chat room event type: ${event.type}`);
     }
   }
 
-  private async onRoomCreated(event: ChatRoomEventPayload): Promise<void> {
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as ChatRoomEventPayload;
+    await this.applyEvent(payload);
+  }
+
+  private async onRoomCreated(event: EventPayload<RoomCreatedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    this.checkCreateIdempotency(existingRoom, event);
+
+    const { data } = event;
     await this.roomRepository.create({
       id: event.aggregateId,
-      participants: event.data['participants'] as string[],
-      isGroup: (event.data['isGroup'] as boolean) ?? false,
-      groupName: event.data['groupName'] as string | undefined,
-      isSupportChat: (event.data['isSupportChat'] as boolean) ?? false,
-      status: ChatRoomStatus.ACTIVE,
+      participants: data.participants,
+      isGroup: data.isGroup ?? false,
+      groupName: data.groupName,
+      isSupportChat: data.isSupportChat ?? false,
+      status: ChatRoomStatus.Active,
       unreadCounts: {},
       translationSettings: {},
       lastMessagePreview: undefined,
       lastMessageAt: new Date(),
-      identifierId: event.data['identifierId'] as string | undefined,
-      identifierType: event.data['identifierType'] as string | undefined,
+      identifierId: data.identifierId,
+      identifierType: data.identifierType,
       isDeleted: false,
       version: event.version,
     });
   }
 
-  private async onParticipantAdded(event: ChatRoomEventPayload): Promise<void> {
-    const room = await this.roomRepository.findById(event.aggregateId);
-    if (!room) return;
+  private async onParticipantAdded(event: EventPayload<ParticipantAddedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    const room = this.checkVersion(existingRoom, event);
 
-    const participantId = event.data['participantId'] as string;
-    const newParticipants = [...room.participants, participantId];
-
-    await this.roomRepository.update(event.aggregateId, {
-      participants: newParticipants,
-      version: event.version,
-    });
-  }
-
-  private async onParticipantRemoved(event: ChatRoomEventPayload): Promise<void> {
-    const room = await this.roomRepository.findById(event.aggregateId);
-    if (!room) return;
-
-    const participantId = event.data['participantId'] as string;
-    const newParticipants = room.participants.filter(p => p !== participantId);
+    const { userId } = event.data;
+    const newParticipants = [...room.participants, userId];
 
     await this.roomRepository.update(event.aggregateId, {
       participants: newParticipants,
@@ -165,13 +191,24 @@ export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onMessageAdded(event: ChatRoomEventPayload): Promise<void> {
-    const senderId = event.data['senderId'] as string;
-    const content = event.data['content'] as string | undefined;
-    const messageId = event.data['messageId'] as string;
+  private async onParticipantRemoved(event: EventPayload<ParticipantRemovedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    const room = this.checkVersion(existingRoom, event);
 
-    const room = await this.roomRepository.findById(event.aggregateId);
-    if (!room) return;
+    const { userId } = event.data;
+    const newParticipants = room.participants.filter(p => p !== userId);
+
+    await this.roomRepository.update(event.aggregateId, {
+      participants: newParticipants,
+      version: event.version,
+    });
+  }
+
+  private async onMessageAdded(event: EventPayload<MessageAddedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    const room = this.checkVersion(existingRoom, event);
+
+    const { messageId, senderId, preview } = event.data;
 
     // Increment unread counts for all participants except sender
     const newUnreadCounts = { ...room.unreadCounts };
@@ -183,19 +220,18 @@ export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
 
     await this.roomRepository.update(event.aggregateId, {
       lastMessageId: messageId,
-      lastMessagePreview: content?.substring(0, 100),
+      lastMessagePreview: preview?.substring(0, 100),
       lastMessageAt: new Date(event.occurredAt),
       unreadCounts: newUnreadCounts,
       version: event.version,
     });
   }
 
-  private async onRoomMarkedAsRead(event: ChatRoomEventPayload): Promise<void> {
-    const userId = event.data['userId'] as string;
+  private async onRoomMarkedAsRead(event: EventPayload<UnreadCountUpdatedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    const room = this.checkVersion(existingRoom, event);
 
-    const room = await this.roomRepository.findById(event.aggregateId);
-    if (!room) return;
-
+    const { userId } = event.data;
     const newUnreadCounts = { ...room.unreadCounts };
     newUnreadCounts[userId] = 0;
 
@@ -205,28 +241,32 @@ export class ChatRoomProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onRoomArchived(event: ChatRoomEventPayload): Promise<void> {
+  private async onRoomArchived(event: EventPayload<RoomArchivedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    this.checkVersion(existingRoom, event);
+
     await this.roomRepository.update(event.aggregateId, {
-      status: ChatRoomStatus.ARCHIVED,
+      status: ChatRoomStatus.Archived,
       version: event.version,
     });
   }
 
-  private async onRoomDeleted(event: ChatRoomEventPayload): Promise<void> {
+  private async onRoomDeleted(event: EventPayload<RoomDeletedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    this.checkVersion(existingRoom, event);
+
     await this.roomRepository.softDelete(event.aggregateId);
   }
 
-  private async onTranslationSettingsUpdated(event: ChatRoomEventPayload): Promise<void> {
-    const userId = event.data['userId'] as string;
-    const enabled = event.data['enabled'] as boolean;
-    const language = event.data['language'] as string;
+  private async onTranslationSettingsUpdated(event: EventPayload<TranslationSettingsUpdatedData>): Promise<void> {
+    const existingRoom = await this.roomRepository.findById(event.aggregateId);
+    const room = this.checkVersion(existingRoom, event);
 
-    const room = await this.roomRepository.findById(event.aggregateId);
-    if (!room) return;
-
+    const { userId, settings } = event.data;
     const newTranslationSettings = { ...room.translationSettings };
-    if (enabled) {
-      newTranslationSettings[userId] = { enabled: true, targetLanguage: language };
+
+    if (settings.enabled) {
+      newTranslationSettings[userId] = { enabled: true, targetLanguage: settings.targetLanguage };
     } else {
       delete newTranslationSettings[userId];
     }

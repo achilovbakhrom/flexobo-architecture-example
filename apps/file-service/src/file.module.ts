@@ -1,18 +1,23 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import {
   CqrsModule,
   EventStoreModule,
   OutboxModule,
   MessagingModule,
   MESSAGE_PUBLISHER,
+  EventBufferModule,
 } from '@flexobo/core';
 import {
   HealthModule,
   ObservabilityModule,
   PostgreSQLHealthIndicator,
+  JwtAuthGuard,
+  GrpcTokenValidator,
+  TOKEN_VALIDATOR,
+  USERS_GRPC_CLIENT,
 } from '@flexobo/shared-kernel';
-import { AuthModule } from '@flexobo/shared-kernel';
 import { PrismaModule } from './prisma.module';
 
 // Controllers
@@ -88,8 +93,8 @@ const QueryHandlers = [
 
     OutboxModule.forRoot({
       workerConfig: {
-        pollingIntervalMs: 5000,
-        batchSize: 100,
+        pollingIntervalMs: 500,
+        batchSize: 500,
         enabled: true,
       },
       messagePublisher: {
@@ -98,16 +103,33 @@ const QueryHandlers = [
       },
     }),
 
-    AuthModule.forRoot({
-      jwt: {
-        secret:
-          process.env['JWT_SECRET'] ||
-          'your-secret-key-change-in-production',
-        accessTokenExpiry: 900, // 15 minutes
-        refreshTokenExpiry: 604800, // 7 days
+    EventBufferModule.forRoot({
+      redis: process.env['REDIS_URL'] || 'redis://localhost:6379',
+      config: {
+        prefix: 'file:evtbuf',
+        eventTtl: 600,
+        lockTtlMs: 5000,
       },
-      globalGuard: false,
     }),
+
+    ClientsModule.registerAsync([
+      {
+        name: USERS_GRPC_CLIENT,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'users',
+            protoPath: require('path').join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/users.proto'
+            ),
+            url: configService.get('USERS_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
 
     HealthModule.forRoot({
       version: '1.0.0',
@@ -151,6 +173,11 @@ const QueryHandlers = [
 
     // Query Handlers
     ...QueryHandlers,
+
+    // Auth (from shared-kernel)
+    GrpcTokenValidator,
+    { provide: TOKEN_VALIDATOR, useExisting: GrpcTokenValidator },
+    JwtAuthGuard,
   ],
 })
 export class FileModule {}

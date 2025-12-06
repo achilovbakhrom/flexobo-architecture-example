@@ -1,4 +1,15 @@
 import { AuthPlatform, UserType } from './user.enums';
+import { AuthMethod } from './user.interface';
+
+export enum OTPStatus {
+  Requested = 'REQUESTED',
+  Used = 'USED',
+}
+
+export enum AccessTokenStatus {
+  Active = 'ACTIVE',
+  Revoked = 'REVOKED',
+}
 
 export enum UserEventType {
   Registered = 'user.registered',
@@ -8,8 +19,13 @@ export enum UserEventType {
   PasswordChanged = 'user.password_changed',
   PasswordReset = 'user.password_reset',
   TelegramLinked = 'user.telegram_linked',
+  GoogleLinked = 'user.google_linked',
   Activated = 'user.activated',
   Deactivated = 'user.deactivated',
+  OTPRequested = 'user.otp_requested',
+  OTPUsed = 'user.otp_used',
+  AccessTokenIssued = 'user.access_token_issued',
+  AccessTokenRevoked = 'user.access_token_revoked',
 }
 
 export interface UserRegisteredEvent {
@@ -18,6 +34,7 @@ export interface UserRegisteredEvent {
     fio: string;
     phoneNumber?: string;
     telegramId?: string;
+    googleId?: string;
     email?: string;
     isPrivacyPolicyAccepted?: boolean;
     isSubscribedNewsletter?: boolean;
@@ -77,6 +94,14 @@ export interface UserTelegramLinkedEvent {
   };
 }
 
+export interface UserGoogleLinkedEvent {
+  type: UserEventType.GoogleLinked;
+  data: {
+    googleId: string;
+    linkedAt: Date;
+  };
+}
+
 export interface UserActivatedEvent {
   type: UserEventType.Activated;
   data: {
@@ -92,6 +117,44 @@ export interface UserDeactivatedEvent {
   };
 }
 
+export interface UserOTPRequestedEvent {
+  type: UserEventType.OTPRequested;
+  data: {
+    code: number;
+    codeHash: string;
+    authMethod: AuthMethod;
+    phoneNumber?: string;
+    email?: string;
+    expiresAt: Date;
+    requestedAt: Date;
+  };
+}
+
+export interface UserOTPUsedEvent {
+  type: UserEventType.OTPUsed;
+  data: {
+    codeHash: string;
+    usedAt: Date;
+  };
+}
+
+export interface UserAccessTokenIssuedEvent {
+  type: UserEventType.AccessTokenIssued;
+  data: {
+    jti: string;
+    issuedAt: Date;
+  };
+}
+
+export interface UserAccessTokenRevokedEvent {
+  type: UserEventType.AccessTokenRevoked;
+  data: {
+    jti: string;
+    revokedAt: Date;
+    reason?: string;
+  };
+}
+
 export type UserEvent =
   | UserRegisteredEvent
   | UserLoggedInEvent
@@ -100,5 +163,10 @@ export type UserEvent =
   | UserPasswordChangedEvent
   | UserPasswordResetEvent
   | UserTelegramLinkedEvent
+  | UserGoogleLinkedEvent
   | UserActivatedEvent
-  | UserDeactivatedEvent;
+  | UserDeactivatedEvent
+  | UserOTPRequestedEvent
+  | UserOTPUsedEvent
+  | UserAccessTokenIssuedEvent
+  | UserAccessTokenRevokedEvent;

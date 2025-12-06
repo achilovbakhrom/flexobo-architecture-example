@@ -1,2 +1,1 @@
-// File storage service removed - file upload now handled by File Service
-// export * from './file-storage.service';
+// File upload is handled by File Service via chat.file.uploaded event

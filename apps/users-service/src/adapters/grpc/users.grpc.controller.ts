@@ -66,10 +66,11 @@ export class UsersGrpcController {
   constructor(private readonly queryBus: QueryBus) {}
 
   @GrpcMethod('UsersService', 'ValidateToken')
-  async validateToken(data: ValidateTokenRequest): Promise<ValidateTokenResponse> {
+  async validateToken(
+    data: ValidateTokenRequest
+  ): Promise<ValidateTokenResponse> {
     const query = new ValidateTokenQuery(data.token);
     const result = await this.queryBus.execute<IValidateTokenResult>(query);
-
     return {
       valid: result.valid,
       userId: result.userId || '',
@@ -83,7 +84,7 @@ export class UsersGrpcController {
   async getUser(data: GetUserRequest): Promise<GetUserResponse> {
     const query = new GetUserByIdQuery(data.userId);
     const user = await this.queryBus.execute<IUser | null>(query);
-
+    console.log('Fetched user:', user);
     if (!user) {
       return { found: false };
     }

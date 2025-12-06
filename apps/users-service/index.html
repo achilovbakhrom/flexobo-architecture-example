@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Google Auth Test - Users Service</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .container {
+      background: white;
+      padding: 30px;
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+    }
+    p {
+      color: #666;
+      margin-bottom: 20px;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      border-radius: 5px;
+      display: none;
+    }
+    #result.success {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      display: block;
+    }
+    #result.error {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      display: block;
+    }
+    #result.loading {
+      background: #fff3cd;
+      border: 1px solid #ffeeba;
+      color: #856404;
+      display: block;
+    }
+    pre {
+      background: #f8f9fa;
+      padding: 10px;
+      border-radius: 5px;
+      overflow-x: auto;
+      font-size: 12px;
+    }
+    .google-btn {
+      margin: 20px 0;
+    }
+  </style>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+  <div class="container">
+    <h1>Google Auth Test</h1>
+    <p>Click the button below to sign in with Google and test the authentication flow.</p>
+
+    <div class="google-btn">
+      <div id="g_id_onload"
+           data-client_id="590056096778-h7qnb2v3ll2mv6jjdmompnt2dhjrikd4.apps.googleusercontent.com"
+           data-callback="handleCredentialResponse"
+           data-auto_prompt="false">
+      </div>
+      <div class="g_id_signin"
+           data-type="standard"
+           data-size="large"
+           data-theme="outline"
+           data-text="sign_in_with"
+           data-shape="rectangular"
+           data-logo_alignment="left">
+      </div>
+    </div>
+
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const resultDiv = document.getElementById('result');
+
+    function showResult(type, message) {
+      resultDiv.className = type;
+      resultDiv.innerHTML = message;
+    }
+
+    async function handleCredentialResponse(response) {
+      const idToken = response.credential;
+
+      showResult('loading', 'Authenticating with backend...');
+
+      try {
+        const res = await fetch('http://localhost:3000/api/v1/auth/google', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            idToken: idToken,
+            isPrivacyPolicyAccepted: true,
+            userType: 'carrier'
+          })
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          showResult('success', `
+            <strong>✓ Authentication Successful!</strong>
+            <p>User: ${data.user?.fio || data.user?.email || 'Unknown'}</p>
+            <p>New User: ${data.isNewUser ? 'Yes' : 'No'}</p>
+            <details>
+              <summary>Full Response</summary>
+              <pre>${JSON.stringify(data, null, 2)}</pre>
+            </details>
+          `);
+        } else {
+          showResult('error', `
+            <strong>✗ Authentication Failed</strong>
+            <p>Status: ${res.status}</p>
+            <pre>${JSON.stringify(data, null, 2)}</pre>
+          `);
+        }
+      } catch (error) {
+        showResult('error', `
+          <strong>✗ Request Failed</strong>
+          <p>${error.message}</p>
+          <p>Make sure the users-service is running on port 3000.</p>
+        `);
+      }
+    }
+  </script>
+</body>
+</html>

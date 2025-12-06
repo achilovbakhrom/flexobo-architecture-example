@@ -110,7 +110,7 @@ export class PrismaChatRoomRepository implements IChatRoomRepository {
         isGroup: room.isGroup,
         groupName: room.groupName,
         isSupportChat: room.isSupportChat,
-        status: room.status,
+        status: this.toPrismaStatus(room.status),
         unreadCounts: room.unreadCounts,
         translationSettings: room.translationSettings,
         lastMessageId: room.lastMessageId,
@@ -139,7 +139,7 @@ export class PrismaChatRoomRepository implements IChatRoomRepository {
         ...(data.isGroup !== undefined && { isGroup: data.isGroup }),
         ...(data.groupName !== undefined && { groupName: data.groupName }),
         ...(data.isSupportChat !== undefined && { isSupportChat: data.isSupportChat }),
-        ...(data.status !== undefined && { status: data.status }),
+        ...(data.status !== undefined && { status: this.toPrismaStatus(data.status) }),
         ...(data.unreadCounts !== undefined && { unreadCounts: data.unreadCounts }),
         ...(data.translationSettings !== undefined && { translationSettings: data.translationSettings }),
         ...(data.lastMessageId !== undefined && { lastMessageId: data.lastMessageId }),
@@ -226,7 +226,7 @@ export class PrismaChatRoomRepository implements IChatRoomRepository {
       isGroup: room.isGroup,
       groupName: room.groupName,
       isSupportChat: room.isSupportChat,
-      status: room.status as ChatRoomStatus,
+      status: this.fromPrismaStatus(room.status),
       unreadCounts: (room.unreadCounts as Record<string, number>) || {},
       translationSettings: (room.translationSettings as Record<string, { enabled: boolean; targetLanguage: string }>) || {},
       lastMessageId: room.lastMessageId,
@@ -241,5 +241,13 @@ export class PrismaChatRoomRepository implements IChatRoomRepository {
       createdAt: room.createdAt,
       updatedAt: room.updatedAt,
     };
+  }
+
+  private toPrismaStatus(status: ChatRoomStatus): string {
+    return status.toUpperCase();
+  }
+
+  private fromPrismaStatus(status: string): ChatRoomStatus {
+    return status.toLowerCase() as ChatRoomStatus;
   }
 }

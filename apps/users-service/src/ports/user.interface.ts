@@ -6,6 +6,7 @@ export interface IUser {
   email?: string | null;
   phoneNumber?: string | null;
   telegramId?: string | null;
+  googleId?: string | null;
   passwordHash: string;
   fio: string;
   avatar?: string | null;
@@ -51,6 +52,7 @@ export interface ITokenPayload {
 export interface ITokenPair {
   accessToken: string;
   refreshToken: string;
+  jti: string; // Access token JTI for tracking in User aggregate
 }
 
 export interface IValidateTokenResult {
@@ -61,7 +63,10 @@ export interface IValidateTokenResult {
   error?: string;
 }
 
-export type AuthMethod = 'PHONE_NUMBER' | 'EMAIL';
+export enum AuthMethod {
+  PhoneNumber = 'phone_number',
+  Email = 'email',
+}
 
 export interface IOTP {
   id: string;

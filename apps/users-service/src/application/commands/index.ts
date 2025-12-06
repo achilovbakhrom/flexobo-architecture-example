@@ -4,3 +4,7 @@ export * from './token.handlers';
 export * from './profile.handlers';
 export * from './password.handlers';
 export * from './otp.handlers';
+export * from './google-auth.handlers';
+export * from './role.handlers';
+export * from './invitation.handlers';
+export * from './company-membership.handlers';

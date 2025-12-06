@@ -193,6 +193,7 @@ export class PrismaFileReadModelRepository implements IFileReadModelRepository {
       s3Key: file.s3Key,
       s3Bucket: file.s3Bucket,
       status: file.status,
+      version: file.version ?? 0,
       uploadedAt: file.uploadedAt,
       createdAt: file.createdAt,
       updatedAt: file.updatedAt,

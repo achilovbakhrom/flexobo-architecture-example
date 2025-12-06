@@ -64,7 +64,7 @@ export class ValidateTokenHandler
       // Check if user exists and is active
       const user = await this.userRepository.findById(payload.sub);
 
-      if (!user || user.status !== UserStatus.ACTIVE) {
+      if (!user || user.status !== UserStatus.Active) {
         return { valid: false, error: 'User not found or inactive' };
       }
 

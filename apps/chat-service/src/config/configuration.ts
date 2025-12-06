@@ -9,8 +9,11 @@ export default () => ({
   rabbitmq: {
     url: process.env.RABBITMQ_URL || 'amqp://guest:guest@localhost:5672',
   },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
   storage: {
-    type: process.env.STORAGE_TYPE || 'local', // 'local' or 's3'
+    type: process.env.STORAGE_TYPE || 'local',
     localPath: process.env.STORAGE_LOCAL_PATH || './uploads',
     s3: {
       bucket: process.env.S3_BUCKET,
