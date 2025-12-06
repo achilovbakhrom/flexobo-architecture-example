@@ -8,3 +8,5 @@ export * from './lib/cache';
 export * from './lib/two-phase-commit';
 export * from './lib/versioning';
 export * from './lib/health';
+export * from './lib/billing';
+export * from './lib/http';

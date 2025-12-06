@@ -2,18 +2,20 @@
  * Development Runner Script
  *
  * Usage:
- *   npx tsx scripts/dev.ts gateway  # Run api-gateway
- *   npx tsx scripts/dev.ts users    # Run users-service
- *   npx tsx scripts/dev.ts chat     # Run chat-service
- *   npx tsx scripts/dev.ts file     # Run file-service
- *   npx tsx scripts/dev.ts main     # Run main-service
- *   npx tsx scripts/dev.ts all      # Run all services
- *   npx tsx scripts/dev.ts stop     # Stop all services and containers
+ *   npx tsx scripts/dev.ts users       # Run users-service
+ *   npx tsx scripts/dev.ts chat        # Run chat-service
+ *   npx tsx scripts/dev.ts file        # Run file-service
+ *   npx tsx scripts/dev.ts main        # Run main-service
+ *   npx tsx scripts/dev.ts billing     # Run billing-service
+ *   npx tsx scripts/dev.ts notification # Run notification-service
+ *   npx tsx scripts/dev.ts telegram    # Run telegram-service
+ *   npx tsx scripts/dev.ts all         # Run all services
+ *   npx tsx scripts/dev.ts stop        # Stop all services and containers
  */
 
 import { execSync, spawn, ChildProcess } from 'child_process';
 
-type ServiceName = 'gateway' | 'users' | 'chat' | 'file' | 'main';
+type ServiceName = 'users' | 'chat' | 'file' | 'main' | 'billing' | 'notification' | 'telegram';
 
 interface ServiceConfig {
   name: string;
@@ -23,12 +25,6 @@ interface ServiceConfig {
 }
 
 const SERVICES: Record<ServiceName, ServiceConfig> = {
-  gateway: {
-    name: 'api-gateway',
-    nxProject: 'api-gateway',
-    dockerCompose: 'apps/api-gateway/docker-compose.yml',
-    color: '\x1b[33m', // yellow
-  },
   users: {
     name: 'users-service',
     nxProject: 'users-service',
@@ -52,6 +48,24 @@ const SERVICES: Record<ServiceName, ServiceConfig> = {
     nxProject: 'main-service',
     dockerCompose: 'apps/main-service/docker-compose.yml',
     color: '\x1b[36m', // cyan
+  },
+  billing: {
+    name: 'billing-service',
+    nxProject: 'billing-service',
+    dockerCompose: 'apps/billing-service/docker-compose.yml',
+    color: '\x1b[33m', // yellow
+  },
+  notification: {
+    name: 'notification-service',
+    nxProject: 'notification-service',
+    dockerCompose: 'apps/notification-service/docker-compose.yml',
+    color: '\x1b[35m', // magenta
+  },
+  telegram: {
+    name: 'telegram-service',
+    nxProject: 'telegram-service',
+    dockerCompose: 'apps/telegram-service/docker-compose.yml',
+    color: '\x1b[96m', // light cyan
   },
 };
 
@@ -185,18 +199,20 @@ function stopAll(): void {
 async function main() {
   const arg = process.argv[2];
 
-  if (!arg || !['gateway', 'users', 'chat', 'file', 'main', 'all', 'stop'].includes(arg)) {
+  if (!arg || !['users', 'chat', 'file', 'main', 'billing', 'notification', 'telegram', 'all', 'stop'].includes(arg)) {
     console.log(`
 Usage: npx tsx scripts/dev.ts <command>
 
 Commands:
-  gateway  - Run api-gateway (port 3000)
-  users    - Run users-service (port 3003)
-  chat     - Run chat-service (port 3004)
-  file     - Run file-service (port 3005)
-  main     - Run main-service (port 3006)
-  all      - Run all services
-  stop     - Stop all services and containers
+  users        - Run users-service (port 3003)
+  chat         - Run chat-service (port 3004)
+  file         - Run file-service (port 3005)
+  main         - Run main-service (port 3006)
+  billing      - Run billing-service (port 3007)
+  notification - Run notification-service (port 3008)
+  telegram     - Run telegram-service (port 3009)
+  all          - Run all services
+  stop         - Stop all services and containers
 `);
     process.exit(1);
   }

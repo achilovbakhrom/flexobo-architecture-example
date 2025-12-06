@@ -7,6 +7,9 @@ export * from './otp-service.port';
 export * from './sms-service.port';
 export * from './email-service.port';
 export * from './google-auth-service.port';
+export * from './role.repository';
+export * from './invitation.repository';
+export * from './company-membership.repository';
 
 // Re-export domain types for adapters to use
 export * from './user.enums';

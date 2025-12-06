@@ -25,13 +25,6 @@ patches:
         value: 1
     target:
       kind: Deployment
-      name: api-gateway
-  - patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 1
-    target:
-      kind: Deployment
       name: admin-panel
 
 configMapGenerator:

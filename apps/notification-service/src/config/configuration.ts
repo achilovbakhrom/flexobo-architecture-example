@@ -24,4 +24,23 @@ export default () => ({
       10
     ) || 30000,
   },
+  smtp: {
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT as string, 10) || 587,
+    user: process.env.SMTP_USER,
+    password: process.env.SMTP_PASSWORD,
+  },
+  email: {
+    from: process.env.EMAIL_FROM || 'noreply@flexobo.com',
+    fromName: process.env.EMAIL_FROM_NAME || 'Flexobo',
+  },
+  sms: {
+    provider: process.env.SMS_PROVIDER || 'playmobile',
+    apiKey: process.env.SMS_API_KEY,
+    senderId: process.env.SMS_SENDER_ID || 'FLEXOBO',
+  },
+  twilio: {
+    accountSid: process.env.TWILIO_ACCOUNT_SID,
+    phoneNumber: process.env.TWILIO_PHONE_NUMBER,
+  },
 });

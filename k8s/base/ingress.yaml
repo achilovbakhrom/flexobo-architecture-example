@@ -4,9 +4,9 @@ metadata:
   name: flexobo-ingress
   namespace: flexobo
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 spec:
   ingressClassName: nginx
   tls:
@@ -18,13 +18,76 @@ spec:
     - host: api.flexobo.com
       http:
         paths:
-          - path: /
+          - path: /api/v1/users
             pathType: Prefix
             backend:
               service:
-                name: api-gateway
+                name: users-service
                 port:
-                  number: 80
+                  number: 3003
+          - path: /api/v1/chat
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-service
+                port:
+                  number: 3004
+          - path: /api/v1/files
+            pathType: Prefix
+            backend:
+              service:
+                name: file-service
+                port:
+                  number: 3005
+          - path: /api/v1/loads
+            pathType: Prefix
+            backend:
+              service:
+                name: main-service
+                port:
+                  number: 3006
+          - path: /api/v1/trips
+            pathType: Prefix
+            backend:
+              service:
+                name: main-service
+                port:
+                  number: 3006
+          - path: /api/v1/bids
+            pathType: Prefix
+            backend:
+              service:
+                name: main-service
+                port:
+                  number: 3006
+          - path: /api/v1/companies
+            pathType: Prefix
+            backend:
+              service:
+                name: main-service
+                port:
+                  number: 3006
+          - path: /api/v1/billing
+            pathType: Prefix
+            backend:
+              service:
+                name: billing-service
+                port:
+                  number: 3007
+          - path: /api/v1/notifications
+            pathType: Prefix
+            backend:
+              service:
+                name: notification-service
+                port:
+                  number: 3008
+          - path: /api/v1/telegram
+            pathType: Prefix
+            backend:
+              service:
+                name: telegram-service
+                port:
+                  number: 3009
     - host: admin.flexobo.com
       http:
         paths:

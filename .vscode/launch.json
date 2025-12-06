@@ -2,27 +2,6 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Debug: API Gateway",
-      "type": "node",
-      "request": "attach",
-      "port": 9231,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"],
-      "preLaunchTask": "start:gateway"
-    },
-    {
-      "name": "Attach: API Gateway (9231)",
-      "type": "node",
-      "request": "attach",
-      "port": 9231,
-      "restart": true,
-      "sourceMaps": true,
-      "skipFiles": ["<node_internals>/**"],
-      "outFiles": ["${workspaceFolder}/dist/apps/api-gateway/**/*.js"]
-    },
-    {
       "type": "node",
       "request": "launch",
       "name": "Debug users-service with Nx",
@@ -117,7 +96,11 @@
     {
       "name": "Debug: All Services",
       "configurations": [
-        "Debug: API Gateway"
+        "Debug users-service with Nx",
+        "Debug chat-service with Nx",
+        "Debug main-service with Nx",
+        "Debug billing-service with Nx",
+        "Debug notification-service with Nx"
       ],
       "stopAll": true
     }

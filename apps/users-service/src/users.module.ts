@@ -27,6 +27,9 @@ import {
   SMS_SERVICE,
   EMAIL_SERVICE,
   GOOGLE_AUTH_SERVICE,
+  ROLE_REPOSITORY,
+  INVITATION_REPOSITORY,
+  COMPANY_MEMBERSHIP_REPOSITORY,
 } from './ports';
 import { USER_AGGREGATE_STORE } from './ports/user-store.port';
 
@@ -36,6 +39,9 @@ import {
   PrismaUserReadModelRepository,
   PrismaTokenRepository,
   UserAggregateStore,
+  PrismaRoleRepository,
+  PrismaInvitationRepository,
+  PrismaCompanyMembershipRepository,
 } from './adapters/persistence';
 
 // Adapters - Services
@@ -67,6 +73,9 @@ import {
   VerifyOTPHandler,
   ForgotPasswordHandler,
   AuthWithGoogleHandler,
+  RoleCommandHandlers,
+  InvitationCommandHandlers,
+  CompanyMembershipCommandHandlers,
 } from './application/commands';
 
 // Query Handlers
@@ -75,6 +84,9 @@ import {
   GetUsersByIdsHandler,
   ValidateTokenHandler,
   IsTokenBlacklistedHandler,
+  RoleQueryHandlers,
+  InvitationQueryHandlers,
+  CompanyMembershipQueryHandlers,
 } from './application/queries';
 
 const CommandHandlers = [
@@ -92,6 +104,9 @@ const CommandHandlers = [
   VerifyOTPHandler,
   ForgotPasswordHandler,
   AuthWithGoogleHandler,
+  ...RoleCommandHandlers,
+  ...InvitationCommandHandlers,
+  ...CompanyMembershipCommandHandlers,
 ];
 
 const QueryHandlers = [
@@ -99,6 +114,9 @@ const QueryHandlers = [
   GetUsersByIdsHandler,
   ValidateTokenHandler,
   IsTokenBlacklistedHandler,
+  ...RoleQueryHandlers,
+  ...InvitationQueryHandlers,
+  ...CompanyMembershipQueryHandlers,
 ];
 
 @Module({
@@ -211,6 +229,18 @@ const QueryHandlers = [
     {
       provide: USER_AGGREGATE_STORE,
       useClass: UserAggregateStore,
+    },
+    {
+      provide: ROLE_REPOSITORY,
+      useClass: PrismaRoleRepository,
+    },
+    {
+      provide: INVITATION_REPOSITORY,
+      useClass: PrismaInvitationRepository,
+    },
+    {
+      provide: COMPANY_MEMBERSHIP_REPOSITORY,
+      useClass: PrismaCompanyMembershipRepository,
     },
     // Projections
     UserProjection,

@@ -20,6 +20,8 @@ import {
 import { DEVICE_TOKEN_REPOSITORY } from './ports/device-token.repository';
 import { PUSH_SERVICE } from './ports/push-service.port';
 import { SSE_MANAGER } from './ports/sse-service.port';
+import { EMAIL_SERVICE } from './ports/email-service.port';
+import { SMS_SERVICE } from './ports/sms-service.port';
 
 // Adapters - Persistence
 import {
@@ -30,6 +32,12 @@ import {
 
 // Adapters - Push
 import { FCMPushService } from './adapters/push/fcm-push.service';
+
+// Adapters - Email
+import { EmailService } from './adapters/email/email.service';
+
+// Adapters - SMS
+import { SmsService } from './adapters/sms/sms.service';
 
 // Adapters - SSE
 import { SSEController, SSEManagerService } from './adapters/sse';
@@ -126,6 +134,20 @@ import { QueryHandlers } from './application/queries';
       useClass: SSEManagerService,
     },
     SSEManagerService,
+
+    // Email
+    {
+      provide: EMAIL_SERVICE,
+      useClass: EmailService,
+    },
+    EmailService,
+
+    // SMS
+    {
+      provide: SMS_SERVICE,
+      useClass: SmsService,
+    },
+    SmsService,
 
     // Projections
     NotificationProjection,

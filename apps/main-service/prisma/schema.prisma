@@ -274,3 +274,178 @@ model BoardReadModel {
   @@index([ownerId])
   @@index([companyId])
 }
+
+// ============ COMPANY READ MODELS ============
+
+model CompanyReadModel {
+  id          String   @id
+  ownerId     String
+  name        String
+  type        String   // LOGISTICS, CARRIER, FORWARDER, SHIPPER
+  status      String   @default("PENDING") // PENDING, VERIFIED, REJECTED, SUSPENDED
+  description String?
+  logo        String?
+  phone       String?
+  email       String?
+  address     String?
+  country     String?
+  city        String?
+  taxId       String?  // Tax identification number
+  website     String?
+  isActive    Boolean  @default(true)
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members CompanyMemberReadModel[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+  @@index([country, city])
+  @@index([name])
+}
+
+model CompanyMemberReadModel {
+  id        String   @id
+  companyId String
+  userId    String
+  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
+  isActive  Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company CompanyReadModel @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
+  @@index([companyId])
+}
+
+// ============ REFERENCE DATA ============
+
+model Country {
+  id        String  @id @default(uuid())
+  code      String  @unique // ISO 3166-1 alpha-2: UZ, RU, KZ
+  name      String
+  nameRu    String?
+  nameUz    String?
+  phoneCode String  // +998, +7, etc.
+  isActive  Boolean @default(true)
+
+  @@index([code])
+  @@index([isActive])
+}
+
+model Language {
+  id       String  @id @default(uuid())
+  code     String  @unique // ISO 639-1: uz, ru, en
+  name     String
+  nativeName String? // O'zbek, Русский, English
+  isActive Boolean @default(true)
+
+  @@index([code])
+}
+
+model Currency {
+  id       String  @id @default(uuid())
+  code     String  @unique // ISO 4217: UZS, USD, RUB
+  name     String
+  symbol   String  // $, ₽, сум
+  rate     Float   @default(1) // Exchange rate to USD
+  isActive Boolean @default(true)
+
+  @@index([code])
+}
+
+model LoadType {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+model TransportType {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+model LoadingType {
+  id          String  @id @default(uuid())
+  code        String  @unique // TOP, SIDE, REAR, FULL_OPEN
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+model CompanyType {
+  id          String  @id @default(uuid())
+  code        String  @unique // LOGISTICS, CARRIER, FORWARDER, SHIPPER
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+model ADRClassification {
+  id          String  @id @default(uuid())
+  code        String  @unique // 1, 2, 3, 4.1, 4.2, etc.
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+model Permit {
+  id          String  @id @default(uuid())
+  code        String  @unique // TIR, CMR, EKMT, etc.
+  name        String
+  nameRu      String?
+  nameUz      String?
+  description String?
+  isActive    Boolean @default(true)
+
+  @@index([code])
+}
+
+// ============ SAVED SEARCHES ============
+
+model SavedSearchReadModel {
+  id          String   @id
+  userId      String
+  name        String
+  searchType  String   // LOAD, TRIP
+  filters     Json     // Search criteria stored as JSON
+  notifyOnNew Boolean  @default(false) // Send notification when new matches found
+  isActive    Boolean  @default(true)
+  lastUsedAt  DateTime?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
+  @@index([searchType])
+  @@index([userId, searchType])
+}
