@@ -1,14 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-
-interface RouteAnalyticsPrismaClient {
-  loadReadModel: {
-    groupBy: (args: unknown) => Promise<Array<{ fromCountry: string; toCountry: string; _count: { id: number }; _avg: { price: number | null } }>>;
-  };
-  tripReadModel: {
-    findMany: (args: unknown) => Promise<Array<{ id: string; loadingPoints: unknown; unloadingPoints: unknown; price: number | null }>>;
-  };
-}
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 
 export class GetRouteAnalyticsQuery implements IQuery {
   constructor(
@@ -37,10 +28,9 @@ export interface RouteAnalyticsResult {
   };
 }
 
-@Injectable()
 @QueryHandler(GetRouteAnalyticsQuery)
 export class GetRouteAnalyticsHandler implements IQueryHandler<GetRouteAnalyticsQuery, RouteAnalyticsResult> {
-  constructor(@Inject('PrismaClient') private readonly prisma: RouteAnalyticsPrismaClient) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: any) {}
 
   async execute(query: GetRouteAnalyticsQuery): Promise<RouteAnalyticsResult> {
     const now = new Date();

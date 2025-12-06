@@ -11,8 +11,8 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { QueryBus } from '@nestjs/cqrs';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { QueryBus } from '@flexobo/core';
+import { JwtAuthGuard, AuthenticatedUser } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import {
   GetDashboardStatsQuery,
@@ -20,13 +20,8 @@ import {
   GetRouteAnalyticsQuery,
 } from '../../../application/queries/statistics';
 
-interface JwtPayload {
-  user: string;
-  role: string;
-}
-
 @ApiTags('Statistics')
-@Controller('api/v1/statistics')
+@Controller('v1/statistics')
 export class StatisticsController {
   constructor(private readonly queryBus: QueryBus) {}
 
@@ -37,11 +32,11 @@ export class StatisticsController {
   @ApiQuery({ name: 'companyId', required: false, description: 'Filter by company ID' })
   @ApiResponse({ status: 200, description: 'Dashboard statistics' })
   async getDashboardStats(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('companyId') companyId?: string
   ) {
     return this.queryBus.execute(
-      new GetDashboardStatsQuery(user.user, companyId)
+      new GetDashboardStatsQuery(user.userId, companyId)
     );
   }
 

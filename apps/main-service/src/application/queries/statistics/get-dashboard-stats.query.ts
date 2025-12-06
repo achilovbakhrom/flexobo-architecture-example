@@ -1,24 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-
-interface StatsPrismaClient {
-  loadReadModel: {
-    groupBy: (args: unknown) => Promise<Array<{ status: string; _count: { status: number } }>>;
-  };
-  tripReadModel: {
-    groupBy: (args: unknown) => Promise<Array<{ status: string; _count: { status: number } }>>;
-  };
-  bidReadModel: {
-    count: (args: unknown) => Promise<number>;
-  };
-  bookingReadModel: {
-    groupBy: (args: unknown) => Promise<Array<{ status: string; _count: { status: number } }>>;
-    aggregate: (args: unknown) => Promise<{ _avg: { ownerRating: number | null } }>;
-  };
-  transportReadModel: {
-    groupBy: (args: unknown) => Promise<Array<{ isActive: boolean; _count: { isActive: number } }>>;
-  };
-}
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 
 export class GetDashboardStatsQuery implements IQuery {
   constructor(
@@ -58,10 +39,9 @@ export interface DashboardStatsResult {
   };
 }
 
-@Injectable()
 @QueryHandler(GetDashboardStatsQuery)
 export class GetDashboardStatsHandler implements IQueryHandler<GetDashboardStatsQuery, DashboardStatsResult> {
-  constructor(@Inject('PrismaClient') private readonly prisma: StatsPrismaClient) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: any) {}
 
   async execute(query: GetDashboardStatsQuery): Promise<DashboardStatsResult> {
     const ownerFilter = query.companyId

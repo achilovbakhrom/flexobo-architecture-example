@@ -18,6 +18,11 @@ import { BidController } from './adapters/http/v1/bid.controller';
 import { BookingController } from './adapters/http/v1/booking.controller';
 import { BoardController } from './adapters/http/v1/board.controller';
 import { LanguageController } from './adapters/http/v1/language.controller';
+import { CompanyController } from './adapters/http/v1/company.controller';
+import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
+import { LocationController } from './adapters/http/v1/location.controller';
+import { StatisticsController } from './adapters/http/v1/statistics.controller';
+import { ReferenceDataAdminController } from './adapters/http/v1/reference-data-admin.controller';
 
 // Guards
 import { JwtAuthGuard } from './adapters/http/guards/jwt-auth.guard';
@@ -53,6 +58,18 @@ import {
 } from './ports/board.repository';
 import { LANGUAGE_REPOSITORY } from './ports/language.repository';
 import { CHAT_SERVICE_CLIENT } from './ports/chat-service.client';
+import {
+  COMPANY_AGGREGATE_STORE,
+  COMPANY_READ_REPOSITORY,
+} from './ports/company.repository';
+import {
+  SAVED_SEARCH_AGGREGATE_STORE,
+  SAVED_SEARCH_READ_REPOSITORY,
+} from './ports/saved-search.repository';
+import { LOCATION_SERVICE } from './ports/location.service';
+
+// External Services
+import { OsmLocationService } from './adapters/external/osm-location.service';
 
 // Aggregate Stores
 import {
@@ -147,6 +164,27 @@ import {
   DeleteLanguageHandler,
 } from './application/commands/language';
 
+// Company Command Handlers
+import {
+  CreateCompanyHandler,
+  UpdateCompanyHandler,
+  DeleteCompanyHandler,
+  VerifyCompanyHandler,
+  RejectCompanyHandler,
+  SuspendCompanyHandler,
+  ReactivateCompanyHandler,
+  AddCompanyMemberHandler,
+  UpdateCompanyMemberHandler,
+  RemoveCompanyMemberHandler,
+} from './application/commands/company';
+
+// SavedSearch Command Handlers
+import {
+  CreateSavedSearchHandler,
+  UpdateSavedSearchHandler,
+  DeleteSavedSearchHandler,
+} from './application/commands/saved-search';
+
 // Transport Query Handlers
 import {
   GetTransportHandler,
@@ -158,6 +196,9 @@ import {
   GetLoadHandler,
   ListLoadsHandler,
   SearchLoadsHandler,
+  GetLoadFilterDataHandler,
+  ListLoadsWithBidsHandler,
+  ListLoadsUserBidOnHandler,
 } from './application/queries/load';
 
 // Trip Query Handlers
@@ -165,6 +206,9 @@ import {
   GetTripHandler,
   ListTripsHandler,
   SearchTripsHandler,
+  GetTripFilterDataHandler,
+  ListTripsWithBidsHandler,
+  ListTripsUserBidOnHandler,
 } from './application/queries/trip';
 
 // Bid Query Handlers
@@ -179,17 +223,51 @@ import {
 import {
   GetBookingHandler,
   ListBookingsHandler,
+  GetRatingStatusHandler,
 } from './application/queries/booking';
 
 // Board Query Handlers
 import {
   GetBoardHandler,
   ListBoardsHandler,
+  ListInvitedBoardsHandler,
 } from './application/queries/board';
 import {
   GetLanguageHandler,
   ListLanguagesHandler,
 } from './application/queries/language';
+
+// Company Query Handlers
+import {
+  GetCompanyHandler,
+  GetMyCompanyHandler,
+  ListCompaniesHandler,
+  GetCompanyMembersHandler,
+  GetUserCompaniesHandler,
+  GetCompanyStatsHandler,
+  GetCompanyRatingsHandler,
+  GetCompanyBookingsHandler,
+} from './application/queries/company';
+
+// Location Query Handlers
+import {
+  AutocompleteLocationHandler,
+  SearchLocationHandler,
+  GetLocationByIdHandler,
+} from './application/queries/location';
+
+// Statistics Query Handlers
+import {
+  GetDashboardStatsHandler,
+  GetMarketStatsHandler,
+  GetRouteAnalyticsHandler,
+} from './application/queries/statistics';
+
+// SavedSearch Query Handlers
+import {
+  GetSavedSearchHandler,
+  ListSavedSearchesHandler,
+} from './application/queries/saved-search';
 
 const CommandHandlers = [
   // Transport
@@ -228,6 +306,21 @@ const CommandHandlers = [
   CreateLanguageHandler,
   UpdateLanguageHandler,
   DeleteLanguageHandler,
+  // Company
+  CreateCompanyHandler,
+  UpdateCompanyHandler,
+  DeleteCompanyHandler,
+  VerifyCompanyHandler,
+  RejectCompanyHandler,
+  SuspendCompanyHandler,
+  ReactivateCompanyHandler,
+  AddCompanyMemberHandler,
+  UpdateCompanyMemberHandler,
+  RemoveCompanyMemberHandler,
+  // SavedSearch
+  CreateSavedSearchHandler,
+  UpdateSavedSearchHandler,
+  DeleteSavedSearchHandler,
 ];
 
 const QueryHandlers = [
@@ -238,10 +331,16 @@ const QueryHandlers = [
   GetLoadHandler,
   ListLoadsHandler,
   SearchLoadsHandler,
+  GetLoadFilterDataHandler,
+  ListLoadsWithBidsHandler,
+  ListLoadsUserBidOnHandler,
   // Trip
   GetTripHandler,
   ListTripsHandler,
   SearchTripsHandler,
+  GetTripFilterDataHandler,
+  ListTripsWithBidsHandler,
+  ListTripsUserBidOnHandler,
   // Bid
   GetBidHandler,
   ListBidsByPostHandler,
@@ -250,12 +349,34 @@ const QueryHandlers = [
   // Booking
   GetBookingHandler,
   ListBookingsHandler,
+  GetRatingStatusHandler,
   // Board
   GetBoardHandler,
   ListBoardsHandler,
+  ListInvitedBoardsHandler,
   // Language
   GetLanguageHandler,
   ListLanguagesHandler,
+  // Company
+  GetCompanyHandler,
+  GetMyCompanyHandler,
+  ListCompaniesHandler,
+  GetCompanyMembersHandler,
+  GetUserCompaniesHandler,
+  GetCompanyStatsHandler,
+  GetCompanyRatingsHandler,
+  GetCompanyBookingsHandler,
+  // SavedSearch
+  GetSavedSearchHandler,
+  ListSavedSearchesHandler,
+  // Location
+  AutocompleteLocationHandler,
+  SearchLocationHandler,
+  GetLocationByIdHandler,
+  // Statistics
+  GetDashboardStatsHandler,
+  GetMarketStatsHandler,
+  GetRouteAnalyticsHandler,
 ];
 
 @Module({
@@ -305,6 +426,11 @@ const QueryHandlers = [
     BookingController,
     BoardController,
     LanguageController,
+    CompanyController,
+    SavedSearchController,
+    LocationController,
+    StatisticsController,
+    ReferenceDataAdminController,
   ],
   providers: [
     // Guards
@@ -380,6 +506,20 @@ const QueryHandlers = [
     {
       provide: LANGUAGE_REPOSITORY,
       useClass: PrismaLanguageRepository,
+    },
+    {
+      provide: COMPANY_READ_REPOSITORY,
+      useClass: PrismaCompanyReadRepository,
+    },
+    {
+      provide: SAVED_SEARCH_READ_REPOSITORY,
+      useClass: PrismaSavedSearchReadRepository,
+    },
+
+    // External Services
+    {
+      provide: LOCATION_SERVICE,
+      useClass: OsmLocationService,
     },
 
     // Projections

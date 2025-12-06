@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { ICommand, ICommandHandler, CommandHandler, Result, Success, Failure } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { Company } from '../../../domain/aggregates/company.aggregate';
 import { CompanyType } from '../../../domain/events/company.events';
@@ -25,15 +25,15 @@ export class CreateCompanyCommand implements ICommand {
   ) {}
 }
 
-@Injectable()
 @CommandHandler(CreateCompanyCommand)
-export class CreateCompanyHandler implements ICommandHandler<CreateCompanyCommand> {
+export class CreateCompanyHandler implements ICommandHandler<CreateCompanyCommand, string> {
   constructor(
     @Inject(COMPANY_AGGREGATE_STORE)
     private readonly companyStore: ICompanyAggregateStore
   ) {}
 
-  async execute(command: CreateCompanyCommand): Promise<string> {
+  async execute(command: CreateCompanyCommand): Promise<Result<string, Error>> {
+    try {
     const companyId = uuidv4();
 
     const company = Company.create(companyId, {
@@ -51,8 +51,11 @@ export class CreateCompanyHandler implements ICommandHandler<CreateCompanyComman
       website: command.website,
     });
 
-    await this.companyStore.save(company);
+      await this.companyStore.save(company);
 
-    return companyId;
+      return new Success(companyId);
+    } catch (error) {
+      return new Failure(error as Error);
+    }
   }
 }

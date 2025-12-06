@@ -31,7 +31,7 @@ export class Booking extends AggregateRoot {
   private postId!: string;
   private bidId!: string;
   private finalPrice!: number;
-  private currency: string = 'USD';
+  private currency = 'USD';
   private status: BookingStatus = BookingStatus.PENDING;
   private customerRating?: number;
   private customerComment?: string;
@@ -39,7 +39,10 @@ export class Booking extends AggregateRoot {
   private ownerComment?: string;
   private completedAt?: string;
 
-  static createFromBid(bookingId: string, data: BookingCreatedEventData): Booking {
+  static createFromBid(
+    bookingId: string,
+    data: BookingCreatedEventData
+  ): Booking {
     const booking = new Booking(bookingId);
     const event = booking.createEvent(BOOKING_EVENT_TYPES.CREATED, data);
     booking.addEvent(event);
@@ -108,7 +111,10 @@ export class Booking extends AggregateRoot {
   }
 
   cancel(userId: string, reason?: string): void {
-    if (this.status === BookingStatus.COMPLETED || this.status === BookingStatus.CANCELLED) {
+    if (
+      this.status === BookingStatus.COMPLETED ||
+      this.status === BookingStatus.CANCELLED
+    ) {
       throw new Error('Cannot cancel completed or already cancelled bookings');
     }
     const event = this.createEvent<

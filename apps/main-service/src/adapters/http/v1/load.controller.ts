@@ -33,6 +33,9 @@ import { DeleteLoadCommand } from '../../../application/commands/load/delete-loa
 import { GetLoadQuery } from '../../../application/queries/load/get-load.query';
 import { ListLoadsQuery } from '../../../application/queries/load/list-loads.query';
 import { SearchLoadsQuery } from '../../../application/queries/load/search-loads.query';
+import { GetLoadFilterDataQuery } from '../../../application/queries/load/get-load-filter-data.query';
+import { ListLoadsWithBidsQuery } from '../../../application/queries/load/list-loads-with-bids.query';
+import { ListLoadsUserBidOnQuery } from '../../../application/queries/load/list-loads-user-bid-on.query';
 import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Loads')
@@ -82,6 +85,13 @@ export class LoadController {
     return { id: loadId };
   }
 
+  @Get('filter-data')
+  @ApiOperation({ summary: 'Get filter options for loads (public)' })
+  @ApiResponse({ status: 200, description: 'Filter options' })
+  async getFilterData() {
+    return this.queryBus.execute(new GetLoadFilterDataQuery());
+  }
+
   @Get('my')
   @ApiOperation({ summary: 'List loads for current user' })
   @ApiResponse({ status: 200, description: 'List of user loads' })
@@ -99,6 +109,33 @@ export class LoadController {
         query.page ?? 1,
         query.limit ?? 20
       )
+    );
+  }
+
+  @Get('my-with-requests')
+  @ApiOperation({ summary: 'List user loads that have received bids' })
+  @ApiResponse({ status: 200, description: 'Loads with bid counts' })
+  async listMyWithRequests(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new ListLoadsWithBidsQuery(user.userId, page ?? 1, limit ?? 20)
+    );
+  }
+
+  @Get('my-sent-bids')
+  @ApiOperation({ summary: 'List loads where current user has made bids' })
+  @ApiResponse({ status: 200, description: 'Loads with user bids' })
+  async listMySentBids(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new ListLoadsUserBidOnQuery(user.userId, status, page ?? 1, limit ?? 20)
     );
   }
 

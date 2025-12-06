@@ -33,11 +33,11 @@ export class Trip extends AggregateRoot {
   private loadingPoints: RoutePointData[] = [];
   private unloadingPoints: RoutePointData[] = [];
   private price?: number;
-  private currency: string = 'USD';
+  private currency = 'USD';
   private paymentTerms?: string;
   private boardIds: string[] = [];
-  private isPublic: boolean = true;
-  private isDeleted: boolean = false;
+  private isPublic = true;
+  private isDeleted = false;
 
   static create(tripId: string, data: TripCreatedEventData): Trip {
     const trip = new Trip(tripId);
@@ -117,7 +117,10 @@ export class Trip extends AggregateRoot {
   }
 
   cancel(userId: string, reason?: string): void {
-    if (this.status === TripStatus.COMPLETED || this.status === TripStatus.CANCELLED) {
+    if (
+      this.status === TripStatus.COMPLETED ||
+      this.status === TripStatus.CANCELLED
+    ) {
       throw new Error('Cannot cancel completed or cancelled trips');
     }
     const event = this.createEvent<
@@ -179,7 +182,8 @@ export class Trip extends AggregateRoot {
         this.applyUpdated(event.data as TripUpdatedEventData);
         break;
       case TRIP_EVENT_TYPES.STATUS_CHANGED:
-        this.status = (event.data as TripStatusChangedEventData).newStatus as TripStatus;
+        this.status = (event.data as TripStatusChangedEventData)
+          .newStatus as TripStatus;
         break;
       case TRIP_EVENT_TYPES.DELETED:
         this.isDeleted = true;

@@ -1,5 +1,5 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Inject, NotFoundException } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   ICompanyReadRepository,
   COMPANY_READ_REPOSITORY,
@@ -10,7 +10,6 @@ export class GetCompanyQuery implements IQuery {
   constructor(public readonly companyId: string) {}
 }
 
-@Injectable()
 @QueryHandler(GetCompanyQuery)
 export class GetCompanyHandler implements IQueryHandler<GetCompanyQuery, CompanyReadDto> {
   constructor(

@@ -11,7 +11,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -49,6 +49,9 @@ import {
   ListCompaniesQuery,
   GetCompanyMembersQuery,
   GetUserCompaniesQuery,
+  GetCompanyStatsQuery,
+  GetCompanyRatingsQuery,
+  GetCompanyBookingsQuery,
 } from '../../../application/queries/company';
 
 @ApiTags('Companies')
@@ -67,7 +70,7 @@ export class CompanyController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCompanyDto
-  ): Promise<{ id: string }> {
+  ) {
     const companyId = await this.commandBus.execute(
       new CreateCompanyCommand(
         user.userId,
@@ -140,7 +143,7 @@ export class CompanyController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateCompanyDto
-  ): Promise<void> {
+  ) {
     await this.commandBus.execute(
       new UpdateCompanyCommand(
         id,
@@ -167,7 +170,7 @@ export class CompanyController {
   async delete(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser
-  ): Promise<void> {
+  ) {
     await this.commandBus.execute(new DeleteCompanyCommand(id, user.userId));
   }
 
@@ -181,7 +184,7 @@ export class CompanyController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: VerifyCompanyDto
-  ): Promise<void> {
+  ) {
     // TODO: Add admin role check
     await this.commandBus.execute(
       new VerifyCompanyCommand(id, user.userId, dto.notes)
@@ -197,7 +200,7 @@ export class CompanyController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: RejectCompanyDto
-  ): Promise<void> {
+  ) {
     // TODO: Add admin role check
     await this.commandBus.execute(
       new RejectCompanyCommand(id, user.userId, dto.reason)
@@ -213,7 +216,7 @@ export class CompanyController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: SuspendCompanyDto
-  ): Promise<void> {
+  ) {
     // TODO: Add admin role check
     await this.commandBus.execute(
       new SuspendCompanyCommand(id, user.userId, dto.reason)
@@ -228,9 +231,47 @@ export class CompanyController {
   async reactivate(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser
-  ): Promise<void> {
+  ) {
     // TODO: Add admin role check
     await this.commandBus.execute(new ReactivateCompanyCommand(id, user.userId));
+  }
+
+  // Company statistics and data
+  @Get(':id/stats')
+  @ApiOperation({ summary: 'Get company statistics (public)' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({ status: 200, description: 'Company statistics' })
+  async getStats(@Param('id') id: string) {
+    return this.queryBus.execute(new GetCompanyStatsQuery(id));
+  }
+
+  @Get(':id/ratings')
+  @ApiOperation({ summary: 'Get company ratings (public)' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({ status: 200, description: 'Company ratings' })
+  async getRatings(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new GetCompanyRatingsQuery(id, page ?? 1, limit ?? 20)
+    );
+  }
+
+  @Get(':id/bookings')
+  @ApiOperation({ summary: 'Get company bookings' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({ status: 200, description: 'Company bookings' })
+  async getBookings(
+    @Param('id') id: string,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new GetCompanyBookingsQuery(id, status, page ?? 1, limit ?? 20)
+    );
   }
 
   // Member management
@@ -250,7 +291,7 @@ export class CompanyController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: AddCompanyMemberDto
-  ): Promise<void> {
+  ) {
     await this.commandBus.execute(
       new AddCompanyMemberCommand(id, user.userId, dto.userId, dto.role)
     );
@@ -267,7 +308,7 @@ export class CompanyController {
     @Param('memberId') memberId: string,
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateCompanyMemberDto
-  ): Promise<void> {
+  ) {
     await this.commandBus.execute(
       new UpdateCompanyMemberCommand(id, user.userId, memberId, dto.role)
     );
@@ -283,7 +324,7 @@ export class CompanyController {
     @Param('id') id: string,
     @Param('memberId') memberId: string,
     @CurrentUser() user: AuthenticatedUser
-  ): Promise<void> {
+  ) {
     await this.commandBus.execute(
       new RemoveCompanyMemberCommand(id, user.userId, memberId)
     );

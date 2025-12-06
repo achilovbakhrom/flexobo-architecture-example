@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   ISavedSearchReadRepository,
   SAVED_SEARCH_READ_REPOSITORY,
@@ -25,7 +25,6 @@ export interface SavedSearchDto {
   updatedAt: Date;
 }
 
-@Injectable()
 @QueryHandler(GetSavedSearchQuery)
 export class GetSavedSearchHandler implements IQueryHandler<GetSavedSearchQuery, SavedSearchDto | null> {
   constructor(

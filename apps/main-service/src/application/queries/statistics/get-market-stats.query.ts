@@ -1,20 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
-
-interface MarketStatsPrismaClient {
-  loadReadModel: {
-    count: (args: unknown) => Promise<number>;
-    aggregate: (args: unknown) => Promise<{ _avg: { price: number | null } }>;
-    groupBy: (args: unknown) => Promise<Array<{ transportType: string; _count: { transportType: number } } | { fromCountry: string; toCountry: string; _count: { id: number } }>>;
-  };
-  tripReadModel: {
-    count: (args: unknown) => Promise<number>;
-    aggregate: (args: unknown) => Promise<{ _avg: { price: number | null } }>;
-  };
-  companyReadModel: {
-    count: (args: unknown) => Promise<number>;
-  };
-}
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 
 export class GetMarketStatsQuery implements IQuery {
   constructor(
@@ -43,10 +28,9 @@ export interface MarketStatsResult {
   activeCompanies: number;
 }
 
-@Injectable()
 @QueryHandler(GetMarketStatsQuery)
 export class GetMarketStatsHandler implements IQueryHandler<GetMarketStatsQuery, MarketStatsResult> {
-  constructor(@Inject('PrismaClient') private readonly prisma: MarketStatsPrismaClient) {}
+  constructor(@Inject('PrismaClient') private readonly prisma: any) {}
 
   async execute(query: GetMarketStatsQuery): Promise<MarketStatsResult> {
     const now = new Date();

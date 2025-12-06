@@ -52,8 +52,8 @@ export class Company extends AggregateRoot {
   private taxId?: string;
   private website?: string;
   private members: CompanyMemberData[] = [];
-  private isActive: boolean = true;
-  private isDeleted: boolean = false;
+  private isActive = true;
+  private isDeleted = false;
 
   static create(companyId: string, data: CompanyCreatedEventData): Company {
     const company = new Company(companyId);
@@ -84,59 +84,63 @@ export class Company extends AggregateRoot {
 
   verify(verifiedBy: string, notes?: string): void {
     if (this.isDeleted) throw new Error('Cannot verify deleted company');
-    if (this.status === 'VERIFIED') throw new Error('Company is already verified');
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.VERIFIED, CompanyVerifiedEventData>(
-      COMPANY_EVENT_TYPES.VERIFIED,
-      {
-        verifiedAt: new Date().toISOString(),
-        verifiedBy,
-        notes,
-      }
-    );
+    if (this.status === 'VERIFIED')
+      throw new Error('Company is already verified');
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.VERIFIED,
+      CompanyVerifiedEventData
+    >(COMPANY_EVENT_TYPES.VERIFIED, {
+      verifiedAt: new Date().toISOString(),
+      verifiedBy,
+      notes,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   reject(rejectedBy: string, reason: string): void {
     if (this.isDeleted) throw new Error('Cannot reject deleted company');
-    if (this.status === 'REJECTED') throw new Error('Company is already rejected');
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.REJECTED, CompanyRejectedEventData>(
-      COMPANY_EVENT_TYPES.REJECTED,
-      {
-        rejectedAt: new Date().toISOString(),
-        rejectedBy,
-        reason,
-      }
-    );
+    if (this.status === 'REJECTED')
+      throw new Error('Company is already rejected');
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.REJECTED,
+      CompanyRejectedEventData
+    >(COMPANY_EVENT_TYPES.REJECTED, {
+      rejectedAt: new Date().toISOString(),
+      rejectedBy,
+      reason,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   suspend(suspendedBy: string, reason: string): void {
     if (this.isDeleted) throw new Error('Cannot suspend deleted company');
-    if (this.status === 'SUSPENDED') throw new Error('Company is already suspended');
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.SUSPENDED, CompanySuspendedEventData>(
-      COMPANY_EVENT_TYPES.SUSPENDED,
-      {
-        suspendedAt: new Date().toISOString(),
-        suspendedBy,
-        reason,
-      }
-    );
+    if (this.status === 'SUSPENDED')
+      throw new Error('Company is already suspended');
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.SUSPENDED,
+      CompanySuspendedEventData
+    >(COMPANY_EVENT_TYPES.SUSPENDED, {
+      suspendedAt: new Date().toISOString(),
+      suspendedBy,
+      reason,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   reactivate(reactivatedBy: string): void {
     if (this.isDeleted) throw new Error('Cannot reactivate deleted company');
-    if (this.status !== 'SUSPENDED') throw new Error('Only suspended companies can be reactivated');
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.REACTIVATED, CompanyReactivatedEventData>(
-      COMPANY_EVENT_TYPES.REACTIVATED,
-      {
-        reactivatedAt: new Date().toISOString(),
-        reactivatedBy,
-      }
-    );
+    if (this.status !== 'SUSPENDED')
+      throw new Error('Only suspended companies can be reactivated');
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.REACTIVATED,
+      CompanyReactivatedEventData
+    >(COMPANY_EVENT_TYPES.REACTIVATED, {
+      reactivatedAt: new Date().toISOString(),
+      reactivatedBy,
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -154,21 +158,26 @@ export class Company extends AggregateRoot {
     }
 
     const memberId = uuidv4();
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.MEMBER_ADDED, CompanyMemberAddedEventData>(
-      COMPANY_EVENT_TYPES.MEMBER_ADDED,
-      {
-        memberId,
-        userId,
-        role,
-        addedBy,
-      }
-    );
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.MEMBER_ADDED,
+      CompanyMemberAddedEventData
+    >(COMPANY_EVENT_TYPES.MEMBER_ADDED, {
+      memberId,
+      userId,
+      role,
+      addedBy,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
-  updateMember(memberId: string, role: CompanyMemberRole, updatedBy: string): void {
-    if (this.isDeleted) throw new Error('Cannot update member in deleted company');
+  updateMember(
+    memberId: string,
+    role: CompanyMemberRole,
+    updatedBy: string
+  ): void {
+    if (this.isDeleted)
+      throw new Error('Cannot update member in deleted company');
     if (!this.canUserManage(updatedBy)) {
       throw new Error('Only owner or admin can update members');
     }
@@ -184,21 +193,22 @@ export class Company extends AggregateRoot {
       throw new Error('Cannot promote to owner');
     }
 
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.MEMBER_UPDATED, CompanyMemberUpdatedEventData>(
-      COMPANY_EVENT_TYPES.MEMBER_UPDATED,
-      {
-        memberId,
-        userId: member.userId,
-        role,
-        updatedBy,
-      }
-    );
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.MEMBER_UPDATED,
+      CompanyMemberUpdatedEventData
+    >(COMPANY_EVENT_TYPES.MEMBER_UPDATED, {
+      memberId,
+      userId: member.userId,
+      role,
+      updatedBy,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   removeMember(memberId: string, removedBy: string): void {
-    if (this.isDeleted) throw new Error('Cannot remove member from deleted company');
+    if (this.isDeleted)
+      throw new Error('Cannot remove member from deleted company');
     if (!this.canUserManage(removedBy)) {
       throw new Error('Only owner or admin can remove members');
     }
@@ -211,14 +221,14 @@ export class Company extends AggregateRoot {
       throw new Error('Cannot remove the company owner');
     }
 
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.MEMBER_REMOVED, CompanyMemberRemovedEventData>(
-      COMPANY_EVENT_TYPES.MEMBER_REMOVED,
-      {
-        memberId,
-        userId: member.userId,
-        removedBy,
-      }
-    );
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.MEMBER_REMOVED,
+      CompanyMemberRemovedEventData
+    >(COMPANY_EVENT_TYPES.MEMBER_REMOVED, {
+      memberId,
+      userId: member.userId,
+      removedBy,
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -229,13 +239,13 @@ export class Company extends AggregateRoot {
       throw new Error('Only the owner can delete the company');
     }
 
-    const event = this.createEvent<typeof COMPANY_EVENT_TYPES.DELETED, CompanyDeletedEventData>(
-      COMPANY_EVENT_TYPES.DELETED,
-      {
-        deletedAt: new Date().toISOString(),
-        deletedBy: userId,
-      }
-    );
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.DELETED,
+      CompanyDeletedEventData
+    >(COMPANY_EVENT_TYPES.DELETED, {
+      deletedAt: new Date().toISOString(),
+      deletedBy: userId,
+    });
     this.addEvent(event);
     this.apply(event);
   }

@@ -33,6 +33,9 @@ import { DeleteTripCommand } from '../../../application/commands/trip/delete-tri
 import { GetTripQuery } from '../../../application/queries/trip/get-trip.query';
 import { ListTripsQuery } from '../../../application/queries/trip/list-trips.query';
 import { SearchTripsQuery } from '../../../application/queries/trip/search-trips.query';
+import { GetTripFilterDataQuery } from '../../../application/queries/trip/get-trip-filter-data.query';
+import { ListTripsWithBidsQuery } from '../../../application/queries/trip/list-trips-with-bids.query';
+import { ListTripsUserBidOnQuery } from '../../../application/queries/trip/list-trips-user-bid-on.query';
 import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Trips')
@@ -83,6 +86,13 @@ export class TripController {
     return { id: tripId };
   }
 
+  @Get('filter-data')
+  @ApiOperation({ summary: 'Get filter options for trips (public)' })
+  @ApiResponse({ status: 200, description: 'Filter options' })
+  async getFilterData() {
+    return this.queryBus.execute(new GetTripFilterDataQuery());
+  }
+
   @Get('my')
   @ApiOperation({ summary: 'List trips for current user' })
   @ApiResponse({ status: 200, description: 'List of user trips' })
@@ -97,6 +107,33 @@ export class TripController {
         query.page ?? 1,
         query.limit ?? 20
       )
+    );
+  }
+
+  @Get('my-with-requests')
+  @ApiOperation({ summary: 'List user trips that have received bids' })
+  @ApiResponse({ status: 200, description: 'Trips with bid counts' })
+  async listMyWithRequests(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new ListTripsWithBidsQuery(user.userId, page ?? 1, limit ?? 20)
+    );
+  }
+
+  @Get('my-sent-bids')
+  @ApiOperation({ summary: 'List trips where current user has made bids' })
+  @ApiResponse({ status: 200, description: 'Trips with user bids' })
+  async listMySentBids(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('status') status?: string,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new ListTripsUserBidOnQuery(user.userId, status, page ?? 1, limit ?? 20)
     );
   }
 
