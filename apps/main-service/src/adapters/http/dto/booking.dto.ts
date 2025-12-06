@@ -3,37 +3,44 @@ import { IsString, IsNumber, IsOptional, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class RateBookingDto {
-  @ApiProperty({ description: 'Rating from 1 to 5' })
+  @ApiProperty({ example: 5, minimum: 1, maximum: 5, description: 'Rating from 1 to 5' })
   @IsNumber()
   @Min(1)
   @Max(5)
   rating!: number;
 
-  @ApiPropertyOptional({ description: 'Optional comment' })
+  @ApiPropertyOptional({
+    example: 'Great driver, punctual delivery!',
+    description: 'Optional comment',
+  })
   @IsOptional()
   @IsString()
   comment?: string;
 }
 
 export class ListBookingsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by booking status' })
+  @ApiPropertyOptional({ example: 'CONFIRMED', description: 'Filter by booking status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ description: 'Filter role: customer or owner' })
+  @ApiPropertyOptional({
+    example: 'customer',
+    enum: ['customer', 'owner'],
+    description: 'Filter role: customer or owner',
+  })
   @IsOptional()
   @IsString()
   role?: 'customer' | 'owner';
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

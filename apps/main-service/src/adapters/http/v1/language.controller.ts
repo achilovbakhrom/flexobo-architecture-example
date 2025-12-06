@@ -16,7 +16,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard } from '@flexobo/shared-kernel';
 import {
   CreateLanguageDto,
   UpdateLanguageDto,

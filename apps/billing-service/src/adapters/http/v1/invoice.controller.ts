@@ -14,10 +14,7 @@ import {
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { RolesGuard } from '../guards/roles.guard';
-import { Roles } from '../guards/roles.guard';
-import { CurrentUser, CurrentUserData } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser, RolesGuard, Roles } from '@flexobo/shared-kernel';
 import {
   CreateInvoiceCommand,
   FinalizeInvoiceCommand,
@@ -47,7 +44,7 @@ export class InvoiceController {
 
   @Get()
   async listInvoices(
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('page') page: number = 1,
     @Query('pageSize') pageSize: number = 20,
   ): Promise<InvoiceListResponseDto> {
@@ -71,7 +68,7 @@ export class InvoiceController {
   @Get(':id')
   async getInvoice(
     @Param('id') id: string,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
   ): Promise<InvoiceResponseDto> {
     const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
       new GetInvoiceQuery(id),
@@ -91,7 +88,7 @@ export class InvoiceController {
   @Get(':id/pdf')
   async downloadInvoicePdf(
     @Param('id') id: string,
-    @CurrentUser() user: CurrentUserData,
+    @CurrentUser() user: AuthenticatedUser,
     @Res() res: Response,
   ): Promise<void> {
     const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(

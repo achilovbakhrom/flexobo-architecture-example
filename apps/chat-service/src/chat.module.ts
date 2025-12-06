@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import {
   CqrsModule,
   MessagingModule,
@@ -8,6 +9,12 @@ import {
   MESSAGE_PUBLISHER,
   EventBufferModule,
 } from '@flexobo/core';
+import {
+  JwtAuthGuard,
+  GrpcTokenValidator,
+  TOKEN_VALIDATOR,
+  USERS_GRPC_CLIENT,
+} from '@flexobo/shared-kernel';
 import { PrismaModule } from './prisma.module';
 import configuration from './config/configuration';
 
@@ -35,7 +42,7 @@ import {
 } from './adapters/persistence';
 
 // Adapters - Guards
-import { HttpJwtAuthGuard, WsJwtGuard } from './adapters/http/guards';
+import { WsJwtGuard } from './adapters/http/guards';
 
 // Adapters - Eventbus
 import {
@@ -141,6 +148,24 @@ const QueryHandlers = [
       }),
       inject: [ConfigService],
     }),
+    ClientsModule.registerAsync([
+      {
+        name: USERS_GRPC_CLIENT,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'users',
+            protoPath: require('path').join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/users.proto'
+            ),
+            url: configService.get('USERS_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   controllers: [ChatController, ChatGrpcController],
   providers: [
@@ -184,9 +209,11 @@ const QueryHandlers = [
     UsersGrpcClient,
     ChatGrpcController,
 
-    // Guards
+    // Guards (JwtAuthGuard from shared-kernel)
+    GrpcTokenValidator,
+    { provide: TOKEN_VALIDATOR, useExisting: GrpcTokenValidator },
+    JwtAuthGuard,
     WsJwtGuard,
-    HttpJwtAuthGuard,
 
     // Handlers need to be provided for DI
     ...CommandHandlers,

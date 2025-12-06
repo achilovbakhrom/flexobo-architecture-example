@@ -1,5 +1,8 @@
 /**
  * Role-Based Access Control (RBAC) Guard
+ *
+ * Works with AuthenticatedUser which has a single `role` field.
+ * Checks if user's role matches any of the required roles.
  */
 
 import {
@@ -9,7 +12,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { UserRole } from './auth.types';
+import { AuthenticatedUser } from './auth.types';
 import { ROLES_KEY } from './roles.decorator';
 
 @Injectable()
@@ -17,7 +20,7 @@ export class RolesGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const requiredRoles = this.reflector.getAllAndOverride<UserRole[]>(
+    const requiredRoles = this.reflector.getAllAndOverride<string[]>(
       ROLES_KEY,
       [context.getHandler(), context.getClass()]
     );
@@ -27,17 +30,18 @@ export class RolesGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest();
-    const user = request.user;
+    const user: AuthenticatedUser = request.user;
 
     if (!user) {
       throw new ForbiddenException('User not authenticated');
     }
 
-    const hasRole = requiredRoles.some((role) => user.roles?.includes(role));
+    // Check if user's role matches any of the required roles
+    const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (!hasRole) {
       throw new ForbiddenException(
-        `Required roles: ${requiredRoles.join(', ')}`
+        `Access denied. Required roles: ${requiredRoles.join(', ')}`
       );
     }
 

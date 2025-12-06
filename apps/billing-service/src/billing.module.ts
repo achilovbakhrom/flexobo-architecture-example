@@ -5,6 +5,12 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ClientsModule, Transport } from '@nestjs/microservices';
 import { PrismaModule } from './prisma.module';
+import {
+  JwtAuthGuard,
+  GrpcTokenValidator,
+  TOKEN_VALIDATOR,
+  USERS_GRPC_CLIENT,
+} from '@flexobo/shared-kernel';
 
 // Controllers
 import { PlanController } from './adapters/http/v1/plan.controller';
@@ -113,6 +119,22 @@ const Projections = [
         }),
         inject: [ConfigService],
       },
+      {
+        name: USERS_GRPC_CLIENT,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'users',
+            protoPath: require('path').join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/users.proto'
+            ),
+            url: configService.get('USERS_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+        inject: [ConfigService],
+      },
     ]),
   ],
   controllers: [
@@ -180,6 +202,11 @@ const Projections = [
 
     // gRPC Clients
     UsersGrpcClient,
+
+    // Auth (from shared-kernel)
+    GrpcTokenValidator,
+    { provide: TOKEN_VALIDATOR, useExisting: GrpcTokenValidator },
+    JwtAuthGuard,
   ],
   exports: [
     PLAN_AGGREGATE_STORE,

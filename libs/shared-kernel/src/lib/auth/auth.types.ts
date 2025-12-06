@@ -2,6 +2,8 @@
  * Authentication and Authorization types
  */
 
+import { Request } from 'express';
+
 /**
  * User roles for RBAC
  */
@@ -10,6 +12,32 @@ export enum UserRole {
   USER = 'USER',
   MANAGER = 'MANAGER',
   GUEST = 'GUEST',
+}
+
+/**
+ * Authenticated user attached to request by JwtAuthGuard
+ * Used across all microservices for consistent auth handling
+ */
+export interface AuthenticatedUser {
+  /** User ID (JWT standard claim) */
+  sub: string;
+  /** User ID (alias for backward compatibility) */
+  userId: string;
+  /** User role */
+  role: string;
+  /** JWT ID for token blacklisting */
+  jti: string;
+  /** User email (optional) */
+  email?: string;
+  /** Company ID if user belongs to a company (optional) */
+  companyId?: string;
+}
+
+/**
+ * Express Request with authenticated user attached
+ */
+export interface AuthenticatedRequest extends Request {
+  user: AuthenticatedUser;
 }
 
 /**

@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import {
   CqrsModule,
   MessagingModule,
@@ -9,6 +9,12 @@ import {
   MESSAGE_PUBLISHER,
   EventBufferModule,
 } from '@flexobo/core';
+import {
+  JwtAuthGuard,
+  GrpcTokenValidator,
+  TOKEN_VALIDATOR,
+  USERS_GRPC_CLIENT,
+} from '@flexobo/shared-kernel';
 import { PrismaModule } from './prisma.module';
 import configuration from './config/configuration';
 
@@ -61,13 +67,24 @@ import { QueryHandlers } from './application/queries';
       isGlobal: true,
       load: [configuration],
     }),
-    JwtModule.registerAsync({
-      imports: [ConfigModule],
-      useFactory: (configService: ConfigService) => ({
-        secret: configService.get('jwt.secret'),
-      }),
-      inject: [ConfigService],
-    }),
+    ClientsModule.registerAsync([
+      {
+        name: USERS_GRPC_CLIENT,
+        imports: [ConfigModule],
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'users',
+            protoPath: require('path').join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/users.proto'
+            ),
+            url: configService.get('USERS_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
     PrismaModule,
     MessagingModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
@@ -158,6 +175,11 @@ import { QueryHandlers } from './application/queries';
     // Command & Query handlers need to be provided for DI
     ...CommandHandlers,
     ...QueryHandlers,
+
+    // Auth (from shared-kernel)
+    GrpcTokenValidator,
+    { provide: TOKEN_VALIDATOR, useExisting: GrpcTokenValidator },
+    JwtAuthGuard,
   ],
 })
 export class NotificationModule {}
