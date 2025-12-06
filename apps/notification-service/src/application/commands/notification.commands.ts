@@ -1,5 +1,10 @@
 import { ICommand } from '@nestjs/cqrs';
-import { NotificationType, NotificationCategory, NotificationChannel } from '../../domain/constants/enums';
+import {
+  NotificationType,
+  NotificationCategory,
+  NotificationChannel,
+  NotificationSeverity,
+} from '../../domain/constants/enums';
 
 export class SendNotificationCommand implements ICommand {
   constructor(
@@ -10,7 +15,8 @@ export class SendNotificationCommand implements ICommand {
     public readonly title: string,
     public readonly body: string,
     public readonly channels: NotificationChannel[],
-    public readonly data?: Record<string, unknown>
+    public readonly data?: Record<string, unknown>,
+    public readonly severity: NotificationSeverity = NotificationSeverity.Info
   ) {}
 }
 
@@ -22,7 +28,8 @@ export class BroadcastNotificationCommand implements ICommand {
     public readonly title: string,
     public readonly body: string,
     public readonly channels: NotificationChannel[],
-    public readonly data?: Record<string, unknown>
+    public readonly data?: Record<string, unknown>,
+    public readonly severity: NotificationSeverity = NotificationSeverity.Info
   ) {}
 }
 

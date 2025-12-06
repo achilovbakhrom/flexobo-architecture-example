@@ -47,8 +47,8 @@ export interface NotificationSnapshotData {
 export class NotificationAggregate extends AggregateRoot {
   private state: NotificationState = {
     userId: '',
-    type: NotificationType.USER,
-    category: NotificationCategory.SYSTEM,
+    type: NotificationType.User,
+    category: NotificationCategory.System,
     title: '',
     body: '',
     channels: [],

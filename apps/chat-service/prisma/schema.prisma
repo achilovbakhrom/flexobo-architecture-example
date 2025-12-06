@@ -115,8 +115,6 @@ model ChatRoom {
     createdAt            DateTime  @default(now()) @map("created_at")
     updatedAt            DateTime  @updatedAt @map("updated_at")
 
-    messages             ChatMessage[]
-
     @@index([participants])
     @@index([status, lastMessageAt])
     @@index([isDeleted, lastMessageAt])
@@ -172,10 +170,6 @@ model ChatMessage {
 
     createdAt       DateTime      @default(now()) @map("created_at")
     updatedAt       DateTime      @updatedAt @map("updated_at")
-
-    room            ChatRoom      @relation(fields: [roomId], references: [id], onDelete: Cascade)
-    replyTo         ChatMessage?  @relation("MessageReplies", fields: [replyToId], references: [id])
-    replies         ChatMessage[] @relation("MessageReplies")
 
     @@index([roomId, createdAt])
     @@index([senderId, senderType])
