@@ -4,7 +4,6 @@ import {
   IsNumber,
   IsOptional,
   IsBoolean,
-  IsEnum,
   Min,
   ArrayNotEmpty,
 } from 'class-validator';
@@ -13,58 +12,98 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { TransportType, LoadingType, Feature } from '../../../domain/constants/enums';
 
 export class CreateTransportDto {
-  @ApiProperty({ enum: TransportType })
+  @ApiProperty({
+    enum: TransportType,
+    example: 'TENT',
+    description: 'Transport type',
+  })
   @IsString()
   transportType!: string;
 
-  @ApiProperty({ type: [String], enum: LoadingType, isArray: true })
+  @ApiProperty({
+    type: [String],
+    enum: LoadingType,
+    isArray: true,
+    example: ['TOP', 'SIDE', 'REAR'],
+    description: 'Available loading methods',
+  })
   @IsArray()
   @ArrayNotEmpty()
   @IsString({ each: true })
   loadingTypes!: string[];
 
-  @ApiProperty({ minimum: 0 })
+  @ApiProperty({
+    example: 22,
+    minimum: 0,
+    description: 'Cargo capacity in tons',
+  })
   @IsNumber()
   @Min(0)
   capacityTons!: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 86,
+    description: 'Cargo volume capacity in cubic meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   capacityM3?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 13.6,
+    description: 'Cargo area length in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   lengthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 2.45,
+    description: 'Cargo area width in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   widthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 2.7,
+    description: 'Cargo area height in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   heightM?: number;
 
-  @ApiPropertyOptional({ type: [String], enum: Feature, isArray: true })
+  @ApiPropertyOptional({
+    type: [String],
+    enum: Feature,
+    isArray: true,
+    example: ['GPS', 'TIR', 'CMR'],
+    description: 'Available features',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['ADR1', 'ADR3'],
+    description: 'ADR certification classes',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   adrClasses?: string[];
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['ECMT', 'EU'],
+    description: 'Available permits/licenses',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -72,60 +111,100 @@ export class CreateTransportDto {
 }
 
 export class UpdateTransportDto {
-  @ApiPropertyOptional({ enum: TransportType })
+  @ApiPropertyOptional({
+    enum: TransportType,
+    example: 'REFRIGERATOR',
+    description: 'Transport type',
+  })
   @IsOptional()
   @IsString()
   transportType?: string;
 
-  @ApiPropertyOptional({ type: [String], enum: LoadingType, isArray: true })
+  @ApiPropertyOptional({
+    type: [String],
+    enum: LoadingType,
+    isArray: true,
+    example: ['REAR'],
+    description: 'Available loading methods',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   loadingTypes?: string[];
 
-  @ApiPropertyOptional({ minimum: 0 })
+  @ApiPropertyOptional({
+    example: 20,
+    minimum: 0,
+    description: 'Cargo capacity in tons',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   capacityTons?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 80,
+    description: 'Cargo volume capacity in cubic meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   capacityM3?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 13.0,
+    description: 'Cargo area length in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   lengthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 2.4,
+    description: 'Cargo area width in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   widthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: 2.6,
+    description: 'Cargo area height in meters',
+  })
   @IsOptional()
   @IsNumber()
   @Min(0)
   heightM?: number;
 
-  @ApiPropertyOptional({ type: [String], enum: Feature, isArray: true })
+  @ApiPropertyOptional({
+    type: [String],
+    enum: Feature,
+    isArray: true,
+    example: ['GPS', 'THERMO'],
+    description: 'Available features',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   features?: string[];
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['ADR1'],
+    description: 'ADR certification classes',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   adrClasses?: string[];
 
-  @ApiPropertyOptional({ type: [String] })
+  @ApiPropertyOptional({
+    type: [String],
+    example: ['ECMT'],
+    description: 'Available permits/licenses',
+  })
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
@@ -133,25 +212,32 @@ export class UpdateTransportDto {
 }
 
 export class ListTransportsQueryDto {
-  @ApiPropertyOptional({ enum: TransportType })
+  @ApiPropertyOptional({
+    enum: TransportType,
+    example: 'TENT',
+    description: 'Filter by transport type',
+  })
   @IsOptional()
   @IsString()
   transportType?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({
+    example: true,
+    description: 'Filter by active status',
+  })
   @IsOptional()
   @IsBoolean()
   @Type(() => Boolean)
   isActive?: boolean;
 
-  @ApiPropertyOptional({ default: 1, minimum: 1 })
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @IsNumber()
   @Min(1)
   @Type(() => Number)
   page?: number = 1;
 
-  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @IsNumber()
   @Min(1)
@@ -160,55 +246,55 @@ export class ListTransportsQueryDto {
 }
 
 export class TransportResponseDto {
-  @ApiProperty()
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440000' })
   id!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440001' })
   ownerId!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: '550e8400-e29b-41d4-a716-446655440002' })
   companyId!: string;
 
-  @ApiProperty({ enum: TransportType })
+  @ApiProperty({ enum: TransportType, example: 'TENT' })
   transportType!: string;
 
-  @ApiProperty({ type: [String], enum: LoadingType })
+  @ApiProperty({ type: [String], enum: LoadingType, example: ['TOP', 'SIDE'] })
   loadingTypes!: string[];
 
-  @ApiProperty()
+  @ApiProperty({ example: 22 })
   capacityTons!: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 86 })
   capacityM3?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 13.6 })
   lengthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 2.45 })
   widthM?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 2.7 })
   heightM?: number;
 
-  @ApiProperty({ type: [String], enum: Feature })
+  @ApiProperty({ type: [String], enum: Feature, example: ['GPS', 'TIR'] })
   features!: string[];
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], example: ['ADR1'] })
   adrClasses!: string[];
 
-  @ApiProperty({ type: [String] })
+  @ApiProperty({ type: [String], example: ['ECMT'] })
   permits!: string[];
 
-  @ApiProperty()
+  @ApiProperty({ example: true })
   isActive!: boolean;
 
-  @ApiProperty()
+  @ApiProperty({ example: 1 })
   version!: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2024-03-15T10:00:00.000Z' })
   createdAt!: Date;
 
-  @ApiProperty()
+  @ApiProperty({ example: '2024-03-15T10:00:00.000Z' })
   updatedAt!: Date;
 }
 
@@ -216,15 +302,15 @@ export class ListTransportsResponseDto {
   @ApiProperty({ type: [TransportResponseDto] })
   items!: TransportResponseDto[];
 
-  @ApiProperty()
+  @ApiProperty({ example: 50 })
   total!: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 1 })
   page!: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 20 })
   limit!: number;
 
-  @ApiProperty()
+  @ApiProperty({ example: 3 })
   totalPages!: number;
 }

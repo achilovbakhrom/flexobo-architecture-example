@@ -1,17 +1,23 @@
-import { Injectable, Inject, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { Inject, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  CommandHandler,
+  ICommand,
+  ICommandHandler,
+  Result,
+  Success,
+  Failure,
+} from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { randomBytes } from 'crypto';
-import { INVITATION_REPOSITORY, IInvitationRepository } from '../../ports/invitation.repository';
+import {
+  INVITATION_REPOSITORY,
+  IInvitationRepository,
+} from '../../ports/invitation.repository';
 import {
   COMPANY_MEMBERSHIP_REPOSITORY,
   ICompanyMembershipRepository,
 } from '../../ports/company-membership.repository';
 import { ROLE_REPOSITORY, IRoleRepository } from '../../ports/role.repository';
-
-// ============================================================
-// Commands
-// ============================================================
 
 export class CreateInvitationCommand implements ICommand {
   constructor(
@@ -25,10 +31,7 @@ export class CreateInvitationCommand implements ICommand {
 }
 
 export class AcceptInvitationCommand implements ICommand {
-  constructor(
-    public readonly token: string,
-    public readonly userId: string
-  ) {}
+  constructor(public readonly token: string, public readonly userId: string) {}
 }
 
 export class RejectInvitationCommand implements ICommand {
@@ -49,14 +52,10 @@ export class ResendInvitationCommand implements ICommand {
   ) {}
 }
 
-// ============================================================
-// Handlers
-// ============================================================
-
-@Injectable()
 @CommandHandler(CreateInvitationCommand)
 export class CreateInvitationHandler
-  implements ICommandHandler<CreateInvitationCommand>
+  implements
+    ICommandHandler<CreateInvitationCommand, { id: string; token: string }>
 {
   constructor(
     @Inject(INVITATION_REPOSITORY)
@@ -67,53 +66,62 @@ export class CreateInvitationHandler
 
   async execute(
     command: CreateInvitationCommand
-  ): Promise<{ id: string; token: string }> {
-    // Check for existing pending invitation
-    const existingInvitation =
-      await this.invitationRepository.findPendingByEmailAndCompany(
-        command.email,
-        command.companyId
-      );
+  ): Promise<Result<{ id: string; token: string }, Error>> {
+    try {
+      // Check for existing pending invitation
+      const existingInvitation =
+        await this.invitationRepository.findPendingByEmailAndCompany(
+          command.email,
+          command.companyId
+        );
 
-    if (existingInvitation) {
-      throw new BadRequestException(
-        'An invitation has already been sent to this email for this company'
-      );
-    }
-
-    // Validate role if provided
-    if (command.roleId) {
-      const role = await this.roleRepository.findById(command.roleId);
-      if (!role || !role.isActive) {
-        throw new BadRequestException('Invalid or inactive role');
+      if (existingInvitation) {
+        return new Failure(
+          new BadRequestException(
+            'An invitation has already been sent to this email for this company'
+          )
+        );
       }
+
+      // Validate role if provided
+      if (command.roleId) {
+        const role = await this.roleRepository.findById(command.roleId);
+        if (!role || !role.isActive) {
+          return new Failure(
+            new BadRequestException('Invalid or inactive role')
+          );
+        }
+      }
+
+      const id = uuidv4();
+      const token = randomBytes(32).toString('hex');
+      const expiresAt = new Date(
+        Date.now() + (command.expiresInDays ?? 7) * 24 * 60 * 60 * 1000
+      );
+
+      await this.invitationRepository.create({
+        id,
+        email: command.email,
+        phone: command.phone,
+        invitedBy: command.invitedBy,
+        companyId: command.companyId,
+        roleId: command.roleId,
+        token,
+        expiresAt,
+      });
+
+      return new Success({ id, token });
+    } catch (error) {
+      return new Failure(
+        error instanceof Error ? error : new Error(String(error))
+      );
     }
-
-    const id = uuidv4();
-    const token = randomBytes(32).toString('hex');
-    const expiresAt = new Date(
-      Date.now() + (command.expiresInDays ?? 7) * 24 * 60 * 60 * 1000
-    );
-
-    await this.invitationRepository.create({
-      id,
-      email: command.email,
-      phone: command.phone,
-      invitedBy: command.invitedBy,
-      companyId: command.companyId,
-      roleId: command.roleId,
-      token,
-      expiresAt,
-    });
-
-    return { id, token };
   }
 }
 
-@Injectable()
 @CommandHandler(AcceptInvitationCommand)
 export class AcceptInvitationHandler
-  implements ICommandHandler<AcceptInvitationCommand>
+  implements ICommandHandler<AcceptInvitationCommand, { companyId: string }>
 {
   constructor(
     @Inject(INVITATION_REPOSITORY)
@@ -124,120 +132,164 @@ export class AcceptInvitationHandler
     private readonly roleRepository: IRoleRepository
   ) {}
 
-  async execute(command: AcceptInvitationCommand): Promise<{ companyId: string }> {
-    const invitation = await this.invitationRepository.findByToken(command.token);
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
+  async execute(
+    command: AcceptInvitationCommand
+  ): Promise<Result<{ companyId: string }, Error>> {
+    try {
+      const invitation = await this.invitationRepository.findByToken(
+        command.token
+      );
+      if (!invitation) {
+        return new Failure(new NotFoundException('Invitation not found'));
+      }
 
-    if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(
-        `Invitation has already been ${invitation.status.toLowerCase()}`
+      if (invitation.status !== 'PENDING') {
+        return new Failure(
+          new BadRequestException(
+            `Invitation has already been ${invitation.status.toLowerCase()}`
+          )
+        );
+      }
+
+      if (new Date() > invitation.expiresAt) {
+        await this.invitationRepository.updateStatus(invitation.id, 'EXPIRED');
+        return new Failure(new BadRequestException('Invitation has expired'));
+      }
+
+      // Check if user is already a member
+      const existingMembership =
+        await this.membershipRepository.findByUserAndCompany(
+          command.userId,
+          invitation.companyId
+        );
+
+      if (existingMembership?.isActive) {
+        return new Failure(
+          new BadRequestException('User is already a member of this company')
+        );
+      }
+
+      // Create membership
+      const membershipId = uuidv4();
+      await this.membershipRepository.create({
+        id: membershipId,
+        userId: command.userId,
+        companyId: invitation.companyId,
+        memberRole: 'MEMBER',
+        isDefault: false,
+      });
+
+      // Assign role if specified
+      if (invitation.roleId) {
+        await this.roleRepository.assignRole({
+          id: uuidv4(),
+          userId: command.userId,
+          roleId: invitation.roleId,
+          companyId: invitation.companyId,
+          assignedBy: invitation.invitedBy,
+        });
+      }
+
+      // Update invitation status
+      await this.invitationRepository.updateStatus(invitation.id, 'ACCEPTED', {
+        acceptedAt: new Date(),
+        acceptedBy: command.userId,
+      });
+
+      return new Success({ companyId: invitation.companyId });
+    } catch (error) {
+      return new Failure(
+        error instanceof Error ? error : new Error(String(error))
       );
     }
-
-    if (new Date() > invitation.expiresAt) {
-      await this.invitationRepository.updateStatus(invitation.id, 'EXPIRED');
-      throw new BadRequestException('Invitation has expired');
-    }
-
-    // Check if user is already a member
-    const existingMembership = await this.membershipRepository.findByUserAndCompany(
-      command.userId,
-      invitation.companyId
-    );
-
-    if (existingMembership?.isActive) {
-      throw new BadRequestException('User is already a member of this company');
-    }
-
-    // Create membership
-    const membershipId = uuidv4();
-    await this.membershipRepository.create({
-      id: membershipId,
-      userId: command.userId,
-      companyId: invitation.companyId,
-      memberRole: 'MEMBER',
-      isDefault: false,
-    });
-
-    // Assign role if specified
-    if (invitation.roleId) {
-      await this.roleRepository.assignRole({
-        id: uuidv4(),
-        userId: command.userId,
-        roleId: invitation.roleId,
-        companyId: invitation.companyId,
-        assignedBy: invitation.invitedBy,
-      });
-    }
-
-    // Update invitation status
-    await this.invitationRepository.updateStatus(invitation.id, 'ACCEPTED', {
-      acceptedAt: new Date(),
-      acceptedBy: command.userId,
-    });
-
-    return { companyId: invitation.companyId };
   }
 }
 
-@Injectable()
 @CommandHandler(RejectInvitationCommand)
 export class RejectInvitationHandler
-  implements ICommandHandler<RejectInvitationCommand>
+  implements ICommandHandler<RejectInvitationCommand, void>
 {
   constructor(
     @Inject(INVITATION_REPOSITORY)
     private readonly invitationRepository: IInvitationRepository
   ) {}
 
-  async execute(command: RejectInvitationCommand): Promise<void> {
-    const invitation = await this.invitationRepository.findByToken(command.token);
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
+  async execute(
+    command: RejectInvitationCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const invitation = await this.invitationRepository.findByToken(
+        command.token
+      );
+      if (!invitation) {
+        return new Failure(new NotFoundException('Invitation not found'));
+      }
 
-    if (invitation.status !== 'PENDING') {
-      throw new BadRequestException(
-        `Invitation has already been ${invitation.status.toLowerCase()}`
+      if (invitation.status !== 'PENDING') {
+        return new Failure(
+          new BadRequestException(
+            `Invitation has already been ${invitation.status.toLowerCase()}`
+          )
+        );
+      }
+
+      await this.invitationRepository.updateStatus(invitation.id, 'REJECTED', {
+        rejectedAt: new Date(),
+      });
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(
+        error instanceof Error ? error : new Error(String(error))
       );
     }
-
-    await this.invitationRepository.updateStatus(invitation.id, 'REJECTED', {
-      rejectedAt: new Date(),
-    });
   }
 }
 
-@Injectable()
 @CommandHandler(RevokeInvitationCommand)
 export class RevokeInvitationHandler
-  implements ICommandHandler<RevokeInvitationCommand>
+  implements ICommandHandler<RevokeInvitationCommand, void>
 {
   constructor(
     @Inject(INVITATION_REPOSITORY)
     private readonly invitationRepository: IInvitationRepository
   ) {}
 
-  async execute(command: RevokeInvitationCommand): Promise<void> {
-    const invitation = await this.invitationRepository.findById(command.invitationId);
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
+  async execute(
+    command: RevokeInvitationCommand
+  ): Promise<Result<void, Error>> {
+    try {
+      const invitation = await this.invitationRepository.findById(
+        command.invitationId
+      );
+      if (!invitation) {
+        return new Failure(new NotFoundException('Invitation not found'));
+      }
 
-    if (invitation.status !== 'PENDING') {
-      throw new BadRequestException('Only pending invitations can be revoked');
-    }
+      if (invitation.status !== 'PENDING') {
+        return new Failure(
+          new BadRequestException('Only pending invitations can be revoked')
+        );
+      }
 
-    await this.invitationRepository.updateStatus(invitation.id, 'REVOKED');
+      await this.invitationRepository.updateStatus(invitation.id, 'REVOKED');
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(
+        error instanceof Error ? error : new Error(String(error))
+      );
+    }
   }
 }
 
-@Injectable()
 @CommandHandler(ResendInvitationCommand)
 export class ResendInvitationHandler
-  implements ICommandHandler<ResendInvitationCommand>
+  implements
+    ICommandHandler<
+      ResendInvitationCommand,
+      { token: string; expiresAt: Date }
+    >
 {
   constructor(
     @Inject(INVITATION_REPOSITORY)
@@ -246,39 +298,49 @@ export class ResendInvitationHandler
 
   async execute(
     command: ResendInvitationCommand
-  ): Promise<{ token: string; expiresAt: Date }> {
-    const invitation = await this.invitationRepository.findById(command.invitationId);
-    if (!invitation) {
-      throw new NotFoundException('Invitation not found');
-    }
+  ): Promise<Result<{ token: string; expiresAt: Date }, Error>> {
+    try {
+      const invitation = await this.invitationRepository.findById(
+        command.invitationId
+      );
+      if (!invitation) {
+        return new Failure(new NotFoundException('Invitation not found'));
+      }
 
-    if (invitation.status !== 'PENDING' && invitation.status !== 'EXPIRED') {
-      throw new BadRequestException(
-        'Only pending or expired invitations can be resent'
+      if (invitation.status !== 'PENDING' && invitation.status !== 'EXPIRED') {
+        return new Failure(
+          new BadRequestException(
+            'Only pending or expired invitations can be resent'
+          )
+        );
+      }
+
+      // Delete old invitation and create new one
+      await this.invitationRepository.delete(invitation.id);
+
+      const newId = uuidv4();
+      const newToken = randomBytes(32).toString('hex');
+      const expiresAt = new Date(
+        Date.now() + (command.newExpiresInDays ?? 7) * 24 * 60 * 60 * 1000
+      );
+
+      await this.invitationRepository.create({
+        id: newId,
+        email: invitation.email,
+        phone: invitation.phone ?? undefined,
+        invitedBy: invitation.invitedBy,
+        companyId: invitation.companyId,
+        roleId: invitation.roleId ?? undefined,
+        token: newToken,
+        expiresAt,
+      });
+
+      return new Success({ token: newToken, expiresAt });
+    } catch (error) {
+      return new Failure(
+        error instanceof Error ? error : new Error(String(error))
       );
     }
-
-    // Delete old invitation and create new one
-    await this.invitationRepository.delete(invitation.id);
-
-    const newId = uuidv4();
-    const newToken = randomBytes(32).toString('hex');
-    const expiresAt = new Date(
-      Date.now() + (command.newExpiresInDays ?? 7) * 24 * 60 * 60 * 1000
-    );
-
-    await this.invitationRepository.create({
-      id: newId,
-      email: invitation.email,
-      phone: invitation.phone ?? undefined,
-      invitedBy: invitation.invitedBy,
-      companyId: invitation.companyId,
-      roleId: invitation.roleId ?? undefined,
-      token: newToken,
-      expiresAt,
-    });
-
-    return { token: newToken, expiresAt };
   }
 }
 

@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { JwtAuthGuard, AuthenticatedUser } from '../guards/jwt-auth.guard';
+import { JwtAuthGuard, AuthenticatedUser } from '@flexobo/shared-kernel';
 import {
   CreateSubscriptionDto,
   ChangePlanDto,

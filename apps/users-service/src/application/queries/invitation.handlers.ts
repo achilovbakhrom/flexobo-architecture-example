@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { QueryHandler, IQuery, IQueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { QueryHandler, IQuery, IQueryHandler } from '@flexobo/core';
 import {
   INVITATION_REPOSITORY,
   IInvitationRepository,
@@ -37,7 +37,6 @@ export class ListInvitationsByCompanyQuery implements IQuery {
 // Handlers
 // ============================================================
 
-@Injectable()
 @QueryHandler(GetInvitationByIdQuery)
 export class GetInvitationByIdHandler
   implements IQueryHandler<GetInvitationByIdQuery, InvitationReadDto | null>
@@ -52,7 +51,6 @@ export class GetInvitationByIdHandler
   }
 }
 
-@Injectable()
 @QueryHandler(GetInvitationByTokenQuery)
 export class GetInvitationByTokenHandler
   implements IQueryHandler<GetInvitationByTokenQuery, InvitationReadDto | null>
@@ -67,7 +65,6 @@ export class GetInvitationByTokenHandler
   }
 }
 
-@Injectable()
 @QueryHandler(ListInvitationsByEmailQuery)
 export class ListInvitationsByEmailHandler
   implements IQueryHandler<ListInvitationsByEmailQuery, InvitationReadDto[]>
@@ -82,7 +79,6 @@ export class ListInvitationsByEmailHandler
   }
 }
 
-@Injectable()
 @QueryHandler(ListInvitationsByCompanyQuery)
 export class ListInvitationsByCompanyHandler
   implements IQueryHandler<ListInvitationsByCompanyQuery, InvitationReadDto[]>

@@ -24,8 +24,15 @@ import { LocationController } from './adapters/http/v1/location.controller';
 import { StatisticsController } from './adapters/http/v1/statistics.controller';
 import { ReferenceDataAdminController } from './adapters/http/v1/reference-data-admin.controller';
 
-// Guards
-import { JwtAuthGuard } from './adapters/http/guards/jwt-auth.guard';
+// Auth (from shared-kernel)
+import {
+  JwtAuthGuard,
+  TOKEN_VALIDATOR,
+  GrpcTokenValidator,
+  USERS_GRPC_CLIENT,
+} from '@flexobo/shared-kernel';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { join } from 'path';
 
 // gRPC Clients
 import { UsersGrpcClient } from './adapters/grpc/users-grpc.client';
@@ -385,6 +392,24 @@ const QueryHandlers = [
       isGlobal: true,
     }),
     PrismaModule,
+    // gRPC client for users-service (used by JwtAuthGuard)
+    ClientsModule.registerAsync([
+      {
+        name: USERS_GRPC_CLIENT,
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'users',
+            protoPath: join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/users.proto'
+            ),
+            url: configService.get('USERS_GRPC_URL', 'localhost:50052'),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
     MessagingModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
         config: {
@@ -433,7 +458,12 @@ const QueryHandlers = [
     ReferenceDataAdminController,
   ],
   providers: [
-    // Guards
+    // Auth Guard (from shared-kernel)
+    GrpcTokenValidator,
+    {
+      provide: TOKEN_VALIDATOR,
+      useExisting: GrpcTokenValidator,
+    },
     JwtAuthGuard,
 
     // gRPC Clients

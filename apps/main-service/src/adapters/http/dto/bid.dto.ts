@@ -12,16 +12,24 @@ import { Type } from 'class-transformer';
 import { PostType } from '../../../domain/constants/enums';
 
 export class CreateBidDto {
-  @ApiProperty({ enum: PostType, description: 'Type of post: LOAD or TRIP' })
+  @ApiProperty({
+    enum: PostType,
+    example: 'LOAD',
+    description: 'Type of post: LOAD or TRIP',
+  })
   @IsEnum(PostType)
   postType!: PostType;
 
-  @ApiProperty({ description: 'ID of the load or trip' })
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'ID of the load or trip',
+  })
   @IsString()
   postId!: string;
 
   @ApiPropertyOptional({
     type: [String],
+    example: ['550e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440002'],
     description: 'Transport IDs (required for bids on loads)',
   })
   @IsOptional()
@@ -29,43 +37,46 @@ export class CreateBidDto {
   @IsString({ each: true })
   transportIds?: string[];
 
-  @ApiProperty({ description: 'Proposed price' })
+  @ApiProperty({ example: 1500, description: 'Proposed price' })
   @IsNumber()
   @Min(0)
   proposedPrice!: number;
 
-  @ApiPropertyOptional({ default: 'USD' })
+  @ApiPropertyOptional({ example: 'USD', default: 'USD', description: 'Currency code' })
   @IsOptional()
   @IsString()
   currency?: string;
 
-  @ApiPropertyOptional({ description: 'Expiration date for the bid' })
+  @ApiPropertyOptional({
+    example: '2024-03-20T12:00:00Z',
+    description: 'Expiration date for the bid (ISO 8601)',
+  })
   @IsOptional()
   @IsString()
   expiresAt?: string;
 }
 
 export class CounterBidDto {
-  @ApiProperty({ description: 'Counter offer price' })
+  @ApiProperty({ example: 1350, description: 'Counter offer price' })
   @IsNumber()
   @Min(0)
   newPrice!: number;
 }
 
 export class ListBidsByPostQueryDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'PENDING', description: 'Filter by bid status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -75,24 +86,24 @@ export class ListBidsByPostQueryDto {
 }
 
 export class ListMyBidsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by bid status' })
+  @ApiPropertyOptional({ example: 'PENDING', description: 'Filter by bid status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional({ enum: PostType })
+  @ApiPropertyOptional({ enum: PostType, example: 'LOAD', description: 'Filter by post type' })
   @IsOptional()
   @IsEnum(PostType)
   postType?: PostType;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -102,19 +113,19 @@ export class ListMyBidsQueryDto {
 }
 
 export class ListReceivedBidsQueryDto {
-  @ApiPropertyOptional({ description: 'Filter by bid status' })
+  @ApiPropertyOptional({ example: 'PENDING', description: 'Filter by bid status' })
   @IsOptional()
   @IsString()
   status?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 20, default: 20, minimum: 1, maximum: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()

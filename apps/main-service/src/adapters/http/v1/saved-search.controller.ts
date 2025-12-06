@@ -20,8 +20,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { CommandBus, QueryBus } from '@flexobo/core';
-import { JwtAuthGuard } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { JwtAuthGuard, AuthenticatedUser, CurrentUser } from '@flexobo/shared-kernel';
 import { CreateSavedSearchDto, UpdateSavedSearchDto, SavedSearchTypeDto } from '../dto/saved-search.dto';
 import {
   CreateSavedSearchCommand,
@@ -32,11 +31,6 @@ import {
   GetSavedSearchQuery,
   ListSavedSearchesQuery,
 } from '../../../application/queries/saved-search';
-
-interface JwtPayload {
-  user: string;
-  role: string;
-}
 
 @ApiTags('Saved Searches')
 @ApiBearerAuth()
@@ -52,12 +46,12 @@ export class SavedSearchController {
   @ApiOperation({ summary: 'Create a saved search' })
   @ApiResponse({ status: 201, description: 'Saved search created successfully' })
   async createSavedSearch(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateSavedSearchDto
   ) {
     const searchId = await this.commandBus.execute(
       new CreateSavedSearchCommand(
-        user.user,
+        user.userId,
         dto.name,
         dto.searchType,
         dto.filters,
@@ -78,14 +72,14 @@ export class SavedSearchController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiResponse({ status: 200, description: 'List of saved searches' })
   async listSavedSearches(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Query('searchType') searchType?: SavedSearchTypeDto,
     @Query('page') page?: string,
     @Query('limit') limit?: string
   ) {
     return this.queryBus.execute(
       new ListSavedSearchesQuery(
-        user.user,
+        user.userId,
         searchType,
         page ? parseInt(page, 10) : 1,
         limit ? parseInt(limit, 10) : 20
@@ -98,11 +92,11 @@ export class SavedSearchController {
   @ApiResponse({ status: 200, description: 'Saved search details' })
   @ApiResponse({ status: 404, description: 'Saved search not found' })
   async getSavedSearch(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string
   ) {
     const search = await this.queryBus.execute(
-      new GetSavedSearchQuery(id, user.user)
+      new GetSavedSearchQuery(id, user.userId)
     );
 
     if (!search) {
@@ -117,14 +111,14 @@ export class SavedSearchController {
   @ApiResponse({ status: 200, description: 'Saved search updated successfully' })
   @ApiResponse({ status: 404, description: 'Saved search not found' })
   async updateSavedSearch(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateSavedSearchDto
   ) {
     await this.commandBus.execute(
       new UpdateSavedSearchCommand(
         id,
-        user.user,
+        user.userId,
         dto.name,
         dto.filters,
         dto.notifyOnNew
@@ -142,11 +136,11 @@ export class SavedSearchController {
   @ApiResponse({ status: 204, description: 'Saved search deleted successfully' })
   @ApiResponse({ status: 404, description: 'Saved search not found' })
   async deleteSavedSearch(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string
   ) {
     await this.commandBus.execute(
-      new DeleteSavedSearchCommand(id, user.user)
+      new DeleteSavedSearchCommand(id, user.userId)
     );
   }
 }

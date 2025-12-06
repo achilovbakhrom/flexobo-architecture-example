@@ -29,49 +29,49 @@ export class ResponseLanguageDto {
 }
 
 export class CreateLanguageDto {
-  @ApiProperty()
+  @ApiProperty({ example: 'Uzbek', description: 'Language name' })
   @IsString()
   name!: string;
 
-  @ApiProperty()
+  @ApiProperty({ example: 'uz', description: 'Language code (ISO 639-1)' })
   @IsString()
   code!: string;
 
-  @ApiPropertyOptional({ default: false })
+  @ApiPropertyOptional({ example: true, default: false, description: 'Whether the language is active' })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
 }
 
 export class UpdateLanguageDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'O\'zbek', description: 'Language name' })
   @IsOptional()
   @IsString()
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'uzb', description: 'Language code' })
   @IsOptional()
   @IsString()
   code?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: false, description: 'Whether the language is active' })
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
 }
 
 export class LanguageListQueryDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'uzbek', description: 'Search by name' })
   @IsOptional()
   @IsString()
   search?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'uz', description: 'Filter by language code' })
   @IsOptional()
   @IsString()
   code?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: true, description: 'Filter by active status' })
   @IsOptional()
   @Transform(({ value }) =>
     value === undefined ? undefined : value === 'true' || value === true
@@ -79,7 +79,7 @@ export class LanguageListQueryDto {
   @IsBoolean()
   is_active?: boolean;
 
-  @ApiPropertyOptional({ default: 1 })
+  @ApiPropertyOptional({ example: 1, default: 1, minimum: 1 })
   @IsOptional()
   @Transform(({ value }) => {
     const num = Number(value);
@@ -89,7 +89,7 @@ export class LanguageListQueryDto {
   @Min(1)
   page?: number;
 
-  @ApiPropertyOptional({ default: 10 })
+  @ApiPropertyOptional({ example: 10, default: 10, minimum: 1 })
   @IsOptional()
   @Transform(({ value }) => {
     const num = Number(value);
