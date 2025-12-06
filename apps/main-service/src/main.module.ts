@@ -67,6 +67,7 @@ import {
   SAVED_SEARCH_READ_REPOSITORY,
 } from './ports/saved-search.repository';
 import { LOCATION_SERVICE } from './ports/location.service';
+import { REFERENCE_DATA_REPOSITORY } from './ports/reference-data.repository';
 
 // External Services
 import { OsmLocationService } from './adapters/external/osm-location.service';
@@ -268,6 +269,7 @@ import {
   GetSavedSearchHandler,
   ListSavedSearchesHandler,
 } from './application/queries/saved-search';
+import { ReferenceDataController } from './adapters/http/v1/reference-data.controller';
 
 const CommandHandlers = [
   // Transport
@@ -430,6 +432,7 @@ const QueryHandlers = [
     SavedSearchController,
     LocationController,
     StatisticsController,
+    ReferenceDataController,
     ReferenceDataAdminController,
   ],
   providers: [
@@ -514,6 +517,10 @@ const QueryHandlers = [
     {
       provide: SAVED_SEARCH_READ_REPOSITORY,
       useClass: PrismaSavedSearchReadRepository,
+    },
+    {
+      provide: REFERENCE_DATA_REPOSITORY,
+      useClass: PrismaReferenceDataRepository,
     },
 
     // External Services

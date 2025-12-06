@@ -62,6 +62,7 @@ export class ReferenceDataAdminController {
         orderBy: { name: 'asc' },
         skip: ((query.page ?? 1) - 1) * (query.limit ?? 50),
         take: query.limit ?? 50,
+        include: { translations: true },
       }),
       this.prisma.countryReadModel.count({ where }),
     ]);
@@ -79,7 +80,14 @@ export class ReferenceDataAdminController {
         currencyCode: dto.currency_code,
         phoneCode: dto.phone_code,
         isActive: dto.is_active ?? true,
+        translations: dto.translations ? {
+          create: dto.translations.map(t => ({
+            languageCode: t.language_code,
+            name: t.name,
+          })),
+        } : undefined,
       },
+      include: { translations: true },
     });
     return { data: country };
   }
@@ -95,9 +103,21 @@ export class ReferenceDataAdminController {
     if (dto.phone_code !== undefined) data.phoneCode = dto.phone_code;
     if (dto.is_active !== undefined) data.isActive = dto.is_active;
 
+    if (dto.translations !== undefined) {
+      // Delete existing translations and create new ones
+      await this.prisma.countryTranslationReadModel.deleteMany({ where: { countryId: id } });
+      data.translations = {
+        create: dto.translations.map(t => ({
+          languageCode: t.language_code,
+          name: t.name,
+        })),
+      };
+    }
+
     const country = await this.prisma.countryReadModel.update({
       where: { id },
       data,
+      include: { translations: true },
     });
     return { data: country };
   }
@@ -133,6 +153,7 @@ export class ReferenceDataAdminController {
         orderBy: { code: 'asc' },
         skip: ((query.page ?? 1) - 1) * (query.limit ?? 50),
         take: query.limit ?? 50,
+        include: { translations: true },
       }),
       this.prisma.currencyReadModel.count({ where }),
     ]);
@@ -150,7 +171,14 @@ export class ReferenceDataAdminController {
         symbol: dto.symbol,
         rate: dto.rate ?? 1,
         isActive: dto.is_active ?? true,
+        translations: dto.translations ? {
+          create: dto.translations.map(t => ({
+            languageCode: t.language_code,
+            name: t.name,
+          })),
+        } : undefined,
       },
+      include: { translations: true },
     });
     return { data: currency };
   }
@@ -166,9 +194,20 @@ export class ReferenceDataAdminController {
     if (dto.rate !== undefined) data.rate = dto.rate;
     if (dto.is_active !== undefined) data.isActive = dto.is_active;
 
+    if (dto.translations !== undefined) {
+      await this.prisma.currencyTranslationReadModel.deleteMany({ where: { currencyId: id } });
+      data.translations = {
+        create: dto.translations.map(t => ({
+          languageCode: t.language_code,
+          name: t.name,
+        })),
+      };
+    }
+
     const currency = await this.prisma.currencyReadModel.update({
       where: { id },
       data,
+      include: { translations: true },
     });
     return { data: currency };
   }
@@ -200,6 +239,7 @@ export class ReferenceDataAdminController {
         orderBy: { name: 'asc' },
         skip: ((query.page ?? 1) - 1) * (query.limit ?? 50),
         take: query.limit ?? 50,
+        include: { translations: true },
       }),
       this.prisma.transportTypeReadModel.count({ where }),
     ]);
@@ -215,7 +255,15 @@ export class ReferenceDataAdminController {
         name: dto.name,
         description: dto.description,
         isActive: dto.is_active ?? true,
+        translations: dto.translations ? {
+          create: dto.translations.map(t => ({
+            languageCode: t.language_code,
+            name: t.name,
+            description: t.description,
+          })),
+        } : undefined,
       },
+      include: { translations: true },
     });
     return { data: item };
   }
@@ -229,9 +277,21 @@ export class ReferenceDataAdminController {
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.is_active !== undefined) data.isActive = dto.is_active;
 
+    if (dto.translations !== undefined) {
+      await this.prisma.transportTypeTranslationReadModel.deleteMany({ where: { transportTypeId: id } });
+      data.translations = {
+        create: dto.translations.map(t => ({
+          languageCode: t.language_code,
+          name: t.name,
+          description: t.description,
+        })),
+      };
+    }
+
     const item = await this.prisma.transportTypeReadModel.update({
       where: { id },
       data,
+      include: { translations: true },
     });
     return { data: item };
   }
