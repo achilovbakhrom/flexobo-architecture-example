@@ -1,20 +1,25 @@
 export const REFERENCE_DATA_REPOSITORY = Symbol('REFERENCE_DATA_REPOSITORY');
 
+export interface TranslationDto {
+  languageCode: string;
+  name: string;
+  description?: string;
+}
+
 export interface CountryDto {
   id: string;
   code: string;
   name: string;
-  nameRu?: string;
-  nameUz?: string;
   phoneCode: string;
+  currencyCode?: string;
   isActive: boolean;
+  translations?: TranslationDto[];
 }
 
 export interface LanguageDto {
   id: string;
   code: string;
   name: string;
-  nativeName?: string;
   isActive: boolean;
 }
 
@@ -25,16 +30,16 @@ export interface CurrencyDto {
   symbol: string;
   rate: number;
   isActive: boolean;
+  translations?: TranslationDto[];
 }
 
 export interface ReferenceItemDto {
   id: string;
   code: string;
   name: string;
-  nameRu?: string;
-  nameUz?: string;
   description?: string;
   isActive: boolean;
+  translations?: TranslationDto[];
 }
 
 export interface IReferenceDataRepository {

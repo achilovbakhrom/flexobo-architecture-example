@@ -8,39 +8,35 @@ import {
 } from '../../../ports/reference-data.repository';
 
 interface ReferenceDataPrismaClient {
-  country: {
+  countryReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  language: {
+  languageReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  currency: {
+  currencyReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  loadType: {
+  loadTypeReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  transportType: {
+  transportTypeReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  loadingType: {
+  loadingTypeReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  companyType: {
+  aDRClassificationReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
-  aDRClassification: {
-    findMany: (args?: any) => Promise<any[]>;
-    findUnique: (args: any) => Promise<any>;
-  };
-  permit: {
+  permitReadModel: {
     findMany: (args?: any) => Promise<any[]>;
     findUnique: (args: any) => Promise<any>;
   };
@@ -54,23 +50,25 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
 
   // Countries
   async findAllCountries(): Promise<CountryDto[]> {
-    const countries = await this.prisma.country.findMany({
+    const countries = await this.prisma.countryReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: { translations: true },
     });
     return countries.map(this.mapCountry);
   }
 
   async findCountryByCode(code: string): Promise<CountryDto | null> {
-    const country = await this.prisma.country.findUnique({
+    const country = await this.prisma.countryReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return country ? this.mapCountry(country) : null;
   }
 
   // Languages
   async findAllLanguages(): Promise<LanguageDto[]> {
-    const languages = await this.prisma.language.findMany({
+    const languages = await this.prisma.languageReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
     });
@@ -78,7 +76,7 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
   }
 
   async findLanguageByCode(code: string): Promise<LanguageDto | null> {
-    const language = await this.prisma.language.findUnique({
+    const language = await this.prisma.languageReadModel.findUnique({
       where: { code },
     });
     return language ? this.mapLanguage(language) : null;
@@ -86,114 +84,126 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
 
   // Currencies
   async findAllCurrencies(): Promise<CurrencyDto[]> {
-    const currencies = await this.prisma.currency.findMany({
+    const currencies = await this.prisma.currencyReadModel.findMany({
       where: { isActive: true },
       orderBy: { code: 'asc' },
+      include: { translations: true },
     });
     return currencies.map(this.mapCurrency);
   }
 
   async findCurrencyByCode(code: string): Promise<CurrencyDto | null> {
-    const currency = await this.prisma.currency.findUnique({
+    const currency = await this.prisma.currencyReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return currency ? this.mapCurrency(currency) : null;
   }
 
   // Load Types
   async findAllLoadTypes(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.loadType.findMany({
+    const items = await this.prisma.loadTypeReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: { translations: true },
     });
     return items.map(this.mapReferenceItem);
   }
 
   async findLoadTypeByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.loadType.findUnique({
+    const item = await this.prisma.loadTypeReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return item ? this.mapReferenceItem(item) : null;
   }
 
   // Transport Types
   async findAllTransportTypes(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.transportType.findMany({
+    const items = await this.prisma.transportTypeReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: { translations: true },
     });
     return items.map(this.mapReferenceItem);
   }
 
   async findTransportTypeByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.transportType.findUnique({
+    const item = await this.prisma.transportTypeReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return item ? this.mapReferenceItem(item) : null;
   }
 
   // Loading Types
   async findAllLoadingTypes(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.loadingType.findMany({
+    const items = await this.prisma.loadingTypeReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: { translations: true },
     });
     return items.map(this.mapReferenceItem);
   }
 
   async findLoadingTypeByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.loadingType.findUnique({
+    const item = await this.prisma.loadingTypeReadModel.findUnique({
       where: { code },
-    });
-    return item ? this.mapReferenceItem(item) : null;
-  }
-
-  // Company Types
-  async findAllCompanyTypes(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.companyType.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' },
-    });
-    return items.map(this.mapReferenceItem);
-  }
-
-  async findCompanyTypeByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.companyType.findUnique({
-      where: { code },
+      include: { translations: true },
     });
     return item ? this.mapReferenceItem(item) : null;
   }
 
   // ADR Classifications
   async findAllADRClassifications(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.aDRClassification.findMany({
+    const items = await this.prisma.aDRClassificationReadModel.findMany({
       where: { isActive: true },
       orderBy: { code: 'asc' },
+      include: { translations: true },
     });
     return items.map(this.mapReferenceItem);
   }
 
   async findADRClassificationByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.aDRClassification.findUnique({
+    const item = await this.prisma.aDRClassificationReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return item ? this.mapReferenceItem(item) : null;
   }
 
   // Permits
   async findAllPermits(): Promise<ReferenceItemDto[]> {
-    const items = await this.prisma.permit.findMany({
+    const items = await this.prisma.permitReadModel.findMany({
       where: { isActive: true },
       orderBy: { name: 'asc' },
+      include: { translations: true },
     });
     return items.map(this.mapReferenceItem);
   }
 
   async findPermitByCode(code: string): Promise<ReferenceItemDto | null> {
-    const item = await this.prisma.permit.findUnique({
+    const item = await this.prisma.permitReadModel.findUnique({
       where: { code },
+      include: { translations: true },
     });
     return item ? this.mapReferenceItem(item) : null;
+  }
+
+  // Company Types - hardcoded list (no database model)
+  async findAllCompanyTypes(): Promise<ReferenceItemDto[]> {
+    return [
+      { id: '1', code: 'LOGISTICS', name: 'Logistics', isActive: true },
+      { id: '2', code: 'CARRIER', name: 'Carrier', isActive: true },
+      { id: '3', code: 'FORWARDER', name: 'Forwarder', isActive: true },
+      { id: '4', code: 'BROKER', name: 'Broker', isActive: true },
+      { id: '5', code: 'SHIPPER', name: 'Shipper', isActive: true },
+    ];
+  }
+
+  async findCompanyTypeByCode(code: string): Promise<ReferenceItemDto | null> {
+    const types = await this.findAllCompanyTypes();
+    return types.find(t => t.code === code) || null;
   }
 
   private mapCountry(country: any): CountryDto {
@@ -201,10 +211,13 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
       id: country.id,
       code: country.code,
       name: country.name,
-      nameRu: country.nameRu,
-      nameUz: country.nameUz,
       phoneCode: country.phoneCode,
+      currencyCode: country.currencyCode,
       isActive: country.isActive,
+      translations: country.translations?.map((t: any) => ({
+        languageCode: t.languageCode,
+        name: t.name,
+      })),
     };
   }
 
@@ -213,7 +226,6 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
       id: language.id,
       code: language.code,
       name: language.name,
-      nativeName: language.nativeName,
       isActive: language.isActive,
     };
   }
@@ -226,6 +238,10 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
       symbol: currency.symbol,
       rate: currency.rate,
       isActive: currency.isActive,
+      translations: currency.translations?.map((t: any) => ({
+        languageCode: t.languageCode,
+        name: t.name,
+      })),
     };
   }
 
@@ -234,10 +250,13 @@ export class PrismaReferenceDataRepository implements IReferenceDataRepository {
       id: item.id,
       code: item.code,
       name: item.name,
-      nameRu: item.nameRu,
-      nameUz: item.nameUz,
       description: item.description,
       isActive: item.isActive,
+      translations: item.translations?.map((t: any) => ({
+        languageCode: t.languageCode,
+        name: t.name,
+        description: t.description,
+      })),
     };
   }
 }

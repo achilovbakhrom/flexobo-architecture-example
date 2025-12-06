@@ -7,7 +7,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: main_service
     ports:
-      - '5439:5432'
+      - '5438:5432'
     volumes:
       - main_service_data:/var/lib/postgresql/data
     healthcheck:

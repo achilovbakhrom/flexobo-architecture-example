@@ -132,6 +132,7 @@ model LoadReadModel {
   @@index([transportType])
   @@index([fromCountry, toCountry])
   @@index([loadingDate])
+  @@map("loads")
 }
 
 model TripReadModel {
@@ -164,6 +165,7 @@ model TripReadModel {
   @@index([ownerId])
   @@index([companyId])
   @@index([status])
+  @@map("trips")
 }
 
 model TransportReadModel {
@@ -199,6 +201,7 @@ model TransportReadModel {
   @@index([companyId])
   @@index([transportType])
   @@index([isActive])
+  @@map("transports")
 }
 
 model BidReadModel {
@@ -235,6 +238,7 @@ model BidReadModel {
   @@index([postType, postId])
   @@index([status])
   @@index([chatRoomId])
+  @@map("bids")
 }
 
 model NegotiationStepReadModel {
@@ -253,6 +257,7 @@ model NegotiationStepReadModel {
 
   @@index([bidId])
   @@index([authorId])
+  @@map("negotiation_steps")
 }
 
 model BookingReadModel {
@@ -289,6 +294,7 @@ model BookingReadModel {
   @@index([postType, postId])
   @@index([bidId])
   @@index([status])
+  @@map("bookings")
 }
 
 model BoardReadModel {
@@ -309,6 +315,7 @@ model BoardReadModel {
 
   @@index([ownerId])
   @@index([companyId])
+  @@map("boards")
 }
 
 // ============ COMPANY ============
@@ -317,7 +324,7 @@ model CompanyReadModel {
   id          String  @id
   ownerId     String
   name        String
-  type        String  // LOGISTICS, CARRIER, FORWARDER, BROKER, SHIPPER
+  type        String // LOGISTICS, CARRIER, FORWARDER, BROKER, SHIPPER
   status      String  @default("PENDING") // PENDING, VERIFIED, REJECTED, SUSPENDED
   description String?
   logo        String?
@@ -362,13 +369,13 @@ model CompanyMemberReadModel {
 // ============ SAVED SEARCHES ============
 
 model SavedSearchReadModel {
-  id          String  @id
+  id          String    @id
   userId      String
   name        String
-  searchType  String  // LOAD, TRIP
-  filters     Json    // Search filter criteria
-  notifyOnNew Boolean @default(false)
-  isActive    Boolean @default(true)
+  searchType  String // LOAD, TRIP
+  filters     Json // Search filter criteria
+  notifyOnNew Boolean   @default(false)
+  isActive    Boolean   @default(true)
   lastUsedAt  DateTime?
 
   version   Int      @default(1)
@@ -395,69 +402,157 @@ model LanguageReadModel {
 }
 
 model CountryReadModel {
-  id           String  @id @default(uuid())
-  code         String  @unique // ISO 3166-1 alpha-2
-  name         String
-  currencyCode String?
-  phoneCode    String?
-  isActive     Boolean @default(true)
+  id           String                        @id @default(uuid())
+  code         String                        @unique // ISO 3166-1 alpha-2
+  currencyCode String?                       @map("currency_code")
+  phoneCode    String?                       @map("phone_code")
+  isActive     Boolean                       @default(true) @map("is_active")
+  translations CountryTranslationReadModel[]
 
   @@map("countries")
 }
 
+model CountryTranslationReadModel {
+  id           String           @id @default(uuid())
+  countryId    String           @map("country_id")
+  country      CountryReadModel @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  languageCode String           @map("language_code")
+  name         String
+
+  @@unique([countryId, languageCode])
+  @@map("country_translations")
+}
+
 model CurrencyReadModel {
-  id       String  @id @default(uuid())
-  code     String  @unique // ISO 4217
-  name     String
-  symbol   String
-  rate     Float   @default(1) // Exchange rate to USD
-  isActive Boolean @default(true)
+  id           String                         @id @default(uuid())
+  code         String                         @unique // ISO 4217
+  name         String
+  symbol       String
+  rate         Float                          @default(1) // Exchange rate to USD
+  isActive     Boolean                        @default(true) @map("is_active")
+  translations CurrencyTranslationReadModel[]
 
   @@map("currencies")
 }
 
+model CurrencyTranslationReadModel {
+  id           String            @id @default(uuid())
+  currencyId   String            @map("currency_id")
+  currency     CurrencyReadModel @relation(fields: [currencyId], references: [id], onDelete: Cascade)
+  languageCode String            @map("language_code")
+  name         String
+
+  @@unique([currencyId, languageCode])
+  @@map("currency_translations")
+}
+
 model TransportTypeReadModel {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  description String?
-  isActive    Boolean @default(true)
+  id           String                              @id @default(uuid())
+  name         String                              @unique
+  description  String?
+  isActive     Boolean                             @default(true) @map("is_active")
+  translations TransportTypeTranslationReadModel[]
 
   @@map("transport_types")
 }
 
+model TransportTypeTranslationReadModel {
+  id              String                 @id @default(uuid())
+  transportTypeId String                 @map("transport_type_id")
+  transportType   TransportTypeReadModel @relation(fields: [transportTypeId], references: [id], onDelete: Cascade)
+  languageCode    String                 @map("language_code")
+  name            String
+  description     String?
+
+  @@unique([transportTypeId, languageCode])
+  @@map("transport_type_translations")
+}
+
 model LoadTypeReadModel {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  description String?
-  isActive    Boolean @default(true)
+  id           String                         @id @default(uuid())
+  name         String                         @unique
+  description  String?
+  isActive     Boolean                        @default(true) @map("is_active")
+  translations LoadTypeTranslationReadModel[]
 
   @@map("load_types")
 }
 
+model LoadTypeTranslationReadModel {
+  id           String            @id @default(uuid())
+  loadTypeId   String            @map("load_type_id")
+  loadType     LoadTypeReadModel @relation(fields: [loadTypeId], references: [id], onDelete: Cascade)
+  languageCode String            @map("language_code")
+  name         String
+  description  String?
+
+  @@unique([loadTypeId, languageCode])
+  @@map("load_type_translations")
+}
+
 model LoadingTypeReadModel {
-  id          String  @id @default(uuid())
-  name        String  @unique // TOP, SIDE, REAR, FULL
-  description String?
-  isActive    Boolean @default(true)
+  id           String                            @id @default(uuid())
+  name         String                            @unique // TOP, SIDE, REAR, FULL
+  description  String?
+  isActive     Boolean                           @default(true) @map("is_active")
+  translations LoadingTypeTranslationReadModel[]
 
   @@map("loading_types")
 }
 
+model LoadingTypeTranslationReadModel {
+  id            String               @id @default(uuid())
+  loadingTypeId String               @map("loading_type_id")
+  loadingType   LoadingTypeReadModel @relation(fields: [loadingTypeId], references: [id], onDelete: Cascade)
+  languageCode  String               @map("language_code")
+  name          String
+  description   String?
+
+  @@unique([loadingTypeId, languageCode])
+  @@map("loading_type_translations")
+}
+
 model ADRClassificationReadModel {
-  id          String  @id @default(uuid())
-  code        String  @unique
-  name        String
-  description String?
-  isActive    Boolean @default(true)
+  id           String                                  @id @default(uuid())
+  code         String                                  @unique
+  name         String
+  description  String?
+  isActive     Boolean                                 @default(true) @map("is_active")
+  translations ADRClassificationTranslationReadModel[]
 
   @@map("adr_classifications")
 }
 
+model ADRClassificationTranslationReadModel {
+  id                  String                     @id @default(uuid())
+  adrClassificationId String                     @map("adr_classification_id")
+  adrClassification   ADRClassificationReadModel @relation(fields: [adrClassificationId], references: [id], onDelete: Cascade)
+  languageCode        String                     @map("language_code")
+  name                String
+  description         String?
+
+  @@unique([adrClassificationId, languageCode])
+  @@map("adr_classification_translations")
+}
+
 model PermitReadModel {
-  id          String  @id @default(uuid())
-  name        String  @unique // TIR, CMR, EKMT, etc.
-  description String?
-  isActive    Boolean @default(true)
+  id           String                       @id @default(uuid())
+  name         String                       @unique // TIR, CMR, EKMT, etc.
+  description  String?
+  isActive     Boolean                      @default(true) @map("is_active")
+  translations PermitTranslationReadModel[]
 
   @@map("permits")
+}
+
+model PermitTranslationReadModel {
+  id           String          @id @default(uuid())
+  permitId     String          @map("permit_id")
+  permit       PermitReadModel @relation(fields: [permitId], references: [id], onDelete: Cascade)
+  languageCode String          @map("language_code")
+  name         String
+  description  String?
+
+  @@unique([permitId, languageCode])
+  @@map("permit_translations")
 }

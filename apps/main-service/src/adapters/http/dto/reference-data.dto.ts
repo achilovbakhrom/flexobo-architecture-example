@@ -1,12 +1,43 @@
-import { Expose, Transform } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsOptional,
   IsString,
   IsNumber,
   Min,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+// ===== Translation DTOs =====
+
+export class TranslationDto {
+  @ApiProperty()
+  @IsString()
+  language_code!: string;
+
+  @ApiProperty()
+  @IsString()
+  name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  description?: string;
+}
+
+export class ResponseTranslationDto {
+  @Expose({ name: 'language_code' })
+  @Transform(({ obj }) => obj.languageCode ?? obj.language_code)
+  language_code!: string;
+
+  @Expose()
+  name!: string;
+
+  @Expose()
+  description?: string;
+}
 
 // ===== Response DTOs =====
 
@@ -32,6 +63,10 @@ export class ResponseCountryDto {
   @Expose({ name: 'is_active' })
   @Transform(({ obj }) => obj.isActive ?? obj.is_active ?? true)
   is_active!: boolean;
+
+  @Expose()
+  @Type(() => ResponseTranslationDto)
+  translations?: ResponseTranslationDto[];
 }
 
 export class ResponseCurrencyDto {
@@ -54,6 +89,10 @@ export class ResponseCurrencyDto {
   @Expose({ name: 'is_active' })
   @Transform(({ obj }) => obj.isActive ?? obj.is_active ?? true)
   is_active!: boolean;
+
+  @Expose()
+  @Type(() => ResponseTranslationDto)
+  translations?: ResponseTranslationDto[];
 }
 
 export class ResponseReferenceItemDto {
@@ -70,6 +109,10 @@ export class ResponseReferenceItemDto {
   @Expose({ name: 'is_active' })
   @Transform(({ obj }) => obj.isActive ?? obj.is_active ?? true)
   is_active!: boolean;
+
+  @Expose()
+  @Type(() => ResponseTranslationDto)
+  translations?: ResponseTranslationDto[];
 }
 
 export class ResponseADRClassificationDto {
@@ -89,6 +132,10 @@ export class ResponseADRClassificationDto {
   @Expose({ name: 'is_active' })
   @Transform(({ obj }) => obj.isActive ?? obj.is_active ?? true)
   is_active!: boolean;
+
+  @Expose()
+  @Type(() => ResponseTranslationDto)
+  translations?: ResponseTranslationDto[];
 }
 
 // ===== Create DTOs =====
@@ -116,6 +163,13 @@ export class CreateCountryDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreateCurrencyDto {
@@ -140,6 +194,13 @@ export class CreateCurrencyDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreateTransportTypeDto {
@@ -156,6 +217,13 @@ export class CreateTransportTypeDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreateLoadTypeDto {
@@ -172,6 +240,13 @@ export class CreateLoadTypeDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreateLoadingTypeDto {
@@ -188,6 +263,13 @@ export class CreateLoadingTypeDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreateADRClassificationDto {
@@ -208,6 +290,13 @@ export class CreateADRClassificationDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class CreatePermitDto {
@@ -224,6 +313,13 @@ export class CreatePermitDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 // ===== Update DTOs =====
@@ -253,6 +349,13 @@ export class UpdateCountryDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class UpdateCurrencyDto {
@@ -280,6 +383,13 @@ export class UpdateCurrencyDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class UpdateReferenceItemDto {
@@ -297,6 +407,13 @@ export class UpdateReferenceItemDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 export class UpdateADRClassificationDto {
@@ -319,6 +436,13 @@ export class UpdateADRClassificationDto {
   @IsOptional()
   @IsBoolean()
   is_active?: boolean;
+
+  @ApiPropertyOptional({ type: [TranslationDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => TranslationDto)
+  translations?: TranslationDto[];
 }
 
 // ===== Query DTOs =====
