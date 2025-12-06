@@ -12,8 +12,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { QueryBus } from '@flexobo/core';
-import { JwtAuthGuard, AuthenticatedUser } from '../guards/jwt-auth.guard';
-import { CurrentUser } from '../decorators/current-user.decorator';
+import { JwtAuthGuard, AuthenticatedUser, CurrentUser } from '@flexobo/shared-kernel';
 import {
   GetDashboardStatsQuery,
   GetMarketStatsQuery,

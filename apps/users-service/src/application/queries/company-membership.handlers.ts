@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { QueryHandler, IQuery, IQueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { QueryHandler, IQuery, IQueryHandler } from '@flexobo/core';
 import {
   COMPANY_MEMBERSHIP_REPOSITORY,
   ICompanyMembershipRepository,
@@ -39,7 +39,6 @@ export class GetUserMembershipQuery implements IQuery {
 // Handlers
 // ============================================================
 
-@Injectable()
 @QueryHandler(GetUserCompaniesQuery)
 export class GetUserCompaniesHandler
   implements IQueryHandler<GetUserCompaniesQuery, CompanyMembershipReadDto[]>
@@ -54,7 +53,6 @@ export class GetUserCompaniesHandler
   }
 }
 
-@Injectable()
 @QueryHandler(GetCompanyMembersQuery)
 export class GetCompanyMembersHandler
   implements IQueryHandler<GetCompanyMembersQuery, CompanyMembershipReadDto[]>
@@ -72,7 +70,6 @@ export class GetCompanyMembersHandler
   }
 }
 
-@Injectable()
 @QueryHandler(GetUserDefaultCompanyQuery)
 export class GetUserDefaultCompanyHandler
   implements IQueryHandler<GetUserDefaultCompanyQuery, CompanyMembershipReadDto | null>
@@ -87,7 +84,6 @@ export class GetUserDefaultCompanyHandler
   }
 }
 
-@Injectable()
 @QueryHandler(GetUserMembershipQuery)
 export class GetUserMembershipHandler
   implements IQueryHandler<GetUserMembershipQuery, CompanyMembershipReadDto | null>

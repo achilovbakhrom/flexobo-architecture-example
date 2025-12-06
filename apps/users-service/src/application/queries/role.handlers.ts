@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { QueryHandler, IQuery, IQueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { QueryHandler, IQuery, IQueryHandler } from '@flexobo/core';
 import {
   ROLE_REPOSITORY,
   IRoleRepository,
@@ -57,7 +57,6 @@ export class CheckUserPermissionQuery implements IQuery {
 // Handlers
 // ============================================================
 
-@Injectable()
 @QueryHandler(GetRoleByIdQuery)
 export class GetRoleByIdHandler implements IQueryHandler<GetRoleByIdQuery, RoleReadDto | null> {
   constructor(
@@ -69,7 +68,6 @@ export class GetRoleByIdHandler implements IQueryHandler<GetRoleByIdQuery, RoleR
   }
 }
 
-@Injectable()
 @QueryHandler(GetRoleByNameQuery)
 export class GetRoleByNameHandler
   implements IQueryHandler<GetRoleByNameQuery, RoleReadDto | null>
@@ -83,7 +81,6 @@ export class GetRoleByNameHandler
   }
 }
 
-@Injectable()
 @QueryHandler(ListRolesQuery)
 export class ListRolesHandler implements IQueryHandler<ListRolesQuery, RoleReadDto[]> {
   constructor(
@@ -95,7 +92,6 @@ export class ListRolesHandler implements IQueryHandler<ListRolesQuery, RoleReadD
   }
 }
 
-@Injectable()
 @QueryHandler(GetUserRolesQuery)
 export class GetUserRolesHandler
   implements IQueryHandler<GetUserRolesQuery, UserRoleMappingReadDto[]>
@@ -109,7 +105,6 @@ export class GetUserRolesHandler
   }
 }
 
-@Injectable()
 @QueryHandler(GetUserPermissionsQuery)
 export class GetUserPermissionsHandler
   implements IQueryHandler<GetUserPermissionsQuery, string[]>
@@ -123,7 +118,6 @@ export class GetUserPermissionsHandler
   }
 }
 
-@Injectable()
 @QueryHandler(CheckUserRoleQuery)
 export class CheckUserRoleHandler implements IQueryHandler<CheckUserRoleQuery, boolean> {
   constructor(
@@ -135,7 +129,6 @@ export class CheckUserRoleHandler implements IQueryHandler<CheckUserRoleQuery, b
   }
 }
 
-@Injectable()
 @QueryHandler(CheckUserPermissionQuery)
 export class CheckUserPermissionHandler
   implements IQueryHandler<CheckUserPermissionQuery, boolean>
