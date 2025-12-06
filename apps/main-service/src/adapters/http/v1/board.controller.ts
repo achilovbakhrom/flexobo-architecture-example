@@ -33,6 +33,7 @@ import { RemoveBoardMemberCommand } from '../../../application/commands/board/re
 import { DeleteBoardCommand } from '../../../application/commands/board/delete-board.command';
 import { GetBoardQuery } from '../../../application/queries/board/get-board.query';
 import { ListBoardsQuery } from '../../../application/queries/board/list-boards.query';
+import { ListInvitedBoardsQuery } from '../../../application/queries/board/list-invited-boards.query';
 import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Boards')
@@ -76,6 +77,19 @@ export class BoardController {
         query.page ?? 1,
         query.limit ?? 20
       )
+    );
+  }
+
+  @Get('invites')
+  @ApiOperation({ summary: 'List boards user has been invited to' })
+  @ApiResponse({ status: 200, description: 'List of invited boards' })
+  async listInvited(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number
+  ) {
+    return this.queryBus.execute(
+      new ListInvitedBoardsQuery(user.userId, page ?? 1, limit ?? 20)
     );
   }
 

@@ -5,7 +5,6 @@ import {
   TransportUpdatedEventData,
   TransportDeletedEventData,
 } from '../events/transport.events';
-import { TransportType, LoadingType, Feature } from '../constants/enums';
 
 export interface TransportState {
   ownerId: string;

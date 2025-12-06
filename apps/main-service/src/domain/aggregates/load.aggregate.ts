@@ -52,14 +52,14 @@ export class Load extends AggregateRoot {
   private temperatureMin?: number;
   private temperatureMax?: number;
   private price?: number;
-  private currency: string = 'USD';
+  private currency = 'USD';
   private paymentTerms?: string;
   private loadingDate!: string;
   private loadingDateTo?: string;
   private unloadingDate?: string;
   private boardIds: string[] = [];
-  private isPublic: boolean = true;
-  private isDeleted: boolean = false;
+  private isPublic = true;
+  private isDeleted = false;
 
   static create(loadId: string, data: LoadCreatedEventData): Load {
     const load = new Load(loadId);
@@ -284,21 +284,26 @@ export class Load extends AggregateRoot {
   private applyUpdated(data: LoadUpdatedEventData): void {
     if (data.from !== undefined) this.from = data.from;
     if (data.to !== undefined) this.to = data.to;
-    if (data.transportType !== undefined) this.transportType = data.transportType;
+    if (data.transportType !== undefined)
+      this.transportType = data.transportType;
     if (data.loadingTypes !== undefined) this.loadingTypes = data.loadingTypes;
     if (data.cargos !== undefined) this.cargos = data.cargos;
     if (data.totalWeight !== undefined) this.totalWeight = data.totalWeight;
     if (data.totalVolume !== undefined) this.totalVolume = data.totalVolume;
     if (data.features !== undefined) this.features = data.features;
     if (data.adrClasses !== undefined) this.adrClasses = data.adrClasses;
-    if (data.temperatureMin !== undefined) this.temperatureMin = data.temperatureMin;
-    if (data.temperatureMax !== undefined) this.temperatureMax = data.temperatureMax;
+    if (data.temperatureMin !== undefined)
+      this.temperatureMin = data.temperatureMin;
+    if (data.temperatureMax !== undefined)
+      this.temperatureMax = data.temperatureMax;
     if (data.price !== undefined) this.price = data.price;
     if (data.currency !== undefined) this.currency = data.currency;
     if (data.paymentTerms !== undefined) this.paymentTerms = data.paymentTerms;
     if (data.loadingDate !== undefined) this.loadingDate = data.loadingDate;
-    if (data.loadingDateTo !== undefined) this.loadingDateTo = data.loadingDateTo;
-    if (data.unloadingDate !== undefined) this.unloadingDate = data.unloadingDate;
+    if (data.loadingDateTo !== undefined)
+      this.loadingDateTo = data.loadingDateTo;
+    if (data.unloadingDate !== undefined)
+      this.unloadingDate = data.unloadingDate;
     if (data.boardIds !== undefined) this.boardIds = data.boardIds;
     if (data.isPublic !== undefined) this.isPublic = data.isPublic;
   }

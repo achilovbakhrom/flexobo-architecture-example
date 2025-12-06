@@ -311,6 +311,76 @@ model BoardReadModel {
   @@index([companyId])
 }
 
+// ============ COMPANY ============
+
+model CompanyReadModel {
+  id          String  @id
+  ownerId     String
+  name        String
+  type        String  // LOGISTICS, CARRIER, FORWARDER, BROKER, SHIPPER
+  status      String  @default("PENDING") // PENDING, VERIFIED, REJECTED, SUSPENDED
+  description String?
+  logo        String?
+  phone       String?
+  email       String?
+  address     String?
+  country     String?
+  city        String?
+  taxId       String?
+  website     String?
+
+  isActive Boolean @default(true)
+
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members CompanyMemberReadModel[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+  @@index([country, city])
+  @@map("companies")
+}
+
+model CompanyMemberReadModel {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String
+  role      String   @default("MEMBER") // OWNER, ADMIN, MEMBER
+  isActive  Boolean  @default(true)
+  joinedAt  DateTime @default(now())
+
+  company CompanyReadModel @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, userId])
+  @@index([userId])
+  @@map("company_members")
+}
+
+// ============ SAVED SEARCHES ============
+
+model SavedSearchReadModel {
+  id          String  @id
+  userId      String
+  name        String
+  searchType  String  // LOAD, TRIP
+  filters     Json    // Search filter criteria
+  notifyOnNew Boolean @default(false)
+  isActive    Boolean @default(true)
+  lastUsedAt  DateTime?
+
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([searchType])
+  @@index([isActive])
+  @@map("saved_searches")
+}
+
 // ============ REFERENCE DATA ============
 
 model LanguageReadModel {
@@ -322,4 +392,72 @@ model LanguageReadModel {
   updatedAt DateTime @updatedAt
 
   @@map("languages")
+}
+
+model CountryReadModel {
+  id           String  @id @default(uuid())
+  code         String  @unique // ISO 3166-1 alpha-2
+  name         String
+  currencyCode String?
+  phoneCode    String?
+  isActive     Boolean @default(true)
+
+  @@map("countries")
+}
+
+model CurrencyReadModel {
+  id       String  @id @default(uuid())
+  code     String  @unique // ISO 4217
+  name     String
+  symbol   String
+  rate     Float   @default(1) // Exchange rate to USD
+  isActive Boolean @default(true)
+
+  @@map("currencies")
+}
+
+model TransportTypeReadModel {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+
+  @@map("transport_types")
+}
+
+model LoadTypeReadModel {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  description String?
+  isActive    Boolean @default(true)
+
+  @@map("load_types")
+}
+
+model LoadingTypeReadModel {
+  id          String  @id @default(uuid())
+  name        String  @unique // TOP, SIDE, REAR, FULL
+  description String?
+  isActive    Boolean @default(true)
+
+  @@map("loading_types")
+}
+
+model ADRClassificationReadModel {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  @@map("adr_classifications")
+}
+
+model PermitReadModel {
+  id          String  @id @default(uuid())
+  name        String  @unique // TIR, CMR, EKMT, etc.
+  description String?
+  isActive    Boolean @default(true)
+
+  @@map("permits")
 }

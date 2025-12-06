@@ -25,12 +25,15 @@ export class SavedSearch extends AggregateRoot {
   private name!: string;
   private searchType!: SavedSearchType;
   private filters!: SearchFilters;
-  private notifyOnNew: boolean = false;
-  private isActive: boolean = true;
-  private isDeleted: boolean = false;
+  private notifyOnNew = false;
+  private isActive = true;
+  private isDeleted = false;
   private lastUsedAt?: string;
 
-  static create(searchId: string, data: SavedSearchCreatedEventData): SavedSearch {
+  static create(
+    searchId: string,
+    data: SavedSearchCreatedEventData
+  ): SavedSearch {
     const search = new SavedSearch(searchId);
     const event = search.createEvent(SAVED_SEARCH_EVENT_TYPES.CREATED, data);
     search.addEvent(event);
@@ -59,12 +62,12 @@ export class SavedSearch extends AggregateRoot {
 
   markUsed(): void {
     if (this.isDeleted) throw new Error('Cannot use deleted saved search');
-    const event = this.createEvent<typeof SAVED_SEARCH_EVENT_TYPES.USED, SavedSearchUsedEventData>(
-      SAVED_SEARCH_EVENT_TYPES.USED,
-      {
-        usedAt: new Date().toISOString(),
-      }
-    );
+    const event = this.createEvent<
+      typeof SAVED_SEARCH_EVENT_TYPES.USED,
+      SavedSearchUsedEventData
+    >(SAVED_SEARCH_EVENT_TYPES.USED, {
+      usedAt: new Date().toISOString(),
+    });
     this.addEvent(event);
     this.apply(event);
   }
@@ -74,13 +77,13 @@ export class SavedSearch extends AggregateRoot {
     if (this.userId !== userId) {
       throw new Error('Only the owner can delete this saved search');
     }
-    const event = this.createEvent<typeof SAVED_SEARCH_EVENT_TYPES.DELETED, SavedSearchDeletedEventData>(
-      SAVED_SEARCH_EVENT_TYPES.DELETED,
-      {
-        deletedAt: new Date().toISOString(),
-        deletedBy: userId,
-      }
-    );
+    const event = this.createEvent<
+      typeof SAVED_SEARCH_EVENT_TYPES.DELETED,
+      SavedSearchDeletedEventData
+    >(SAVED_SEARCH_EVENT_TYPES.DELETED, {
+      deletedAt: new Date().toISOString(),
+      deletedBy: userId,
+    });
     this.addEvent(event);
     this.apply(event);
   }

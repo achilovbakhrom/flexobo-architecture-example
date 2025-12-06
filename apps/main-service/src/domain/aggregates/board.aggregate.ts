@@ -25,8 +25,8 @@ export class Board extends AggregateRoot {
   private name!: string;
   private description?: string;
   private members: BoardMemberData[] = [];
-  private isActive: boolean = true;
-  private isDeleted: boolean = false;
+  private isActive = true;
+  private isDeleted = false;
 
   static create(boardId: string, data: BoardCreatedEventData): Board {
     const board = new Board(boardId);
@@ -52,7 +52,11 @@ export class Board extends AggregateRoot {
     this.apply(event);
   }
 
-  addMember(userId: string, role: 'ADMIN' | 'MEMBER' | 'VIEWER', addedBy: string): void {
+  addMember(
+    userId: string,
+    role: 'ADMIN' | 'MEMBER' | 'VIEWER',
+    addedBy: string
+  ): void {
     if (this.isDeleted) throw new Error('Cannot add member to deleted board');
     if (this.members.some((m) => m.userId === userId)) {
       throw new Error('User is already a member of this board');
@@ -70,7 +74,8 @@ export class Board extends AggregateRoot {
   }
 
   removeMember(userId: string, removedBy: string): void {
-    if (this.isDeleted) throw new Error('Cannot remove member from deleted board');
+    if (this.isDeleted)
+      throw new Error('Cannot remove member from deleted board');
     if (!this.members.some((m) => m.userId === userId)) {
       throw new Error('User is not a member of this board');
     }

@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   ISavedSearchReadRepository,
   SAVED_SEARCH_READ_REPOSITORY,
@@ -26,7 +26,6 @@ export interface ListSavedSearchesResult {
   totalPages: number;
 }
 
-@Injectable()
 @QueryHandler(ListSavedSearchesQuery)
 export class ListSavedSearchesHandler implements IQueryHandler<ListSavedSearchesQuery, ListSavedSearchesResult> {
   constructor(

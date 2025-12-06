@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { Inject, NotFoundException } from '@nestjs/common';
+import { ICommand, ICommandHandler, CommandHandler, Result, Success, Failure } from '@flexobo/core';
 import { SearchFilters } from '../../../domain/events/saved-search.events';
 import {
   ISavedSearchAggregateStore,
@@ -16,31 +16,36 @@ export class UpdateSavedSearchCommand implements ICommand {
   ) {}
 }
 
-@Injectable()
 @CommandHandler(UpdateSavedSearchCommand)
-export class UpdateSavedSearchHandler implements ICommandHandler<UpdateSavedSearchCommand> {
+export class UpdateSavedSearchHandler implements ICommandHandler<UpdateSavedSearchCommand, void> {
   constructor(
     @Inject(SAVED_SEARCH_AGGREGATE_STORE)
     private readonly searchStore: ISavedSearchAggregateStore
   ) {}
 
-  async execute(command: UpdateSavedSearchCommand): Promise<void> {
-    const search = await this.searchStore.load(command.searchId);
+  async execute(command: UpdateSavedSearchCommand): Promise<Result<void, Error>> {
+    try {
+      const search = await this.searchStore.load(command.searchId);
 
-    if (!search) {
-      throw new Error('Saved search not found');
+      if (!search) {
+        return new Failure(new NotFoundException('Saved search not found'));
+      }
+
+      // Authorization check is done inside the aggregate
+      search.update(
+        {
+          name: command.name,
+          filters: command.filters,
+          notifyOnNew: command.notifyOnNew,
+        },
+        command.userId
+      );
+
+      await this.searchStore.save(search);
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error as Error);
     }
-
-    // Authorization check is done inside the aggregate
-    search.update(
-      {
-        name: command.name,
-        filters: command.filters,
-        notifyOnNew: command.notifyOnNew,
-      },
-      command.userId
-    );
-
-    await this.searchStore.save(search);
   }
 }

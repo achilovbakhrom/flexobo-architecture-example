@@ -19,7 +19,7 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { CreateSavedSearchDto, UpdateSavedSearchDto, SavedSearchTypeDto } from '../dto/saved-search.dto';
@@ -40,7 +40,7 @@ interface JwtPayload {
 
 @ApiTags('Saved Searches')
 @ApiBearerAuth()
-@Controller('api/v1/saved-searches')
+@Controller('v1/saved-searches')
 @UseGuards(JwtAuthGuard)
 export class SavedSearchController {
   constructor(

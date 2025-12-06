@@ -26,6 +26,7 @@ import { CancelBookingCommand } from '../../../application/commands/booking/canc
 import { RateBookingCommand } from '../../../application/commands/booking/rate-booking.command';
 import { GetBookingQuery } from '../../../application/queries/booking/get-booking.query';
 import { ListBookingsQuery } from '../../../application/queries/booking/list-bookings.query';
+import { GetRatingStatusQuery } from '../../../application/queries/booking/get-rating-status.query';
 import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Bookings')
@@ -125,6 +126,21 @@ export class BookingController {
   ): Promise<void> {
     await this.commandBus.execute(
       new RateBookingCommand(id, user.userId, dto.rating, dto.comment)
+    );
+  }
+
+  @Get('rating-status/:postType/:postId')
+  @ApiOperation({ summary: 'Check if user has rated for a post' })
+  @ApiParam({ name: 'postType', description: 'Post type (LOAD or TRIP)' })
+  @ApiParam({ name: 'postId', description: 'Post ID' })
+  @ApiResponse({ status: 200, description: 'Rating status' })
+  async getRatingStatus(
+    @Param('postType') postType: 'LOAD' | 'TRIP',
+    @Param('postId') postId: string,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    return this.queryBus.execute(
+      new GetRatingStatusQuery(postId, postType, user.userId)
     );
   }
 }

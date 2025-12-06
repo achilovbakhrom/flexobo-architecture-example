@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   ICompanyReadRepository,
   COMPANY_READ_REPOSITORY,
@@ -31,7 +31,6 @@ export interface PaginatedCompaniesResult {
   totalPages: number;
 }
 
-@Injectable()
 @QueryHandler(ListCompaniesQuery)
 export class ListCompaniesHandler
   implements IQueryHandler<ListCompaniesQuery, PaginatedCompaniesResult>

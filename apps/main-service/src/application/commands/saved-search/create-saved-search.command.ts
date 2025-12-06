@@ -1,5 +1,5 @@
-import { Injectable, Inject } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { Inject } from '@nestjs/common';
+import { ICommand, ICommandHandler, CommandHandler, Result, Success, Failure } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { SavedSearch } from '../../../domain/aggregates/saved-search.aggregate';
 import { SavedSearchType, SearchFilters } from '../../../domain/events/saved-search.events';
@@ -18,27 +18,30 @@ export class CreateSavedSearchCommand implements ICommand {
   ) {}
 }
 
-@Injectable()
 @CommandHandler(CreateSavedSearchCommand)
-export class CreateSavedSearchHandler implements ICommandHandler<CreateSavedSearchCommand> {
+export class CreateSavedSearchHandler implements ICommandHandler<CreateSavedSearchCommand, string> {
   constructor(
     @Inject(SAVED_SEARCH_AGGREGATE_STORE)
     private readonly searchStore: ISavedSearchAggregateStore
   ) {}
 
-  async execute(command: CreateSavedSearchCommand): Promise<string> {
-    const searchId = uuidv4();
+  async execute(command: CreateSavedSearchCommand): Promise<Result<string, Error>> {
+    try {
+      const searchId = uuidv4();
 
-    const search = SavedSearch.create(searchId, {
-      userId: command.userId,
-      name: command.name,
-      searchType: command.searchType,
-      filters: command.filters,
-      notifyOnNew: command.notifyOnNew,
-    });
+      const search = SavedSearch.create(searchId, {
+        userId: command.userId,
+        name: command.name,
+        searchType: command.searchType,
+        filters: command.filters,
+        notifyOnNew: command.notifyOnNew,
+      });
 
-    await this.searchStore.save(search);
+      await this.searchStore.save(search);
 
-    return searchId;
+      return new Success(searchId);
+    } catch (error) {
+      return new Failure(error as Error);
+    }
   }
 }

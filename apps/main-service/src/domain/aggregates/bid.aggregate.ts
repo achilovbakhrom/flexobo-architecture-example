@@ -33,9 +33,9 @@ export class Bid extends AggregateRoot {
   private postId!: string;
   private transportIds: string[] = [];
   private proposedPrice!: number;
-  private currency: string = 'USD';
+  private currency = 'USD';
   private status: BidStatus = BidStatus.PENDING;
-  private negotiationRound: number = 1;
+  private negotiationRound = 1;
   private chatRoomId?: string;
   private expiresAt?: string;
   private acceptedAt?: string;
@@ -138,7 +138,10 @@ export class Bid extends AggregateRoot {
   }
 
   expire(): void {
-    if (this.status !== BidStatus.PENDING && this.status !== BidStatus.COUNTERED) {
+    if (
+      this.status !== BidStatus.PENDING &&
+      this.status !== BidStatus.COUNTERED
+    ) {
       throw new Error('Cannot expire bid in current status');
     }
 
@@ -153,7 +156,10 @@ export class Bid extends AggregateRoot {
   }
 
   private validateCanNegotiate(userId: string): void {
-    if (this.status !== BidStatus.PENDING && this.status !== BidStatus.COUNTERED) {
+    if (
+      this.status !== BidStatus.PENDING &&
+      this.status !== BidStatus.COUNTERED
+    ) {
       throw new Error('Cannot counter bid in current status');
     }
 
@@ -171,7 +177,10 @@ export class Bid extends AggregateRoot {
   }
 
   private validateCanAccept(userId: string): void {
-    if (this.status !== BidStatus.PENDING && this.status !== BidStatus.COUNTERED) {
+    if (
+      this.status !== BidStatus.PENDING &&
+      this.status !== BidStatus.COUNTERED
+    ) {
       throw new Error('Cannot accept bid in current status');
     }
 
@@ -188,7 +197,10 @@ export class Bid extends AggregateRoot {
   }
 
   private validateCanReject(userId: string): void {
-    if (this.status !== BidStatus.PENDING && this.status !== BidStatus.COUNTERED) {
+    if (
+      this.status !== BidStatus.PENDING &&
+      this.status !== BidStatus.COUNTERED
+    ) {
       throw new Error('Cannot reject bid in current status');
     }
 

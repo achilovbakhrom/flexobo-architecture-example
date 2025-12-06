@@ -1,5 +1,5 @@
-import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { Inject, NotFoundException } from '@nestjs/common';
+import { ICommand, ICommandHandler, CommandHandler, Result, Success, Failure } from '@flexobo/core';
 import { CompanyMemberRole } from '../../../domain/events/company.events';
 import {
   ICompanyAggregateStore,
@@ -15,23 +15,28 @@ export class UpdateCompanyMemberCommand implements ICommand {
   ) {}
 }
 
-@Injectable()
 @CommandHandler(UpdateCompanyMemberCommand)
-export class UpdateCompanyMemberHandler implements ICommandHandler<UpdateCompanyMemberCommand> {
+export class UpdateCompanyMemberHandler implements ICommandHandler<UpdateCompanyMemberCommand, void> {
   constructor(
     @Inject(COMPANY_AGGREGATE_STORE)
     private readonly companyStore: ICompanyAggregateStore
   ) {}
 
-  async execute(command: UpdateCompanyMemberCommand): Promise<void> {
-    const company = await this.companyStore.load(command.companyId);
+  async execute(command: UpdateCompanyMemberCommand): Promise<Result<void, Error>> {
+    try {
+      const company = await this.companyStore.load(command.companyId);
 
-    if (!company) {
-      throw new NotFoundException('Company not found');
+      if (!company) {
+        return new Failure(new NotFoundException('Company not found'));
+      }
+
+      company.updateMember(command.memberId, command.role, command.updatedBy);
+
+      await this.companyStore.save(company);
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error as Error);
     }
-
-    company.updateMember(command.memberId, command.role, command.updatedBy);
-
-    await this.companyStore.save(company);
   }
 }
