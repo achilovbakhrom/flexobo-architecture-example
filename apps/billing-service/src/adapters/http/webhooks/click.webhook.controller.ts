@@ -6,7 +6,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import {
   ClickProvider,
   ClickPrepareRequest,
@@ -60,10 +60,9 @@ export class ClickWebhookController {
       const subscriptionId = request.merchant_trans_id;
 
       // Get subscription to validate
-      const subscription = await this.queryBus.execute<
-        GetSubscriptionQuery,
-        SubscriptionDto | null
-      >(new GetSubscriptionQuery(subscriptionId));
+      const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+        new GetSubscriptionQuery(subscriptionId),
+      );
 
       if (!subscription) {
         this.logger.warn(`Subscription ${subscriptionId} not found`);
@@ -76,7 +75,7 @@ export class ClickWebhookController {
       }
 
       // Get plan to get expected amount
-      const plan = await this.queryBus.execute<GetPlanQuery, PlanDto | null>(
+      const plan = await this.queryBus.execute<PlanDto | null>(
         new GetPlanQuery(subscription.planId),
       );
 
@@ -108,9 +107,12 @@ export class ClickWebhookController {
         // Find and update payment status
         const payment = await this.findPaymentBySubscription(subscriptionId);
         if (payment) {
-          await this.commandBus.execute(
+          const processResult = await this.commandBus.execute(
             new ProcessPaymentCommand(payment.id, request.click_trans_id.toString()),
           );
+          if (processResult.isFailure) {
+            this.logger.error(`Failed to process payment ${payment.id}: ${processResult.error}`);
+          }
         }
 
         this.logger.log(
@@ -167,7 +169,7 @@ export class ClickWebhookController {
         // Payment succeeded
         const payment = await this.findPaymentBySubscription(subscriptionId);
         if (payment) {
-          await this.commandBus.execute(
+          const succeedResult = await this.commandBus.execute(
             new SucceedPaymentCommand(
               payment.id,
               request.click_trans_id.toString(),
@@ -176,15 +178,21 @@ export class ClickWebhookController {
               },
             ),
           );
+          if (succeedResult.isFailure) {
+            this.logger.error(`Failed to succeed payment ${payment.id}: ${succeedResult.error}`);
+          }
 
           // Activate subscription
-          await this.commandBus.execute(
+          const activateResult = await this.commandBus.execute(
             new ActivateSubscriptionCommand(
               subscriptionId,
               PaymentProvider.CLICK,
               request.click_trans_id.toString(),
             ),
           );
+          if (activateResult.isFailure) {
+            this.logger.error(`Failed to activate subscription ${subscriptionId}: ${activateResult.error}`);
+          }
 
           this.logger.log(
             `Payment and subscription ${subscriptionId} activated via Click.uz`,
@@ -197,9 +205,12 @@ export class ClickWebhookController {
         // Payment failed
         const payment = await this.findPaymentBySubscription(subscriptionId);
         if (payment) {
-          await this.commandBus.execute(
+          const failResult = await this.commandBus.execute(
             new FailPaymentCommand(payment.id, response.error_note),
           );
+          if (failResult.isFailure) {
+            this.logger.error(`Failed to fail payment ${payment.id}: ${failResult.error}`);
+          }
         }
         prepareIdStore.delete(subscriptionId);
       }
@@ -223,11 +234,8 @@ export class ClickWebhookController {
   ): Promise<PaymentDto | null> {
     // In a real implementation, you'd query payments by subscription ID
     // For now, we use the external ID lookup
-    const payment = await this.queryBus.execute<
-      GetPaymentByExternalIdQuery,
-      PaymentDto | null
-    >(new GetPaymentByExternalIdQuery(PaymentProvider.CLICK, subscriptionId));
-
-    return payment;
+    return this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentByExternalIdQuery(PaymentProvider.CLICK, subscriptionId),
+    );
   }
 }

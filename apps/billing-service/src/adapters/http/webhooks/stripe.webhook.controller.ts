@@ -7,7 +7,7 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { Request } from 'express';
 import { StripeProvider } from '../../payment-providers/stripe.provider';
 import {
@@ -138,13 +138,18 @@ export class StripeWebhookController {
     }
 
     // Activate subscription
-    await this.commandBus.execute(
+    const activateResult = await this.commandBus.execute(
       new ActivateSubscriptionCommand(
         subscriptionId,
         PaymentProvider.STRIPE,
         session.subscription ?? session.id,
       ),
     );
+
+    if (activateResult.isFailure) {
+      this.logger.error(`Failed to activate subscription ${subscriptionId}: ${activateResult.error}`);
+      return;
+    }
 
     this.logger.log(`Subscription ${subscriptionId} activated via Stripe checkout`);
   }
@@ -158,15 +163,18 @@ export class StripeWebhookController {
     }
 
     // Find payment by external ID
-    const payment = await this.queryBus.execute<
-      GetPaymentByExternalIdQuery,
-      PaymentDto | null
-    >(new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntentId));
+    const payment = await this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntentId),
+    );
 
     if (payment && payment.status !== PaymentStatus.SUCCEEDED) {
-      await this.commandBus.execute(
+      const succeedResult = await this.commandBus.execute(
         new SucceedPaymentCommand(payment.id, paymentIntentId),
       );
+      if (succeedResult.isFailure) {
+        this.logger.error(`Failed to succeed payment ${payment.id}: ${succeedResult.error}`);
+        return;
+      }
       this.logger.log(`Payment ${payment.id} marked as succeeded from invoice.paid`);
     }
   }
@@ -179,15 +187,18 @@ export class StripeWebhookController {
       return;
     }
 
-    const payment = await this.queryBus.execute<
-      GetPaymentByExternalIdQuery,
-      PaymentDto | null
-    >(new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntentId));
+    const payment = await this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntentId),
+    );
 
     if (payment) {
       const reason =
         invoice.last_payment_error?.message ?? 'Payment failed';
-      await this.commandBus.execute(new FailPaymentCommand(payment.id, reason));
+      const failResult = await this.commandBus.execute(new FailPaymentCommand(payment.id, reason));
+      if (failResult.isFailure) {
+        this.logger.error(`Failed to mark payment ${payment.id} as failed: ${failResult.error}`);
+        return;
+      }
       this.logger.log(`Payment ${payment.id} marked as failed: ${reason}`);
     }
   }
@@ -205,13 +216,17 @@ export class StripeWebhookController {
     const subscriptionId = subscription.metadata?.subscriptionId;
 
     if (subscriptionId) {
-      await this.commandBus.execute(
+      const cancelResult = await this.commandBus.execute(
         new CancelSubscriptionCommand({
           subscriptionId,
           immediate: false,
           reason: 'Cancelled via Stripe',
         }),
       );
+      if (cancelResult.isFailure) {
+        this.logger.error(`Failed to cancel subscription ${subscriptionId}: ${cancelResult.error}`);
+        return;
+      }
       this.logger.log(`Subscription ${subscriptionId} cancelled via Stripe webhook`);
     }
   }
@@ -219,20 +234,23 @@ export class StripeWebhookController {
   private async handlePaymentIntentSucceeded(event: StripeWebhookEvent): Promise<void> {
     const paymentIntent = event.data.object;
 
-    const payment = await this.queryBus.execute<
-      GetPaymentByExternalIdQuery,
-      PaymentDto | null
-    >(new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntent.id));
+    const payment = await this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntent.id),
+    );
 
     if (payment && payment.status !== PaymentStatus.SUCCEEDED) {
       const paymentMethod = paymentIntent.payment_method_details;
-      await this.commandBus.execute(
+      const succeedResult = await this.commandBus.execute(
         new SucceedPaymentCommand(payment.id, paymentIntent.id, {
           type: paymentMethod?.type ?? 'unknown',
           last4: paymentMethod?.card?.last4,
           brand: paymentMethod?.card?.brand,
         }),
       );
+      if (succeedResult.isFailure) {
+        this.logger.error(`Failed to succeed payment ${payment.id}: ${succeedResult.error}`);
+        return;
+      }
       this.logger.log(`Payment ${payment.id} succeeded`);
     }
   }
@@ -240,15 +258,18 @@ export class StripeWebhookController {
   private async handlePaymentIntentFailed(event: StripeWebhookEvent): Promise<void> {
     const paymentIntent = event.data.object;
 
-    const payment = await this.queryBus.execute<
-      GetPaymentByExternalIdQuery,
-      PaymentDto | null
-    >(new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntent.id));
+    const payment = await this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentByExternalIdQuery(PaymentProvider.STRIPE, paymentIntent.id),
+    );
 
     if (payment) {
       const reason =
         paymentIntent.last_payment_error?.message ?? 'Payment failed';
-      await this.commandBus.execute(new FailPaymentCommand(payment.id, reason));
+      const failResult = await this.commandBus.execute(new FailPaymentCommand(payment.id, reason));
+      if (failResult.isFailure) {
+        this.logger.error(`Failed to fail payment ${payment.id}: ${failResult.error}`);
+        return;
+      }
       this.logger.log(`Payment ${payment.id} failed: ${reason}`);
     }
   }

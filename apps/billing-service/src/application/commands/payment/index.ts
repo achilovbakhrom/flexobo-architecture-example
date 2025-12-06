@@ -1,6 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { PaymentAggregate } from '../../../domain/aggregates/payment.aggregate';
 import { PaymentProvider, PaymentType } from '../../../domain/constants/enums';
 import { PAYMENT_AGGREGATE_STORE } from '../../../ports/payment.repository';
@@ -54,106 +53,126 @@ export class RefundPaymentCommand implements ICommand {
 
 @Injectable()
 @CommandHandler(InitiatePaymentCommand)
-export class InitiatePaymentHandler implements ICommandHandler<InitiatePaymentCommand> {
+export class InitiatePaymentHandler implements ICommandHandler<InitiatePaymentCommand, PaymentAggregate> {
   constructor(
     @Inject(PAYMENT_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<PaymentAggregate>,
   ) {}
 
-  async execute(command: InitiatePaymentCommand): Promise<PaymentAggregate> {
-    const payment = PaymentAggregate.initiate({
-      id: command.id,
-      subscriptionId: command.subscriptionId,
-      companyId: command.companyId,
-      amount: command.amount,
-      currency: command.currency,
-      provider: command.provider,
-      paymentType: command.paymentType,
-      externalId: command.externalId,
-    });
+  async execute(command: InitiatePaymentCommand): Promise<Result<PaymentAggregate, Error>> {
+    try {
+      const payment = PaymentAggregate.initiate({
+        id: command.id,
+        subscriptionId: command.subscriptionId,
+        companyId: command.companyId,
+        amount: command.amount,
+        currency: command.currency,
+        provider: command.provider,
+        paymentType: command.paymentType,
+        externalId: command.externalId,
+      });
 
-    await this.aggregateStore.save(payment);
-    return payment;
+      await this.aggregateStore.save(payment);
+      return new Success(payment);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(ProcessPaymentCommand)
-export class ProcessPaymentHandler implements ICommandHandler<ProcessPaymentCommand> {
+export class ProcessPaymentHandler implements ICommandHandler<ProcessPaymentCommand, PaymentAggregate> {
   constructor(
     @Inject(PAYMENT_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<PaymentAggregate>,
   ) {}
 
-  async execute(command: ProcessPaymentCommand): Promise<PaymentAggregate> {
-    const payment = await this.aggregateStore.load(command.paymentId);
-    if (!payment) {
-      throw new NotFoundException(`Payment ${command.paymentId} not found`);
-    }
+  async execute(command: ProcessPaymentCommand): Promise<Result<PaymentAggregate, Error>> {
+    try {
+      const payment = await this.aggregateStore.load(command.paymentId);
+      if (!payment) {
+        return new Failure(new NotFoundException(`Payment ${command.paymentId} not found`));
+      }
 
-    payment.process(command.externalId);
-    await this.aggregateStore.save(payment);
-    return payment;
+      payment.process(command.externalId);
+      await this.aggregateStore.save(payment);
+      return new Success(payment);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(SucceedPaymentCommand)
-export class SucceedPaymentHandler implements ICommandHandler<SucceedPaymentCommand> {
+export class SucceedPaymentHandler implements ICommandHandler<SucceedPaymentCommand, PaymentAggregate> {
   constructor(
     @Inject(PAYMENT_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<PaymentAggregate>,
   ) {}
 
-  async execute(command: SucceedPaymentCommand): Promise<PaymentAggregate> {
-    const payment = await this.aggregateStore.load(command.paymentId);
-    if (!payment) {
-      throw new NotFoundException(`Payment ${command.paymentId} not found`);
-    }
+  async execute(command: SucceedPaymentCommand): Promise<Result<PaymentAggregate, Error>> {
+    try {
+      const payment = await this.aggregateStore.load(command.paymentId);
+      if (!payment) {
+        return new Failure(new NotFoundException(`Payment ${command.paymentId} not found`));
+      }
 
-    payment.succeed(command.externalId, command.paymentMethod);
-    await this.aggregateStore.save(payment);
-    return payment;
+      payment.succeed(command.externalId, command.paymentMethod);
+      await this.aggregateStore.save(payment);
+      return new Success(payment);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(FailPaymentCommand)
-export class FailPaymentHandler implements ICommandHandler<FailPaymentCommand> {
+export class FailPaymentHandler implements ICommandHandler<FailPaymentCommand, PaymentAggregate> {
   constructor(
     @Inject(PAYMENT_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<PaymentAggregate>,
   ) {}
 
-  async execute(command: FailPaymentCommand): Promise<PaymentAggregate> {
-    const payment = await this.aggregateStore.load(command.paymentId);
-    if (!payment) {
-      throw new NotFoundException(`Payment ${command.paymentId} not found`);
-    }
+  async execute(command: FailPaymentCommand): Promise<Result<PaymentAggregate, Error>> {
+    try {
+      const payment = await this.aggregateStore.load(command.paymentId);
+      if (!payment) {
+        return new Failure(new NotFoundException(`Payment ${command.paymentId} not found`));
+      }
 
-    payment.fail(command.reason);
-    await this.aggregateStore.save(payment);
-    return payment;
+      payment.fail(command.reason);
+      await this.aggregateStore.save(payment);
+      return new Success(payment);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(RefundPaymentCommand)
-export class RefundPaymentHandler implements ICommandHandler<RefundPaymentCommand> {
+export class RefundPaymentHandler implements ICommandHandler<RefundPaymentCommand, PaymentAggregate> {
   constructor(
     @Inject(PAYMENT_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<PaymentAggregate>,
   ) {}
 
-  async execute(command: RefundPaymentCommand): Promise<PaymentAggregate> {
-    const payment = await this.aggregateStore.load(command.paymentId);
-    if (!payment) {
-      throw new NotFoundException(`Payment ${command.paymentId} not found`);
-    }
+  async execute(command: RefundPaymentCommand): Promise<Result<PaymentAggregate, Error>> {
+    try {
+      const payment = await this.aggregateStore.load(command.paymentId);
+      if (!payment) {
+        return new Failure(new NotFoundException(`Payment ${command.paymentId} not found`));
+      }
 
-    payment.refund(command.amount, command.reason);
-    await this.aggregateStore.save(payment);
-    return payment;
+      payment.refund(command.amount, command.reason);
+      await this.aggregateStore.save(payment);
+      return new Success(payment);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 

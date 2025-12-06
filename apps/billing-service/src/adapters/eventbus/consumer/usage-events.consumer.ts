@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { RecordUsageCommand } from '../../../application/commands/subscription';
 import {
@@ -119,10 +119,9 @@ export class UsageEventsConsumer implements OnModuleInit {
 
     try {
       // Get subscription for the company
-      const subscription = await this.queryBus.execute<
-        GetSubscriptionByCompanyQuery,
-        SubscriptionDto | null
-      >(new GetSubscriptionByCompanyQuery(companyIdOrUserId));
+      const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+        new GetSubscriptionByCompanyQuery(companyIdOrUserId),
+      );
 
       if (!subscription) {
         this.logger.debug(
@@ -132,7 +131,7 @@ export class UsageEventsConsumer implements OnModuleInit {
       }
 
       // Record the usage
-      await this.commandBus.execute(
+      const result = await this.commandBus.execute(
         new RecordUsageCommand({
           companyId: companyIdOrUserId,
           usageType,
@@ -141,6 +140,11 @@ export class UsageEventsConsumer implements OnModuleInit {
           entityId,
         }),
       );
+
+      if (result.isFailure) {
+        this.logger.error(`Failed to record usage: ${result.error}`);
+        return;
+      }
 
       this.logger.debug(
         `Recorded ${usageType} usage for subscription ${subscription.id}`,

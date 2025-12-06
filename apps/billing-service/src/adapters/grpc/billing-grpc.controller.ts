@@ -1,6 +1,6 @@
 import { Controller, Logger } from '@nestjs/common';
 import { GrpcMethod } from '@nestjs/microservices';
-import { QueryBus, CommandBus } from '@nestjs/cqrs';
+import { QueryBus, CommandBus } from '@flexobo/core';
 import {
   GetSubscriptionByCompanyQuery,
   CheckUsageLimitQuery,
@@ -106,10 +106,7 @@ export class BillingGrpcController {
     );
 
     try {
-      const result = await this.queryBus.execute<
-        CheckUsageLimitQuery,
-        CheckUsageLimitResult
-      >(
+      const result = await this.queryBus.execute<CheckUsageLimitResult>(
         new CheckUsageLimitQuery({
           companyId: request.companyId,
           usageType: request.usageType as UsageType,
@@ -140,16 +137,15 @@ export class BillingGrpcController {
     this.logger.debug(`GetSubscriptionPlan: company=${request.companyId}`);
 
     try {
-      const subscription = await this.queryBus.execute<
-        GetSubscriptionByCompanyQuery,
-        SubscriptionDto | null
-      >(new GetSubscriptionByCompanyQuery(request.companyId));
+      const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+        new GetSubscriptionByCompanyQuery(request.companyId),
+      );
 
       if (!subscription) {
         return { found: false };
       }
 
-      const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+      const plan = await this.queryBus.execute<PlanReadData | null>(
         new GetPlanQuery(subscription.planId),
       );
 
@@ -190,10 +186,9 @@ export class BillingGrpcController {
 
     try {
       // Get subscription
-      const subscription = await this.queryBus.execute<
-        GetSubscriptionByCompanyQuery,
-        SubscriptionDto | null
-      >(new GetSubscriptionByCompanyQuery(request.companyId));
+      const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+        new GetSubscriptionByCompanyQuery(request.companyId),
+      );
 
       if (!subscription) {
         return {
@@ -205,7 +200,7 @@ export class BillingGrpcController {
       }
 
       // Record usage
-      await this.commandBus.execute(
+      const recordResult = await this.commandBus.execute(
         new RecordUsageCommand({
           companyId: request.companyId,
           usageType: request.usageType as UsageType,
@@ -215,11 +210,18 @@ export class BillingGrpcController {
         }),
       );
 
+      if (recordResult.isFailure) {
+        this.logger.error(`RecordUsage failed: ${recordResult.error}`);
+        return {
+          success: false,
+          newUsage: 0,
+          limit: 0,
+          remaining: 0,
+        };
+      }
+
       // Get updated usage stats
-      const usageResult = await this.queryBus.execute<
-        CheckUsageLimitQuery,
-        CheckUsageLimitResult
-      >(
+      const usageResult = await this.queryBus.execute<CheckUsageLimitResult>(
         new CheckUsageLimitQuery({
           companyId: request.companyId,
           usageType: request.usageType as UsageType,
@@ -250,16 +252,15 @@ export class BillingGrpcController {
     this.logger.debug(`GetUsageStats: company=${request.companyId}`);
 
     try {
-      const subscription = await this.queryBus.execute<
-        GetSubscriptionByCompanyQuery,
-        SubscriptionDto | null
-      >(new GetSubscriptionByCompanyQuery(request.companyId));
+      const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+        new GetSubscriptionByCompanyQuery(request.companyId),
+      );
 
       if (!subscription) {
         return { found: false, usage: {} };
       }
 
-      const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+      const plan = await this.queryBus.execute<PlanReadData | null>(
         new GetPlanQuery(subscription.planId),
       );
 
@@ -272,10 +273,7 @@ export class BillingGrpcController {
       const usage: Record<string, UsageStat> = {};
 
       for (const usageType of usageTypes) {
-        const result = await this.queryBus.execute<
-          CheckUsageLimitQuery,
-          CheckUsageLimitResult
-        >(
+        const result = await this.queryBus.execute<CheckUsageLimitResult>(
           new CheckUsageLimitQuery({
             companyId: request.companyId,
             usageType,

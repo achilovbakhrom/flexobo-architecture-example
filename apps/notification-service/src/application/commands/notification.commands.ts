@@ -1,4 +1,4 @@
-import { ICommand } from '@nestjs/cqrs';
+import { ICommand } from '@flexobo/core';
 import {
   NotificationType,
   NotificationCategory,

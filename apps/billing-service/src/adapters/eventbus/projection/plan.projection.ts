@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { PrismaService } from '../../../prisma.module';
 import {
@@ -19,7 +19,7 @@ interface ProjectedEvent<T> {
 export class PlanProjection implements OnModuleInit {
   private readonly logger = new Logger(PlanProjection.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PrismaService') private readonly prisma: PrismaService) {}
 
   onModuleInit() {
     this.logger.log('PlanProjection initialized');

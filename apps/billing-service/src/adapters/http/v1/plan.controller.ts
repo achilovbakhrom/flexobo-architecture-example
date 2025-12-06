@@ -12,7 +12,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { JwtAuthGuard, RolesGuard, Roles, Public } from '@flexobo/shared-kernel';
 import {
   CreatePlanDto,
@@ -44,11 +44,14 @@ export class PlanController {
   @ApiOperation({ summary: 'Create a new plan (Admin only)' })
   @ApiResponse({ status: 201, description: 'Plan created', type: PlanResponseDto })
   async createPlan(@Body() dto: CreatePlanDto): Promise<PlanResponseDto> {
-    const result = await this.commandBus.execute<CreatePlanCommand, CreatePlanResult>(
+    const result = await this.commandBus.execute<CreatePlanResult>(
       new CreatePlanCommand(dto),
     );
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
-      new GetPlanQuery(result.id),
+    if (result.isFailure) {
+      throw result.error;
+    }
+    const plan = await this.queryBus.execute<PlanReadData | null>(
+      new GetPlanQuery(result.value.id),
     );
     if (!plan) {
       throw new Error('Plan creation failed');
@@ -64,7 +67,7 @@ export class PlanController {
     @Query('activeOnly') activeOnly?: string,
   ): Promise<ListPlansResponseDto> {
     const isActive = activeOnly === 'true' ? true : undefined;
-    const plans = await this.queryBus.execute<ListPlansQuery, PlanReadData[]>(
+    const plans = await this.queryBus.execute<PlanReadData[]>(
       new ListPlansQuery({ isActive }),
     );
     return {
@@ -78,7 +81,7 @@ export class PlanController {
   @ApiOperation({ summary: 'List active plans for public display' })
   @ApiResponse({ status: 200, type: ListPlansResponseDto })
   async listActivePlans(): Promise<ListPlansResponseDto> {
-    const plans = await this.queryBus.execute<ListPlansQuery, PlanReadData[]>(
+    const plans = await this.queryBus.execute<PlanReadData[]>(
       new ListPlansQuery({ isActive: true }),
     );
     return {
@@ -93,7 +96,7 @@ export class PlanController {
   @ApiResponse({ status: 200, type: PlanResponseDto })
   @ApiResponse({ status: 404, description: 'Plan not found' })
   async getPlan(@Param('id') id: string): Promise<PlanResponseDto> {
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+    const plan = await this.queryBus.execute<PlanReadData | null>(
       new GetPlanQuery(id),
     );
     if (!plan) {
@@ -113,8 +116,11 @@ export class PlanController {
     @Param('id') id: string,
     @Body() dto: UpdatePlanDto,
   ): Promise<PlanResponseDto> {
-    await this.commandBus.execute(new UpdatePlanCommand({ planId: id, ...dto }));
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+    const result = await this.commandBus.execute(new UpdatePlanCommand({ planId: id, ...dto }));
+    if (result.isFailure) {
+      throw result.error;
+    }
+    const plan = await this.queryBus.execute<PlanReadData | null>(
       new GetPlanQuery(id),
     );
     if (!plan) {
@@ -132,8 +138,11 @@ export class PlanController {
   @ApiResponse({ status: 200, type: PlanResponseDto })
   @ApiResponse({ status: 404, description: 'Plan not found' })
   async activatePlan(@Param('id') id: string): Promise<PlanResponseDto> {
-    await this.commandBus.execute(new ActivatePlanCommand(id));
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+    const result = await this.commandBus.execute(new ActivatePlanCommand(id));
+    if (result.isFailure) {
+      throw result.error;
+    }
+    const plan = await this.queryBus.execute<PlanReadData | null>(
       new GetPlanQuery(id),
     );
     if (!plan) {
@@ -151,8 +160,11 @@ export class PlanController {
   @ApiResponse({ status: 200, type: PlanResponseDto })
   @ApiResponse({ status: 404, description: 'Plan not found' })
   async deactivatePlan(@Param('id') id: string): Promise<PlanResponseDto> {
-    await this.commandBus.execute(new DeactivatePlanCommand(id));
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanReadData | null>(
+    const result = await this.commandBus.execute(new DeactivatePlanCommand(id));
+    if (result.isFailure) {
+      throw result.error;
+    }
+    const plan = await this.queryBus.execute<PlanReadData | null>(
       new GetPlanQuery(id),
     );
     if (!plan) {

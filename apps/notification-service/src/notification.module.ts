@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ClientsModule, Transport } from '@nestjs/microservices';
+import { JwtModule } from '@nestjs/jwt';
 import {
   CqrsModule,
   MessagingModule,
@@ -15,7 +16,7 @@ import {
   TOKEN_VALIDATOR,
   USERS_GRPC_CLIENT,
 } from '@flexobo/shared-kernel';
-import { PrismaModule } from './prisma.module';
+import { PrismaModule, PRISMA_CLIENT } from './prisma.module';
 import configuration from './config/configuration';
 
 // Ports
@@ -105,8 +106,9 @@ import { QueryHandlers } from './application/queries';
       commandHandlers: CommandHandlers,
       queryHandlers: QueryHandlers,
     }),
-    EventStoreModule.forRoot({ enableUpcasting: false }),
+    EventStoreModule.forRoot({ prismaClientToken: PRISMA_CLIENT, enableUpcasting: false }),
     OutboxModule.forRoot({
+      prismaClientToken: PRISMA_CLIENT,
       workerConfig: { pollingIntervalMs: 500, batchSize: 500, enabled: true },
       messagePublisher: {
         provide: 'IMessagePublisher',
@@ -120,6 +122,16 @@ import { QueryHandlers } from './application/queries';
           prefix: 'notification:evtbuf',
           eventTtl: 600,
           lockTtlMs: 5000,
+        },
+      }),
+      inject: [ConfigService],
+    }),
+    JwtModule.registerAsync({
+      imports: [ConfigModule],
+      useFactory: (configService: ConfigService) => ({
+        secret: configService.get('jwt.secret', 'your-super-secret-jwt-key'),
+        signOptions: {
+          expiresIn: configService.get('jwt.accessTokenExpiry', '15m'),
         },
       }),
       inject: [ConfigService],
@@ -146,11 +158,11 @@ import { QueryHandlers } from './application/queries';
       provide: PUSH_SERVICE,
       useClass: FCMPushService,
     },
+    SSEManagerService,
     {
       provide: SSE_MANAGER,
-      useClass: SSEManagerService,
+      useExisting: SSEManagerService,
     },
-    SSEManagerService,
 
     // Email
     {

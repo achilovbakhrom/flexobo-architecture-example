@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
+import { CommandHandler, ICommandHandler, Result, Success, Failure } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import {
   SendNotificationCommand,
@@ -20,7 +20,7 @@ import { NotificationType, NotificationChannel } from '../../domain/constants/en
 
 @Injectable()
 @CommandHandler(SendNotificationCommand)
-export class SendNotificationHandler implements ICommandHandler<SendNotificationCommand> {
+export class SendNotificationHandler implements ICommandHandler<SendNotificationCommand, void> {
   private readonly logger = new Logger(SendNotificationHandler.name);
 
   constructor(
@@ -32,28 +32,76 @@ export class SendNotificationHandler implements ICommandHandler<SendNotification
     private readonly sseManager: ISSEManager
   ) {}
 
-  async execute(command: SendNotificationCommand): Promise<void> {
-    this.logger.debug(
-      `Sending notification to ${command.userIds.length} users: ${command.title}`
-    );
+  async execute(command: SendNotificationCommand): Promise<Result<void, Error>> {
+    try {
+      this.logger.debug(
+        `Sending notification to ${command.userIds.length} users: ${command.title}`
+      );
 
-    for (const userId of command.userIds) {
-      const notificationId = uuidv4();
+      for (const userId of command.userIds) {
+        const notificationId = uuidv4();
 
-      if (command.type === NotificationType.User) {
-        const notification = NotificationAggregate.create({
-          id: notificationId,
-          userId,
+        if (command.type === NotificationType.User) {
+          const notification = NotificationAggregate.create({
+            id: notificationId,
+            userId,
+            type: command.type,
+            category: command.category,
+            title: command.title,
+            body: command.body,
+            data: command.data,
+            channels: command.channels,
+          });
+
+          await this.aggregateStore.save(notification);
+        }
+
+        const payload: SSEPayload = {
           type: command.type,
           category: command.category,
           title: command.title,
           body: command.body,
           data: command.data,
-          channels: command.channels,
-        });
+          timestamp: Date.now(),
+        };
 
-        await this.aggregateStore.save(notification);
+        if (command.channels.includes(NotificationChannel.Sse)) {
+          await this.sseManager.sendToUser(userId, payload);
+        }
       }
+
+      if (command.channels.includes(NotificationChannel.Push)) {
+        await this.pushService.sendToUsers(command.userIds, {
+          title: command.title,
+          body: command.body,
+          data: command.data as Record<string, string> | undefined,
+        });
+      }
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
+  }
+}
+
+@Injectable()
+@CommandHandler(BroadcastNotificationCommand)
+export class BroadcastNotificationHandler
+  implements ICommandHandler<BroadcastNotificationCommand, void>
+{
+  private readonly logger = new Logger(BroadcastNotificationHandler.name);
+
+  constructor(
+    @Inject(PUSH_SERVICE)
+    private readonly pushService: IPushService,
+    @Inject(SSE_MANAGER)
+    private readonly sseManager: ISSEManager
+  ) {}
+
+  async execute(command: BroadcastNotificationCommand): Promise<Result<void, Error>> {
+    try {
+      this.logger.debug(`Broadcasting notification: ${command.title}`);
 
       const payload: SSEPayload = {
         type: command.type,
@@ -65,56 +113,20 @@ export class SendNotificationHandler implements ICommandHandler<SendNotification
       };
 
       if (command.channels.includes(NotificationChannel.Sse)) {
-        await this.sseManager.sendToUser(userId, payload);
+        await this.sseManager.broadcast(payload);
       }
-    }
 
-    if (command.channels.includes(NotificationChannel.Push)) {
-      await this.pushService.sendToUsers(command.userIds, {
-        title: command.title,
-        body: command.body,
-        data: command.data as Record<string, string> | undefined,
-      });
-    }
-  }
-}
+      if (command.channels.includes(NotificationChannel.Push)) {
+        await this.pushService.sendToAll({
+          title: command.title,
+          body: command.body,
+          data: command.data as Record<string, string> | undefined,
+        });
+      }
 
-@Injectable()
-@CommandHandler(BroadcastNotificationCommand)
-export class BroadcastNotificationHandler
-  implements ICommandHandler<BroadcastNotificationCommand>
-{
-  private readonly logger = new Logger(BroadcastNotificationHandler.name);
-
-  constructor(
-    @Inject(PUSH_SERVICE)
-    private readonly pushService: IPushService,
-    @Inject(SSE_MANAGER)
-    private readonly sseManager: ISSEManager
-  ) {}
-
-  async execute(command: BroadcastNotificationCommand): Promise<void> {
-    this.logger.debug(`Broadcasting notification: ${command.title}`);
-
-    const payload: SSEPayload = {
-      type: command.type,
-      category: command.category,
-      title: command.title,
-      body: command.body,
-      data: command.data,
-      timestamp: Date.now(),
-    };
-
-    if (command.channels.includes(NotificationChannel.Sse)) {
-      await this.sseManager.broadcast(payload);
-    }
-
-    if (command.channels.includes(NotificationChannel.Push)) {
-      await this.pushService.sendToAll({
-        title: command.title,
-        body: command.body,
-        data: command.data as Record<string, string> | undefined,
-      });
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
   }
 }
@@ -122,7 +134,7 @@ export class BroadcastNotificationHandler
 @Injectable()
 @CommandHandler(MarkNotificationReadCommand)
 export class MarkNotificationReadHandler
-  implements ICommandHandler<MarkNotificationReadCommand>
+  implements ICommandHandler<MarkNotificationReadCommand, void>
 {
   constructor(
     @Inject(NOTIFICATION_AGGREGATE_STORE)
@@ -131,49 +143,60 @@ export class MarkNotificationReadHandler
     private readonly readRepository: INotificationReadRepository
   ) {}
 
-  async execute(command: MarkNotificationReadCommand): Promise<void> {
-    const notification = await this.readRepository.findById(command.notificationId);
+  async execute(command: MarkNotificationReadCommand): Promise<Result<void, Error>> {
+    try {
+      const notification = await this.readRepository.findById(command.notificationId);
 
-    if (!notification) {
-      throw new NotFoundException(
-        `Notification ${command.notificationId} not found`
-      );
+      if (!notification) {
+        return new Failure(
+          new NotFoundException(`Notification ${command.notificationId} not found`)
+        );
+      }
+
+      if (notification.userId !== command.userId) {
+        return new Failure(
+          new NotFoundException(`Notification ${command.notificationId} not found`)
+        );
+      }
+
+      if (notification.isRead) {
+        return new Success(undefined);
+      }
+
+      const aggregate = await this.aggregateStore.load(command.notificationId);
+      if (!aggregate) {
+        return new Failure(
+          new NotFoundException(`Notification ${command.notificationId} not found`)
+        );
+      }
+
+      aggregate.markAsRead();
+      await this.aggregateStore.save(aggregate);
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    if (notification.userId !== command.userId) {
-      throw new NotFoundException(
-        `Notification ${command.notificationId} not found`
-      );
-    }
-
-    if (notification.isRead) {
-      return;
-    }
-
-    const aggregate = await this.aggregateStore.load(command.notificationId);
-    if (!aggregate) {
-      throw new NotFoundException(
-        `Notification ${command.notificationId} not found`
-      );
-    }
-
-    aggregate.markAsRead();
-    await this.aggregateStore.save(aggregate);
   }
 }
 
 @Injectable()
 @CommandHandler(MarkAllNotificationsReadCommand)
 export class MarkAllNotificationsReadHandler
-  implements ICommandHandler<MarkAllNotificationsReadCommand>
+  implements ICommandHandler<MarkAllNotificationsReadCommand, number>
 {
   constructor(
     @Inject(NOTIFICATION_READ_REPOSITORY)
     private readonly readRepository: INotificationReadRepository
   ) {}
 
-  async execute(command: MarkAllNotificationsReadCommand): Promise<number> {
-    return this.readRepository.markAllAsRead(command.userId);
+  async execute(command: MarkAllNotificationsReadCommand): Promise<Result<number, Error>> {
+    try {
+      const count = await this.readRepository.markAllAsRead(command.userId);
+      return new Success(count);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
