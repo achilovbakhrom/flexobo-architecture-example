@@ -58,7 +58,7 @@ import {
 } from '../../../application/commands';
 import { GetUserByIdQuery } from '../../../application/queries';
 import { JwtAuthGuard, AuthenticatedRequest } from '../guards';
-import { AuthPlatform, UserType } from '../../../ports';
+import { UserType } from '../../../ports';
 import { IUser, AuthMethod } from '../../../ports/user.interface';
 
 @ApiTags('Auth')

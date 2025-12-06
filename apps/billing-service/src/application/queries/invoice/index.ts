@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
 
-// ============ DTOs ============
-
 export interface LineItemDto {
   description: string;
   quantity: number;
@@ -49,8 +47,6 @@ export interface InvoiceListResult {
   pageSize: number;
 }
 
-// ============ Read Model Interface ============
-
 export interface IInvoiceReadRepository {
   findById(id: string): Promise<InvoiceDto | null>;
   findByInvoiceNumber(invoiceNumber: string): Promise<InvoiceDto | null>;
@@ -66,8 +62,6 @@ export interface IInvoiceReadRepository {
   ): Promise<InvoiceListResult>;
   findUnpaidOverdue(): Promise<InvoiceDto[]>;
 }
-
-// ============ Queries ============
 
 export class GetInvoiceQuery implements IQuery {
   constructor(public readonly invoiceId: string) {}
@@ -96,8 +90,6 @@ export class ListInvoicesByCompanyQuery implements IQuery {
 export class GetUnpaidOverdueInvoicesQuery implements IQuery {
   constructor() {}
 }
-
-// ============ Handlers ============
 
 export const INVOICE_READ_REPOSITORY = Symbol('INVOICE_READ_REPOSITORY');
 

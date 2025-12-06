@@ -1,10 +1,6 @@
 import { DomainEvent } from '@flexobo/core';
 import { ChatRoom, ChatRoomStatus } from '../domain/aggregates/chat-room.aggregate';
 
-// ============================================================
-// Chat Room Read Model DTO
-// ============================================================
-
 export interface ChatRoomReadModelDto {
   id: string;
   participants: string[];
@@ -27,10 +23,6 @@ export interface ChatRoomReadModelDto {
   updatedAt: Date;
 }
 
-// ============================================================
-// Chat Room Repository Port (Read Model)
-// ============================================================
-
 export interface IChatRoomRepository {
   findById(id: string): Promise<ChatRoomReadModelDto | null>;
   findByParticipants(participantIds: string[]): Promise<ChatRoomReadModelDto | null>;
@@ -50,10 +42,6 @@ export interface IChatRoomRepository {
 }
 
 export const CHAT_ROOM_REPOSITORY = Symbol('IChatRoomRepository');
-
-// ============================================================
-// Chat Room Aggregate Store Port (Event Sourcing)
-// ============================================================
 
 export interface IChatRoomAggregateStore {
   load(roomId: string): Promise<ChatRoom | null>;

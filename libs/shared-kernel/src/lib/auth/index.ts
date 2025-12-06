@@ -2,6 +2,7 @@ export * from './auth.types';
 export * from './jwt.service';
 export * from './password.service';
 export * from './jwt-auth.guard';
+export * from './grpc-auth.guard';
 export * from './roles.guard';
 export * from './public.decorator';
 export * from './roles.decorator';

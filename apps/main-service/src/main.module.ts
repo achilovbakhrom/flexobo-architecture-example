@@ -5,6 +5,7 @@ import {
   MessagingModule,
   EventStoreModule,
   OutboxModule,
+  EventBufferModule,
   MESSAGE_PUBLISHER,
 } from '@flexobo/core';
 import { PrismaModule } from './prisma.module';
@@ -271,11 +272,22 @@ const QueryHandlers = [
     }),
     EventStoreModule.forRoot({ enableUpcasting: false }),
     OutboxModule.forRoot({
-      workerConfig: { pollingIntervalMs: 5000, batchSize: 100, enabled: true },
+      workerConfig: { pollingIntervalMs: 500, batchSize: 500, enabled: true },
       messagePublisher: {
         provide: 'IMessagePublisher',
         useExisting: MESSAGE_PUBLISHER,
       },
+    }),
+    EventBufferModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        redis: configService.get('REDIS_URL', 'redis://localhost:6379'),
+        config: {
+          prefix: 'main:evtbuf',
+          eventTtl: 600,
+          lockTtlMs: 5000,
+        },
+      }),
+      inject: [ConfigService],
     }),
   ],
   controllers: [

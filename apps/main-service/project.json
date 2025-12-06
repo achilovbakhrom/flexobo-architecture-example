@@ -28,7 +28,7 @@
         "buildTarget": "main-service:build",
         "watch": true,
         "inspect": "inspect",
-        "port": 9235,
+        "port": 9232,
         "debounce": 500,
         "runtimeArgs": ["--enable-source-maps"]
       }

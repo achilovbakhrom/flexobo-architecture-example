@@ -14,10 +14,6 @@ import {
   ChatRoomReadModelDto,
 } from '../../ports/chat-room.port';
 
-// ============================================================
-// Room Query Handlers
-// ============================================================
-
 @QueryHandler(GetRoomByIdQuery)
 export class GetRoomByIdHandler
   implements IQueryHandler<GetRoomByIdQuery, ChatRoomReadModelDto | null>

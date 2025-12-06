@@ -1,19 +1,19 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   IBidReadRepository,
   BID_READ_REPOSITORY,
+  BidReadDto,
 } from '../../../ports/bid.repository';
 import {
   BID_EVENT_TYPES,
@@ -22,93 +22,79 @@ import {
 } from '../../../domain/events/bid.events';
 import { BidStatus } from '../../../domain/constants/enums';
 
-interface EventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-const QUEUE_NAME = 'main-service.bid.projection';
+type BidEventPayload = EventPayload<
+  BidCreatedEventData | BidCounteredEventData | Record<string, unknown>
+>;
 
 @Injectable()
-export class BidProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(BidProjection.name);
-  private isSubscribed = false;
-
+export class BidProjection extends BaseProjection<BidReadDto, BidEventPayload> {
   constructor(
     @Inject(BID_READ_REPOSITORY)
     private readonly bidRepo: IBidReadRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, BidProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: 'main-service.bid.projection',
+      routingKeys: ['bid.#'],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping bid projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
-      ['bid.#'],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      { durable: true, maxRetries: 3 }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUE_NAME}`);
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.bidRepo.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as EventPayload;
-
-    this.logger.debug(
-      `[Projection] Bid event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(event: BidEventPayload): Promise<void> {
+    switch (event.type) {
       case BID_EVENT_TYPES.CREATED:
-        await this.onBidCreated(payload);
+        await this.onBidCreated(event as EventPayload<BidCreatedEventData>);
         break;
       case BID_EVENT_TYPES.COUNTERED:
-        await this.onBidCountered(payload);
+        await this.onBidCountered(event as EventPayload<BidCounteredEventData>);
         break;
       case BID_EVENT_TYPES.ACCEPTED:
-        await this.onBidAccepted(payload);
+        await this.onBidAccepted(event);
         break;
       case BID_EVENT_TYPES.REJECTED:
-        await this.onBidRejected(payload);
+        await this.onBidRejected(event);
         break;
       case BID_EVENT_TYPES.CANCELLED:
-        await this.onBidCancelled(payload);
+        await this.onBidCancelled(event);
         break;
       case BID_EVENT_TYPES.EXPIRED:
-        await this.onBidExpired(payload);
+        await this.onBidExpired(event);
         break;
       default:
-        this.logger.warn(`Unknown bid event type: ${payload.type}`);
+        this.logger.warn(`Unknown bid event type: ${event.type}`);
     }
   }
 
-  private async onBidCreated(event: EventPayload): Promise<void> {
-    const data = event.data as unknown as BidCreatedEventData;
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as BidEventPayload;
+    await this.applyEvent(payload);
+  }
 
+  private async onBidCreated(
+    event: EventPayload<BidCreatedEventData>
+  ): Promise<void> {
+    const existing = await this.bidRepo.findById(event.aggregateId);
+    this.checkCreateIdempotency(existing, event);
+
+    const { data } = event;
     await this.bidRepo.save({
       id: event.aggregateId,
       bidderId: data.bidderId,
@@ -127,7 +113,6 @@ export class BidProjection implements OnModuleInit, OnModuleDestroy {
       expiresAt: data.expiresAt ? new Date(data.expiresAt) : undefined,
     });
 
-    // Save initial negotiation step
     await this.bidRepo.saveNegotiationStep({
       id: uuidv4(),
       bidId: event.aggregateId,
@@ -141,14 +126,15 @@ export class BidProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onBidCountered(event: EventPayload): Promise<void> {
+  private async onBidCountered(
+    event: EventPayload<BidCounteredEventData>
+  ): Promise<void> {
     const existing = await this.bidRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
-    const data = event.data as unknown as BidCounteredEventData;
-
+    const { data } = event;
     await this.bidRepo.save({
-      ...existing,
+      ...existing!,
       proposedPrice: data.newPrice,
       status: BidStatus.COUNTERED,
       negotiationRound: data.negotiationRound,
@@ -156,7 +142,6 @@ export class BidProjection implements OnModuleInit, OnModuleDestroy {
       updatedAt: new Date(event.occurredAt),
     });
 
-    // Save counter offer as negotiation step
     await this.bidRepo.saveNegotiationStep({
       id: uuidv4(),
       bidId: event.aggregateId,
@@ -170,48 +155,48 @@ export class BidProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onBidAccepted(event: EventPayload): Promise<void> {
+  private async onBidAccepted(event: BidEventPayload): Promise<void> {
     const existing = await this.bidRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
     await this.bidRepo.save({
-      ...existing,
+      ...existing!,
       status: BidStatus.ACCEPTED,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onBidRejected(event: EventPayload): Promise<void> {
+  private async onBidRejected(event: BidEventPayload): Promise<void> {
     const existing = await this.bidRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
     await this.bidRepo.save({
-      ...existing,
+      ...existing!,
       status: BidStatus.REJECTED,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onBidCancelled(event: EventPayload): Promise<void> {
+  private async onBidCancelled(event: BidEventPayload): Promise<void> {
     const existing = await this.bidRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
     await this.bidRepo.save({
-      ...existing,
+      ...existing!,
       status: BidStatus.CANCELLED,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onBidExpired(event: EventPayload): Promise<void> {
+  private async onBidExpired(event: BidEventPayload): Promise<void> {
     const existing = await this.bidRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
     await this.bidRepo.save({
-      ...existing,
+      ...existing!,
       status: BidStatus.EXPIRED,
       version: event.version,
       updatedAt: new Date(event.occurredAt),

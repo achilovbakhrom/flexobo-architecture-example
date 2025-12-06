@@ -12,6 +12,9 @@ export default () => ({
   rabbitmq: {
     url: process.env.RABBITMQ_URL,
   },
+  redis: {
+    url: process.env.REDIS_URL || 'redis://localhost:6379',
+  },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,
   },

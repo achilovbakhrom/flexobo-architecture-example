@@ -4,8 +4,6 @@ import { IAggregateStore } from '@flexobo/core';
 import { InvoiceAggregate, LineItem, BillingInfo } from '../../../domain/aggregates/invoice.aggregate';
 import { INVOICE_AGGREGATE_STORE } from '../../../ports/invoice.repository';
 
-// ============ Commands ============
-
 export class CreateInvoiceCommand implements ICommand {
   constructor(
     public readonly id: string,
@@ -44,8 +42,6 @@ export class SetInvoicePdfUrlCommand implements ICommand {
     public readonly pdfUrl: string,
   ) {}
 }
-
-// ============ Handlers ============
 
 @Injectable()
 @CommandHandler(CreateInvoiceCommand)

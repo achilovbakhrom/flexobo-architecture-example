@@ -154,6 +154,7 @@ export class PrismaBoardReadRepository implements IBoardReadRepository {
       description: board.description,
       members: board.members || [],
       isActive: board.isActive,
+      version: board.version ?? 0,
       createdAt: board.createdAt,
       updatedAt: board.updatedAt,
     };

@@ -15,9 +15,9 @@ import {
 } from '../events/chat.events';
 
 export enum ChatRoomStatus {
-  ACTIVE = 'ACTIVE',
-  ARCHIVED = 'ARCHIVED',
-  CLOSED = 'CLOSED',
+  Active = 'active',
+  Archived = 'archived',
+  Closed = 'closed',
 }
 
 export interface TranslationSettings {
@@ -48,7 +48,7 @@ export class ChatRoom extends AggregateRoot {
   private _isGroup = false;
   private _groupName?: string;
   private _isSupportChat = false;
-  private _status: ChatRoomStatus = ChatRoomStatus.ACTIVE;
+  private _status: ChatRoomStatus = ChatRoomStatus.Active;
   private _unreadCounts: Record<string, number> = {};
   private _translationSettings: Record<string, TranslationSettings> = {};
   private _lastMessageId?: string;
@@ -285,7 +285,7 @@ export class ChatRoom extends AggregateRoot {
   }
 
   archive(archivedBy: string): void {
-    if (this._status !== ChatRoomStatus.ACTIVE) {
+    if (this._status !== ChatRoomStatus.Active) {
       throw new Error('Can only archive active rooms');
     }
 
@@ -298,7 +298,7 @@ export class ChatRoom extends AggregateRoot {
   }
 
   close(closedBy: string): void {
-    if (this._status === ChatRoomStatus.CLOSED) {
+    if (this._status === ChatRoomStatus.Closed) {
       throw new Error('Room is already closed');
     }
 
@@ -347,10 +347,10 @@ export class ChatRoom extends AggregateRoot {
         );
         break;
       case ChatRoomEventType.Archived:
-        this._status = ChatRoomStatus.ARCHIVED;
+        this._status = ChatRoomStatus.Archived;
         break;
       case ChatRoomEventType.Closed:
-        this._status = ChatRoomStatus.CLOSED;
+        this._status = ChatRoomStatus.Closed;
         break;
       case ChatRoomEventType.Deleted:
         this._isDeleted = true;
@@ -366,7 +366,7 @@ export class ChatRoom extends AggregateRoot {
     this._isSupportChat = data.isSupportChat;
     this._identifierId = data.identifierId;
     this._identifierType = data.identifierType;
-    this._status = ChatRoomStatus.ACTIVE;
+    this._status = ChatRoomStatus.Active;
     this._unreadCounts = {};
     this._translationSettings = {};
   }
