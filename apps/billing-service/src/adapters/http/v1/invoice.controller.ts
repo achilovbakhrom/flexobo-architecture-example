@@ -14,8 +14,7 @@ import {
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@flexobo/shared-kernel';
-import { RolesGuard, Roles } from '../guards/roles.guard';
+import { JwtAuthGuard, CurrentUser, AuthenticatedUser, RolesGuard, Roles } from '@flexobo/shared-kernel';
 import {
   CreateInvoiceCommand,
   FinalizeInvoiceCommand,

@@ -3,11 +3,15 @@
  */
 
 import { SetMetadata } from '@nestjs/common';
-import { UserRole } from './auth.types';
 
 export const ROLES_KEY = 'roles';
 
 /**
  * Specifies required roles for accessing a route
+ *
+ * @example
+ * @Roles('ADMIN', 'SUPERADMIN')
+ * @UseGuards(JwtAuthGuard, RolesGuard)
+ * async adminEndpoint() { ... }
  */
-export const Roles = (...roles: UserRole[]) => SetMetadata(ROLES_KEY, roles);
+export const Roles = (...roles: string[]) => SetMetadata(ROLES_KEY, roles);
