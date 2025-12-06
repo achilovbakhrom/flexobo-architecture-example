@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { Injectable, Inject } from '@nestjs/common';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
+import { INVOICE_READ_REPOSITORY } from '../../../ports/invoice.repository';
 
 export interface LineItemDto {
   description: string;
@@ -91,12 +92,10 @@ export class GetUnpaidOverdueInvoicesQuery implements IQuery {
   constructor() {}
 }
 
-export const INVOICE_READ_REPOSITORY = Symbol('INVOICE_READ_REPOSITORY');
-
 @Injectable()
 @QueryHandler(GetInvoiceQuery)
 export class GetInvoiceHandler implements IQueryHandler<GetInvoiceQuery> {
-  constructor(private readonly invoiceReadRepository: IInvoiceReadRepository) {}
+  constructor(@Inject(INVOICE_READ_REPOSITORY) private readonly invoiceReadRepository: IInvoiceReadRepository) {}
 
   async execute(query: GetInvoiceQuery): Promise<InvoiceDto | null> {
     return this.invoiceReadRepository.findById(query.invoiceId);
@@ -108,7 +107,7 @@ export class GetInvoiceHandler implements IQueryHandler<GetInvoiceQuery> {
 export class GetInvoiceByNumberHandler
   implements IQueryHandler<GetInvoiceByNumberQuery>
 {
-  constructor(private readonly invoiceReadRepository: IInvoiceReadRepository) {}
+  constructor(@Inject(INVOICE_READ_REPOSITORY) private readonly invoiceReadRepository: IInvoiceReadRepository) {}
 
   async execute(query: GetInvoiceByNumberQuery): Promise<InvoiceDto | null> {
     return this.invoiceReadRepository.findByInvoiceNumber(query.invoiceNumber);
@@ -120,7 +119,7 @@ export class GetInvoiceByNumberHandler
 export class ListInvoicesBySubscriptionHandler
   implements IQueryHandler<ListInvoicesBySubscriptionQuery>
 {
-  constructor(private readonly invoiceReadRepository: IInvoiceReadRepository) {}
+  constructor(@Inject(INVOICE_READ_REPOSITORY) private readonly invoiceReadRepository: IInvoiceReadRepository) {}
 
   async execute(query: ListInvoicesBySubscriptionQuery): Promise<InvoiceListResult> {
     return this.invoiceReadRepository.findBySubscriptionId(
@@ -136,7 +135,7 @@ export class ListInvoicesBySubscriptionHandler
 export class ListInvoicesByCompanyHandler
   implements IQueryHandler<ListInvoicesByCompanyQuery>
 {
-  constructor(private readonly invoiceReadRepository: IInvoiceReadRepository) {}
+  constructor(@Inject(INVOICE_READ_REPOSITORY) private readonly invoiceReadRepository: IInvoiceReadRepository) {}
 
   async execute(query: ListInvoicesByCompanyQuery): Promise<InvoiceListResult> {
     return this.invoiceReadRepository.findByCompanyId(
@@ -152,7 +151,7 @@ export class ListInvoicesByCompanyHandler
 export class GetUnpaidOverdueInvoicesHandler
   implements IQueryHandler<GetUnpaidOverdueInvoicesQuery>
 {
-  constructor(private readonly invoiceReadRepository: IInvoiceReadRepository) {}
+  constructor(@Inject(INVOICE_READ_REPOSITORY) private readonly invoiceReadRepository: IInvoiceReadRepository) {}
 
   async execute(_query: GetUnpaidOverdueInvoicesQuery): Promise<InvoiceDto[]> {
     return this.invoiceReadRepository.findUnpaidOverdue();

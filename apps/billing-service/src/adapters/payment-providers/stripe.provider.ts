@@ -14,8 +14,9 @@ import {
 @Injectable()
 export class StripeProvider implements IPaymentProvider {
   private readonly logger = new Logger(StripeProvider.name);
-  private readonly stripe: Stripe;
+  private readonly stripe: Stripe | null;
   private readonly webhookSecret: string;
+  private readonly isConfigured: boolean;
 
   readonly provider = PaymentProvider.STRIPE;
 
@@ -26,14 +27,29 @@ export class StripeProvider implements IPaymentProvider {
       ''
     );
 
-    this.stripe = new Stripe(apiKey, {
-      apiVersion: '2025-11-17.clover',
-    });
+    if (apiKey) {
+      this.stripe = new Stripe(apiKey, {
+        apiVersion: '2025-11-17.clover',
+      });
+      this.isConfigured = true;
+    } else {
+      this.stripe = null;
+      this.isConfigured = false;
+      this.logger.warn('Stripe is not configured - STRIPE_SECRET_KEY not provided');
+    }
+  }
+
+  private ensureConfigured(): Stripe {
+    if (!this.stripe) {
+      throw new Error('Stripe is not configured. Please provide STRIPE_SECRET_KEY.');
+    }
+    return this.stripe;
   }
 
   async createCheckoutSession(
     params: CreateCheckoutParams
   ): Promise<CheckoutSession> {
+    const stripe = this.ensureConfigured();
     try {
       const priceData: Stripe.Checkout.SessionCreateParams.LineItem.PriceData = {
         currency: params.currency.toLowerCase(),
@@ -46,7 +62,7 @@ export class StripeProvider implements IPaymentProvider {
         },
       };
 
-      const session = await this.stripe.checkout.sessions.create({
+      const session = await stripe.checkout.sessions.create({
         mode: 'subscription',
         payment_method_types: ['card'],
         line_items: [
@@ -78,8 +94,9 @@ export class StripeProvider implements IPaymentProvider {
   }
 
   async getPaymentStatus(externalId: string): Promise<PaymentStatusResult> {
+    const stripe = this.ensureConfigured();
     try {
-      const paymentIntent = await this.stripe.paymentIntents.retrieve(externalId);
+      const paymentIntent = await stripe.paymentIntents.retrieve(externalId);
 
       let status: PaymentStatusResult['status'];
       switch (paymentIntent.status) {
@@ -130,6 +147,7 @@ export class StripeProvider implements IPaymentProvider {
     amount?: number,
     reason?: string
   ): Promise<RefundResult> {
+    const stripe = this.ensureConfigured();
     try {
       const refundParams: Stripe.RefundCreateParams = {
         payment_intent: paymentId,
@@ -143,7 +161,7 @@ export class StripeProvider implements IPaymentProvider {
         refundParams.reason = 'requested_by_customer';
       }
 
-      const refund = await this.stripe.refunds.create(refundParams);
+      const refund = await stripe.refunds.create(refundParams);
 
       return {
         refundId: refund.id,
@@ -157,8 +175,9 @@ export class StripeProvider implements IPaymentProvider {
   }
 
   async cancelSubscription(externalId: string): Promise<void> {
+    const stripe = this.ensureConfigured();
     try {
-      await this.stripe.subscriptions.cancel(externalId);
+      await stripe.subscriptions.cancel(externalId);
     } catch (error) {
       this.logger.error('Failed to cancel Stripe subscription', error);
       throw error;
@@ -169,8 +188,9 @@ export class StripeProvider implements IPaymentProvider {
     payload: string | Buffer,
     signature: string
   ): Promise<WebhookValidationResult> {
+    const stripe = this.ensureConfigured();
     try {
-      const event = this.stripe.webhooks.constructEvent(
+      const event = stripe.webhooks.constructEvent(
         payload,
         signature,
         this.webhookSecret
@@ -191,10 +211,12 @@ export class StripeProvider implements IPaymentProvider {
   }
 
   async getSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
-    return this.stripe.subscriptions.retrieve(subscriptionId);
+    const stripe = this.ensureConfigured();
+    return stripe.subscriptions.retrieve(subscriptionId);
   }
 
   async getInvoice(invoiceId: string): Promise<Stripe.Invoice> {
-    return this.stripe.invoices.retrieve(invoiceId);
+    const stripe = this.ensureConfigured();
+    return stripe.invoices.retrieve(invoiceId);
   }
 }

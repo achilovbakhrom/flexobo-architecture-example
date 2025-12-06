@@ -1,6 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { InvoiceAggregate, LineItem, BillingInfo } from '../../../domain/aggregates/invoice.aggregate';
 import { INVOICE_AGGREGATE_STORE } from '../../../ports/invoice.repository';
 
@@ -45,124 +44,144 @@ export class SetInvoicePdfUrlCommand implements ICommand {
 
 @Injectable()
 @CommandHandler(CreateInvoiceCommand)
-export class CreateInvoiceHandler implements ICommandHandler<CreateInvoiceCommand> {
+export class CreateInvoiceHandler implements ICommandHandler<CreateInvoiceCommand, InvoiceAggregate> {
   constructor(
     @Inject(INVOICE_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<InvoiceAggregate>,
   ) {}
 
-  async execute(command: CreateInvoiceCommand): Promise<InvoiceAggregate> {
-    // Generate invoice number (YYYY-NNNNNN format)
-    const year = new Date().getFullYear();
-    const sequence = Math.floor(Math.random() * 999999)
-      .toString()
-      .padStart(6, '0');
-    const invoiceNumber = `${year}-${sequence}`;
+  async execute(command: CreateInvoiceCommand): Promise<Result<InvoiceAggregate, Error>> {
+    try {
+      // Generate invoice number (YYYY-NNNNNN format)
+      const year = new Date().getFullYear();
+      const sequence = Math.floor(Math.random() * 999999)
+        .toString()
+        .padStart(6, '0');
+      const invoiceNumber = `${year}-${sequence}`;
 
-    // Calculate due date (30 days from now)
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 30);
+      // Calculate due date (30 days from now)
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + 30);
 
-    // Calculate subtotal from line items
-    const subtotal = command.lineItems.reduce((sum, item) => sum + item.amount, 0);
+      // Calculate subtotal from line items
+      const subtotal = command.lineItems.reduce((sum, item) => sum + item.amount, 0);
 
-    const invoice = InvoiceAggregate.create({
-      id: command.id,
-      invoiceNumber,
-      subscriptionId: command.subscriptionId,
-      companyId: command.companyId,
-      periodStart: command.periodStart,
-      periodEnd: command.periodEnd,
-      dueDate,
-      lineItems: command.lineItems,
-      billingInfo: command.billingInfo,
-      currency: command.currency,
-      subtotal,
-      tax: command.tax,
-    });
+      const invoice = InvoiceAggregate.create({
+        id: command.id,
+        invoiceNumber,
+        subscriptionId: command.subscriptionId,
+        companyId: command.companyId,
+        periodStart: command.periodStart,
+        periodEnd: command.periodEnd,
+        dueDate,
+        lineItems: command.lineItems,
+        billingInfo: command.billingInfo,
+        currency: command.currency,
+        subtotal,
+        tax: command.tax,
+      });
 
-    await this.aggregateStore.save(invoice);
-    return invoice;
+      await this.aggregateStore.save(invoice);
+      return new Success(invoice);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(FinalizeInvoiceCommand)
-export class FinalizeInvoiceHandler implements ICommandHandler<FinalizeInvoiceCommand> {
+export class FinalizeInvoiceHandler implements ICommandHandler<FinalizeInvoiceCommand, InvoiceAggregate> {
   constructor(
     @Inject(INVOICE_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<InvoiceAggregate>,
   ) {}
 
-  async execute(command: FinalizeInvoiceCommand): Promise<InvoiceAggregate> {
-    const invoice = await this.aggregateStore.load(command.invoiceId);
-    if (!invoice) {
-      throw new NotFoundException(`Invoice ${command.invoiceId} not found`);
-    }
+  async execute(command: FinalizeInvoiceCommand): Promise<Result<InvoiceAggregate, Error>> {
+    try {
+      const invoice = await this.aggregateStore.load(command.invoiceId);
+      if (!invoice) {
+        return new Failure(new NotFoundException(`Invoice ${command.invoiceId} not found`));
+      }
 
-    invoice.finalize();
-    await this.aggregateStore.save(invoice);
-    return invoice;
+      invoice.finalize();
+      await this.aggregateStore.save(invoice);
+      return new Success(invoice);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(MarkInvoicePaidCommand)
-export class MarkInvoicePaidHandler implements ICommandHandler<MarkInvoicePaidCommand> {
+export class MarkInvoicePaidHandler implements ICommandHandler<MarkInvoicePaidCommand, InvoiceAggregate> {
   constructor(
     @Inject(INVOICE_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<InvoiceAggregate>,
   ) {}
 
-  async execute(command: MarkInvoicePaidCommand): Promise<InvoiceAggregate> {
-    const invoice = await this.aggregateStore.load(command.invoiceId);
-    if (!invoice) {
-      throw new NotFoundException(`Invoice ${command.invoiceId} not found`);
-    }
+  async execute(command: MarkInvoicePaidCommand): Promise<Result<InvoiceAggregate, Error>> {
+    try {
+      const invoice = await this.aggregateStore.load(command.invoiceId);
+      if (!invoice) {
+        return new Failure(new NotFoundException(`Invoice ${command.invoiceId} not found`));
+      }
 
-    invoice.markPaid(command.paymentId);
-    await this.aggregateStore.save(invoice);
-    return invoice;
+      invoice.markPaid(command.paymentId);
+      await this.aggregateStore.save(invoice);
+      return new Success(invoice);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(VoidInvoiceCommand)
-export class VoidInvoiceHandler implements ICommandHandler<VoidInvoiceCommand> {
+export class VoidInvoiceHandler implements ICommandHandler<VoidInvoiceCommand, InvoiceAggregate> {
   constructor(
     @Inject(INVOICE_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<InvoiceAggregate>,
   ) {}
 
-  async execute(command: VoidInvoiceCommand): Promise<InvoiceAggregate> {
-    const invoice = await this.aggregateStore.load(command.invoiceId);
-    if (!invoice) {
-      throw new NotFoundException(`Invoice ${command.invoiceId} not found`);
-    }
+  async execute(command: VoidInvoiceCommand): Promise<Result<InvoiceAggregate, Error>> {
+    try {
+      const invoice = await this.aggregateStore.load(command.invoiceId);
+      if (!invoice) {
+        return new Failure(new NotFoundException(`Invoice ${command.invoiceId} not found`));
+      }
 
-    invoice.void(command.reason);
-    await this.aggregateStore.save(invoice);
-    return invoice;
+      invoice.void(command.reason);
+      await this.aggregateStore.save(invoice);
+      return new Success(invoice);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 
 @Injectable()
 @CommandHandler(SetInvoicePdfUrlCommand)
-export class SetInvoicePdfUrlHandler implements ICommandHandler<SetInvoicePdfUrlCommand> {
+export class SetInvoicePdfUrlHandler implements ICommandHandler<SetInvoicePdfUrlCommand, InvoiceAggregate> {
   constructor(
     @Inject(INVOICE_AGGREGATE_STORE)
     private readonly aggregateStore: IAggregateStore<InvoiceAggregate>,
   ) {}
 
-  async execute(command: SetInvoicePdfUrlCommand): Promise<InvoiceAggregate> {
-    const invoice = await this.aggregateStore.load(command.invoiceId);
-    if (!invoice) {
-      throw new NotFoundException(`Invoice ${command.invoiceId} not found`);
-    }
+  async execute(command: SetInvoicePdfUrlCommand): Promise<Result<InvoiceAggregate, Error>> {
+    try {
+      const invoice = await this.aggregateStore.load(command.invoiceId);
+      if (!invoice) {
+        return new Failure(new NotFoundException(`Invoice ${command.invoiceId} not found`));
+      }
 
-    invoice.setPdfUrl(command.pdfUrl);
-    await this.aggregateStore.save(invoice);
-    return invoice;
+      invoice.setPdfUrl(command.pdfUrl);
+      await this.aggregateStore.save(invoice);
+      return new Success(invoice);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }
 

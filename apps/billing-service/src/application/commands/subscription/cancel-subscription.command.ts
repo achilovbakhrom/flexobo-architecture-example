@@ -1,5 +1,4 @@
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SubscriptionAggregate } from '../../../domain/aggregates/subscription.aggregate';
 import { SUBSCRIPTION_AGGREGATE_STORE } from '../../../ports/subscription.repository';
@@ -24,20 +23,25 @@ export class CancelSubscriptionCommandHandler
     private readonly aggregateStore: IAggregateStore<SubscriptionAggregate>
   ) {}
 
-  async execute(command: CancelSubscriptionCommand): Promise<void> {
-    const aggregate = await this.aggregateStore.load(command.data.subscriptionId);
-    if (!aggregate) {
-      throw new NotFoundException(
-        `Subscription ${command.data.subscriptionId} not found`
-      );
-    }
+  async execute(command: CancelSubscriptionCommand): Promise<Result<void, Error>> {
+    try {
+      const aggregate = await this.aggregateStore.load(command.data.subscriptionId);
+      if (!aggregate) {
+        return new Failure(new NotFoundException(
+          `Subscription ${command.data.subscriptionId} not found`
+        ));
+      }
 
-    if (command.data.immediate) {
-      aggregate.cancelImmediately(command.data.reason);
-    } else {
-      aggregate.cancelAtPeriodEndFn(command.data.reason);
-    }
+      if (command.data.immediate) {
+        aggregate.cancelImmediately(command.data.reason);
+      } else {
+        aggregate.cancelAtPeriodEndFn(command.data.reason);
+      }
 
-    await this.aggregateStore.save(aggregate);
+      await this.aggregateStore.save(aggregate);
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
+    }
   }
 }

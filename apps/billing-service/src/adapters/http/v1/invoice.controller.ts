@@ -11,7 +11,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard, CurrentUser, AuthenticatedUser, RolesGuard, Roles } from '@flexobo/shared-kernel';
@@ -52,10 +52,9 @@ export class InvoiceController {
       throw new BadRequestException('User must have a company');
     }
 
-    const result = await this.queryBus.execute<
-      ListInvoicesByCompanyQuery,
-      InvoiceListResult
-    >(new ListInvoicesByCompanyQuery(user.companyId, page, pageSize));
+    const result = await this.queryBus.execute<InvoiceListResult>(
+      new ListInvoicesByCompanyQuery(user.companyId, page, pageSize),
+    );
 
     return {
       items: result.items.map(this.toInvoiceResponse),
@@ -70,7 +69,7 @@ export class InvoiceController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<InvoiceResponseDto> {
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -91,7 +90,7 @@ export class InvoiceController {
     @CurrentUser() user: AuthenticatedUser,
     @Res() res: Response,
   ): Promise<void> {
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -128,7 +127,7 @@ export class InvoiceController {
       amount: item.quantity * item.unitPrice,
     }));
 
-    await this.commandBus.execute(
+    const createResult = await this.commandBus.execute(
       new CreateInvoiceCommand(
         id,
         dto.subscriptionId,
@@ -142,7 +141,11 @@ export class InvoiceController {
       ),
     );
 
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    if (createResult.isFailure) {
+      throw createResult.error;
+    }
+
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -159,7 +162,7 @@ export class InvoiceController {
   async finalizeInvoice(
     @Param('id') id: string,
   ): Promise<InvoiceResponseDto> {
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -167,9 +170,12 @@ export class InvoiceController {
       throw new NotFoundException('Invoice not found');
     }
 
-    await this.commandBus.execute(new FinalizeInvoiceCommand(id));
+    const finalizeResult = await this.commandBus.execute(new FinalizeInvoiceCommand(id));
+    if (finalizeResult.isFailure) {
+      throw finalizeResult.error;
+    }
 
-    const updated = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto>(
+    const updated = await this.queryBus.execute<InvoiceDto>(
       new GetInvoiceQuery(id),
     );
 
@@ -183,7 +189,7 @@ export class InvoiceController {
     @Param('id') id: string,
     @Body() dto: VoidInvoiceDto,
   ): Promise<InvoiceResponseDto> {
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -191,9 +197,12 @@ export class InvoiceController {
       throw new NotFoundException('Invoice not found');
     }
 
-    await this.commandBus.execute(new VoidInvoiceCommand(id, dto.reason));
+    const voidResult = await this.commandBus.execute(new VoidInvoiceCommand(id, dto.reason));
+    if (voidResult.isFailure) {
+      throw voidResult.error;
+    }
 
-    const updated = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto>(
+    const updated = await this.queryBus.execute<InvoiceDto>(
       new GetInvoiceQuery(id),
     );
 
@@ -207,7 +216,7 @@ export class InvoiceController {
     @Param('id') id: string,
     @Body() body: { paymentId: string },
   ): Promise<InvoiceResponseDto> {
-    const invoice = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto | null>(
+    const invoice = await this.queryBus.execute<InvoiceDto | null>(
       new GetInvoiceQuery(id),
     );
 
@@ -215,9 +224,12 @@ export class InvoiceController {
       throw new NotFoundException('Invoice not found');
     }
 
-    await this.commandBus.execute(new MarkInvoicePaidCommand(id, body.paymentId));
+    const markPaidResult = await this.commandBus.execute(new MarkInvoicePaidCommand(id, body.paymentId));
+    if (markPaidResult.isFailure) {
+      throw markPaidResult.error;
+    }
 
-    const updated = await this.queryBus.execute<GetInvoiceQuery, InvoiceDto>(
+    const updated = await this.queryBus.execute<InvoiceDto>(
       new GetInvoiceQuery(id),
     );
 

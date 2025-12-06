@@ -1,5 +1,4 @@
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SubscriptionAggregate } from '../../../domain/aggregates/subscription.aggregate';
 import { UsageType } from '../../../domain/constants/enums';
@@ -33,37 +32,42 @@ export class RecordUsageCommandHandler
     private readonly planRepository: IPlanReadRepository
   ) {}
 
-  async execute(command: RecordUsageCommand): Promise<void> {
-    // Find subscription by company
-    const subscriptionData = await this.subscriptionRepository.findByCompanyId(
-      command.data.companyId
-    );
-    if (!subscriptionData) {
-      throw new NotFoundException(
-        `No subscription found for company ${command.data.companyId}`
+  async execute(command: RecordUsageCommand): Promise<Result<void, Error>> {
+    try {
+      // Find subscription by company
+      const subscriptionData = await this.subscriptionRepository.findByCompanyId(
+        command.data.companyId
       );
-    }
+      if (!subscriptionData) {
+        return new Failure(new NotFoundException(
+          `No subscription found for company ${command.data.companyId}`
+        ));
+      }
 
-    const aggregate = await this.aggregateStore.load(subscriptionData.id);
-    if (!aggregate) {
-      throw new NotFoundException(
-        `Subscription ${subscriptionData.id} not found`
+      const aggregate = await this.aggregateStore.load(subscriptionData.id);
+      if (!aggregate) {
+        return new Failure(new NotFoundException(
+          `Subscription ${subscriptionData.id} not found`
+        ));
+      }
+
+      // Load plan limits
+      const plan = await this.planRepository.findById(aggregate.planId);
+      if (plan) {
+        aggregate.setPlanLimits(PlanLimits.create(plan.limits));
+      }
+
+      aggregate.recordUsage(
+        command.data.usageType,
+        command.data.quantity ?? 1,
+        command.data.entityType,
+        command.data.entityId
       );
+
+      await this.aggregateStore.save(aggregate);
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    // Load plan limits
-    const plan = await this.planRepository.findById(aggregate.planId);
-    if (plan) {
-      aggregate.setPlanLimits(PlanLimits.create(plan.limits));
-    }
-
-    aggregate.recordUsage(
-      command.data.usageType,
-      command.data.quantity ?? 1,
-      command.data.entityType,
-      command.data.entityId
-    );
-
-    await this.aggregateStore.save(aggregate);
   }
 }
