@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CqrsModule } from '@nestjs/cqrs';
+import { CqrsModule } from '@flexobo/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ClientsModule, Transport } from '@nestjs/microservices';
@@ -94,7 +94,7 @@ const Projections = [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
-    CqrsModule,
+    CqrsModule.forRoot({}),
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     PrismaModule,

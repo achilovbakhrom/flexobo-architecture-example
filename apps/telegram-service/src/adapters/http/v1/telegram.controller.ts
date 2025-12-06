@@ -14,7 +14,7 @@ import {
   ApiResponse,
   ApiBody,
 } from '@nestjs/swagger';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { IsString, IsNotEmpty, IsOptional, IsEnum } from 'class-validator';
 
 import {

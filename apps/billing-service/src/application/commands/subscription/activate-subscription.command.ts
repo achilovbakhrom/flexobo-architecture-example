@@ -1,5 +1,4 @@
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { SubscriptionAggregate } from '../../../domain/aggregates/subscription.aggregate';
 import { PaymentProvider } from '../../../domain/constants/enums';
@@ -23,17 +22,21 @@ export class ActivateSubscriptionCommandHandler
     private readonly aggregateStore: IAggregateStore<SubscriptionAggregate>,
   ) {}
 
-  async execute(command: ActivateSubscriptionCommand): Promise<void> {
-    const aggregate = await this.aggregateStore.load(command.subscriptionId);
+  async execute(command: ActivateSubscriptionCommand): Promise<Result<void, Error>> {
+    try {
+      const aggregate = await this.aggregateStore.load(command.subscriptionId);
 
-    if (!aggregate) {
-      throw new NotFoundException(
-        `Subscription ${command.subscriptionId} not found`,
-      );
+      if (!aggregate) {
+        return new Failure(new NotFoundException(
+          `Subscription ${command.subscriptionId} not found`,
+        ));
+      }
+
+      aggregate.activate(command.paymentProvider, command.externalId);
+      await this.aggregateStore.save(aggregate);
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    aggregate.activate(command.paymentProvider, command.externalId);
-
-    await this.aggregateStore.save(aggregate);
   }
 }

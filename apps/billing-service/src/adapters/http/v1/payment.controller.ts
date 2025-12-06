@@ -10,7 +10,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import { JwtAuthGuard, CurrentUser, AuthenticatedUser } from '@flexobo/shared-kernel';
 import { PaymentProvider, PaymentType, BillingCycle } from '../../../domain/constants/enums';
@@ -61,10 +61,9 @@ export class PaymentController {
     }
 
     // Get subscription
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionByCompanyQuery,
-      SubscriptionDto | null
-    >(new GetSubscriptionByCompanyQuery(user.companyId));
+    const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+      new GetSubscriptionByCompanyQuery(user.companyId),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -75,7 +74,7 @@ export class PaymentController {
     }
 
     // Get plan for pricing
-    const plan = await this.queryBus.execute<GetPlanQuery, PlanDto | null>(
+    const plan = await this.queryBus.execute<PlanDto | null>(
       new GetPlanQuery(subscription.planId),
     );
 
@@ -106,7 +105,7 @@ export class PaymentController {
     });
 
     // Initiate payment record
-    await this.commandBus.execute(
+    const paymentResult = await this.commandBus.execute(
       new InitiatePaymentCommand(
         uuidv4(),
         subscription.id,
@@ -118,6 +117,10 @@ export class PaymentController {
         session.sessionId,
       ),
     );
+
+    if (paymentResult.isFailure) {
+      throw paymentResult.error;
+    }
 
     return {
       sessionId: session.sessionId,
@@ -135,10 +138,9 @@ export class PaymentController {
     }
 
     // Get subscription
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionByCompanyQuery,
-      SubscriptionDto | null
-    >(new GetSubscriptionByCompanyQuery(user.companyId));
+    const subscription = await this.queryBus.execute<SubscriptionDto | null>(
+      new GetSubscriptionByCompanyQuery(user.companyId),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -159,7 +161,7 @@ export class PaymentController {
     });
 
     // Initiate payment record
-    await this.commandBus.execute(
+    const paymentResult = await this.commandBus.execute(
       new InitiatePaymentCommand(
         uuidv4(),
         subscription.id,
@@ -171,6 +173,10 @@ export class PaymentController {
         order.orderId,
       ),
     );
+
+    if (paymentResult.isFailure) {
+      throw paymentResult.error;
+    }
 
     return {
       orderId: order.orderId,
@@ -187,10 +193,9 @@ export class PaymentController {
       throw new BadRequestException('User must have a company');
     }
 
-    const payments = await this.queryBus.execute<
-      ListPaymentsByCompanyQuery,
-      PaymentDto[]
-    >(new ListPaymentsByCompanyQuery(user.companyId, limit));
+    const payments = await this.queryBus.execute<PaymentDto[]>(
+      new ListPaymentsByCompanyQuery(user.companyId, limit),
+    );
 
     return payments.map(this.toPaymentResponse);
   }
@@ -200,7 +205,7 @@ export class PaymentController {
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaymentResponseDto> {
-    const payment = await this.queryBus.execute<GetPaymentQuery, PaymentDto | null>(
+    const payment = await this.queryBus.execute<PaymentDto | null>(
       new GetPaymentQuery(id),
     );
 
@@ -221,7 +226,7 @@ export class PaymentController {
     @Body() dto: RefundPaymentDto,
     @CurrentUser() user: AuthenticatedUser,
   ): Promise<PaymentResponseDto> {
-    const payment = await this.queryBus.execute<GetPaymentQuery, PaymentDto | null>(
+    const payment = await this.queryBus.execute<PaymentDto | null>(
       new GetPaymentQuery(id),
     );
 
@@ -248,14 +253,17 @@ export class PaymentController {
     }
 
     // Update payment record
-    await this.commandBus.execute(
+    const refundResult = await this.commandBus.execute(
       new RefundPaymentCommand(id, dto.amount, dto.reason),
     );
 
-    const updatedPayment = await this.queryBus.execute<
-      GetPaymentQuery,
-      PaymentDto | null
-    >(new GetPaymentQuery(id));
+    if (refundResult.isFailure) {
+      throw refundResult.error;
+    }
+
+    const updatedPayment = await this.queryBus.execute<PaymentDto | null>(
+      new GetPaymentQuery(id),
+    );
 
     return this.toPaymentResponse(updatedPayment!);
   }

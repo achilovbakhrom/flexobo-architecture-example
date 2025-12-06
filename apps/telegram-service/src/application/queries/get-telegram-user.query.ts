@@ -1,8 +1,8 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import { TELEGRAM_USER_REPOSITORY, ITelegramUserRepository, TelegramUserReadDto } from '../../ports/telegram-user.repository';
 
-export class GetTelegramUserQuery implements IQuery {
+export class GetTelegramUserQuery implements IQuery<TelegramUserReadDto | null> {
   constructor(
     public readonly telegramId?: string,
     public readonly userId?: string

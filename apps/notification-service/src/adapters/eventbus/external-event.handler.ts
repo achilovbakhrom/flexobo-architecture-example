@@ -1,7 +1,6 @@
 import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
-import { CommandBus } from '@nestjs/cqrs';
 import { v4 as uuidv4 } from 'uuid';
-import { RabbitMQConsumer, MESSAGE_CONSUMER } from '@flexobo/core';
+import { RabbitMQConsumer, MESSAGE_CONSUMER, CommandBus } from '@flexobo/core';
 import {
   SendNotificationCommand,
   BroadcastNotificationCommand,

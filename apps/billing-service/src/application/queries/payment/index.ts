@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import { PaymentProvider } from '../../../domain/constants/enums';
 import {
   PAYMENT_READ_REPOSITORY,

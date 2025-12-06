@@ -524,7 +524,8 @@ export class RabbitMQConsumer
         queueName,
         {
           durable: opts.durable,
-
+          exclusive: opts.exclusive,
+          autoDelete: opts.autoDelete,
           arguments: {
             'x-dead-letter-exchange': opts.deadLetterExchange,
             'x-dead-letter-routing-key': `dlq.${queueName}`,

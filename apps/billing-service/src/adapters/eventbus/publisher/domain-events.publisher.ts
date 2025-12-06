@@ -11,7 +11,7 @@ export class DomainEventsPublisher implements OnModuleInit {
   private isProcessing = false;
 
   constructor(
-    private readonly prisma: PrismaService,
+    @Inject('PrismaService') private readonly prisma: PrismaService,
     private readonly eventEmitter: EventEmitter2,
     @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
   ) {}
