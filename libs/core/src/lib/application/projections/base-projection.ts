@@ -9,6 +9,11 @@ import {
   IMessagePublisher,
 } from '../../infrastructure/messaging';
 import { IEventBuffer } from '../../infrastructure/event-buffer/event-buffer.interface';
+import {
+  INotificationResolver,
+  NotificationTarget,
+} from './notification-resolver.interface';
+import type { NotificationIntent } from './notification-resolver.interface';
 
 /**
  * Projection completion notification payload
@@ -89,7 +94,12 @@ export abstract class BaseProjection<
     protected readonly rabbitMQConsumer: RabbitMQConsumer,
     loggerContext: string,
     protected readonly eventBuffer?: IEventBuffer | null,
-    protected readonly messagePublisher?: IMessagePublisher | null
+    protected readonly messagePublisher?: IMessagePublisher | null,
+    /**
+     * Optional notification resolver for sending SSE notifications after projection updates.
+     * When provided, the resolver determines who to notify and with what content.
+     */
+    protected readonly notificationResolver?: INotificationResolver<TEventPayload> | null
   ) {
     this.logger = new Logger(loggerContext);
   }
@@ -239,6 +249,9 @@ export abstract class BaseProjection<
       await this.applyEvent(event);
       this.logger.debug(`Applied event v${eventVersion} for ${aggregateId}`);
 
+      // Send notification if resolver is configured
+      await this.sendNotification(event);
+
       // After processing, try to drain the buffer
       await this.drainBuffer(aggregateId, eventVersion + 1);
     } finally {
@@ -272,10 +285,14 @@ export abstract class BaseProjection<
 
       // Process the buffered event
       try {
-        await this.applyEvent(bufferedEvent as TEventPayload);
+        const eventToApply = bufferedEvent as TEventPayload;
+        await this.applyEvent(eventToApply);
         this.logger.debug(
           `Applied buffered event v${nextVersion} for ${aggregateId}`
         );
+
+        // Send notification if resolver is configured
+        await this.sendNotification(eventToApply);
 
         // Remove from buffer after successful processing
         await this.eventBuffer?.removeEvent(aggregateId, nextVersion);
@@ -431,6 +448,59 @@ export abstract class BaseProjection<
       // Log but don't fail the projection - notification is best-effort
       this.logger.warn(
         `Failed to publish projection.completed for ${event.aggregateType}:${event.aggregateId}: ${error}`
+      );
+    }
+  }
+
+  /**
+   * Send notification based on resolver's decision.
+   * This method uses the Strategy pattern - the resolver determines who to notify
+   * and with what content.
+   *
+   * Call this method after successfully applying an event in your projection,
+   * or it will be called automatically when using event buffering.
+   *
+   * @param event The event that was applied
+   */
+  protected async sendNotification(event: TEventPayload): Promise<void> {
+    if (!this.messagePublisher || !this.notificationResolver) {
+      return;
+    }
+
+    const intent: NotificationIntent | null =
+      this.notificationResolver.resolve(event);
+
+    if (!intent || intent.target === NotificationTarget.None) {
+      return;
+    }
+
+    const routingKey =
+      intent.target === NotificationTarget.Broadcast
+        ? 'notification.broadcast'
+        : `notification.user.${intent.userIds?.join(',')}`;
+
+    try {
+      await this.messagePublisher.publish(
+        'flexobo.events',
+        {
+          target: intent.target,
+          userIds: intent.userIds,
+          channels: intent.channels ?? ['sse'], // Default to SSE if not specified
+          ...intent.payload,
+        },
+        {
+          routingKey,
+          correlationId: intent.correlationId,
+        }
+      );
+
+      this.logger.debug(
+        `Published notification for ${event.aggregateType}:${event.aggregateId} to ${intent.target === NotificationTarget.Broadcast ? 'broadcast' : intent.userIds?.length + ' users'}`
+      );
+    } catch (error) {
+      // Log but don't fail the projection - notification is best-effort
+      this.logger.warn(
+        `Failed to publish notification for ${event.aggregateType}:${event.aggregateId}: ${error}`
       );
     }
   }

@@ -335,8 +335,6 @@ model CompanyReadModel {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members CompanyMemberReadModel[]
-
   @@index([ownerId])
   @@index([status])
   @@index([type])
@@ -352,9 +350,8 @@ model CompanyMemberReadModel {
   isActive  Boolean  @default(true)
   joinedAt  DateTime @default(now())
 
-  company CompanyReadModel @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   @@unique([companyId, userId])
+  @@index([companyId])
   @@index([userId])
   @@map("company_members")
 }

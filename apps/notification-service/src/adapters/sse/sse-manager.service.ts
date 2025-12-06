@@ -14,6 +14,7 @@ import {
 } from '../../ports/sse-service.port';
 import {
   RabbitMQConsumer,
+  MESSAGE_CONSUMER,
   MESSAGE_PUBLISHER,
   IMessagePublisher,
 } from '@flexobo/core';
@@ -38,6 +39,7 @@ export class SSEManagerService
   private readonly connections = new Map<string, ConnectionInfo>();
 
   constructor(
+    @Inject(MESSAGE_CONSUMER)
     private readonly rabbitMQConsumer: RabbitMQConsumer,
     @Inject(MESSAGE_PUBLISHER)
     private readonly messagePublisher: IMessagePublisher
@@ -53,24 +55,29 @@ export class SSEManagerService
 
     const queueName = `notification.sse.${this.instanceId}`;
 
-    await this.rabbitMQConsumer.subscribeToEvents(
-      queueName,
-      ['sse.user.*', 'sse.broadcast'],
-      async (message) => {
-        const routingKey = message.metadata?.routingKey as string;
-        const payload = message.content as SSEPayload;
+    try {
+      await this.rabbitMQConsumer.subscribeToEvents(
+        queueName,
+        ['sse.user.*', 'sse.broadcast'],
+        async (message) => {
+          const routingKey = message.metadata?.routingKey as string;
+          const payload = message.content as SSEPayload;
 
-        if (routingKey === 'sse.broadcast') {
-          this.broadcastLocal(payload);
-        } else if (routingKey?.startsWith('sse.user.')) {
-          const userId = routingKey.replace('sse.user.', '');
-          this.sendToUserLocal(userId, payload);
-        }
+          if (routingKey === 'sse.broadcast') {
+            this.broadcastLocal(payload);
+          } else if (routingKey?.startsWith('sse.user.')) {
+            const userId = routingKey.replace('sse.user.', '');
+            this.sendToUserLocal(userId, payload);
+          }
 
-        message.ack();
-      },
-      { durable: false, exclusive: true, autoDelete: true }
-    );
+          message.ack();
+        },
+        { durable: false, exclusive: false, autoDelete: true }
+      );
+    } catch (error) {
+      this.logger.warn(`Failed to subscribe to SSE events: ${error}`);
+      // Non-fatal - SSE will work locally but not across instances
+    }
 
     this.logger.log(
       `SSE Manager initialized with instance ID: ${this.instanceId}`

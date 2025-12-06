@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject } from '@nestjs/common';
 import { PrismaService } from '../../../prisma.module';
 import { PaymentProvider } from '../../../domain/constants/enums';
 import {
@@ -8,7 +8,7 @@ import {
 
 @Injectable()
 export class PaymentReadRepository implements IPaymentReadRepository {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PrismaService') private readonly prisma: PrismaService) {}
 
   async findById(id: string): Promise<PaymentReadData | null> {
     const payment = await this.prisma.paymentReadModel.findUnique({
