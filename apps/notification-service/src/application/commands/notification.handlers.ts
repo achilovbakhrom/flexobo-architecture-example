@@ -40,7 +40,7 @@ export class SendNotificationHandler implements ICommandHandler<SendNotification
     for (const userId of command.userIds) {
       const notificationId = uuidv4();
 
-      if (command.type === NotificationType.USER) {
+      if (command.type === NotificationType.User) {
         const notification = NotificationAggregate.create({
           id: notificationId,
           userId,
@@ -64,12 +64,12 @@ export class SendNotificationHandler implements ICommandHandler<SendNotification
         timestamp: Date.now(),
       };
 
-      if (command.channels.includes(NotificationChannel.SSE)) {
+      if (command.channels.includes(NotificationChannel.Sse)) {
         await this.sseManager.sendToUser(userId, payload);
       }
     }
 
-    if (command.channels.includes(NotificationChannel.PUSH)) {
+    if (command.channels.includes(NotificationChannel.Push)) {
       await this.pushService.sendToUsers(command.userIds, {
         title: command.title,
         body: command.body,
@@ -105,11 +105,11 @@ export class BroadcastNotificationHandler
       timestamp: Date.now(),
     };
 
-    if (command.channels.includes(NotificationChannel.SSE)) {
+    if (command.channels.includes(NotificationChannel.Sse)) {
       await this.sseManager.broadcast(payload);
     }
 
-    if (command.channels.includes(NotificationChannel.PUSH)) {
+    if (command.channels.includes(NotificationChannel.Push)) {
       await this.pushService.sendToAll({
         title: command.title,
         body: command.body,

@@ -212,7 +212,6 @@ model Role {
     isActive    Boolean          @default(true) @map("is_active")
     createdAt   DateTime         @default(now()) @map("created_at")
     updatedAt   DateTime         @updatedAt @map("updated_at")
-    userRoles   UserRoleMapping[]
 
     @@index([name])
     @@index([isActive])
@@ -226,7 +225,6 @@ model UserRoleMapping {
     companyId String?  @map("company_id") // Role can be scoped to a company
     assignedBy String? @map("assigned_by")
     assignedAt DateTime @default(now()) @map("assigned_at")
-    role      Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
     @@unique([userId, roleId, companyId])
     @@index([userId])
