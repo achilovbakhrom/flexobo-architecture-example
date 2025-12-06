@@ -2,9 +2,7 @@ import { v4 as uuid } from 'uuid';
 import { AggregateRoot, DomainEvent } from '@flexobo/core';
 import {
   ChatMessageEventType,
-  ChatMessageEvent,
   ChatMessageSentEvent,
-  ChatMessageDeliveredEvent,
   ChatMessageReadEvent,
   ChatMessageEditedEvent,
   ChatMessageDeletedEvent,
@@ -12,26 +10,26 @@ import {
 } from '../events/chat.events';
 
 export enum MessageType {
-  TEXT = 'TEXT',
-  IMAGE = 'IMAGE',
-  FILE = 'FILE',
-  VIDEO = 'VIDEO',
-  AUDIO = 'AUDIO',
-  VOICE = 'VOICE',
-  GIF = 'GIF',
-  STATUS = 'STATUS',
+  Text = 'text',
+  Image = 'image',
+  File = 'file',
+  Video = 'video',
+  Audio = 'audio',
+  Voice = 'voice',
+  Gif = 'gif',
+  Status = 'status',
 }
 
 export enum MessageStatus {
-  SENT = 'SENT',
-  DELIVERED = 'DELIVERED',
-  READ = 'READ',
+  Sent = 'sent',
+  Delivered = 'delivered',
+  Read = 'read',
 }
 
 export enum SenderType {
-  USER = 'USER',
-  ADMIN = 'ADMIN',
-  SUPERADMIN = 'SUPERADMIN',
+  User = 'user',
+  Admin = 'admin',
+  Superadmin = 'superadmin',
 }
 
 export interface EditHistoryEntry {
@@ -71,13 +69,13 @@ export class ChatMessage extends AggregateRoot {
   private _roomId!: string;
   private _senderId!: string;
   private _senderType!: SenderType;
-  private _type: MessageType = MessageType.TEXT;
+  private _type: MessageType = MessageType.Text;
   private _content?: string;
   private _fileUrls: string[] = [];
   private _fileName?: string;
   private _fileMetadata?: Record<string, unknown>;
   private _voiceDuration?: number;
-  private _status: MessageStatus = MessageStatus.SENT;
+  private _status: MessageStatus = MessageStatus.Sent;
   private _isRead = false;
   private _readAt?: Date;
   private _replyToId?: string;
@@ -253,7 +251,7 @@ export class ChatMessage extends AggregateRoot {
       roomId: data.roomId,
       senderId: data.senderId,
       senderType: data.senderType,
-      messageType: data.type || MessageType.TEXT,
+      messageType: data.type || MessageType.Text,
       content: data.content,
       fileUrls: data.fileUrls,
       fileName: data.fileName,
@@ -267,7 +265,7 @@ export class ChatMessage extends AggregateRoot {
   }
 
   markAsDelivered(deliveredTo: string): void {
-    if (this._status === MessageStatus.READ) {
+    if (this._status === MessageStatus.Read) {
       return; // Already read, no need to mark as delivered
     }
 
@@ -301,7 +299,7 @@ export class ChatMessage extends AggregateRoot {
       throw new Error('Only sender can edit message');
     }
 
-    if (this._type !== MessageType.TEXT) {
+    if (this._type !== MessageType.Text) {
       throw new Error('Can only edit text messages');
     }
 
@@ -349,7 +347,7 @@ export class ChatMessage extends AggregateRoot {
         this.applySent(event.data as ChatMessageSentEvent['data']);
         break;
       case ChatMessageEventType.Delivered:
-        this._status = MessageStatus.DELIVERED;
+        this._status = MessageStatus.Delivered;
         break;
       case ChatMessageEventType.Read:
         this.applyRead(event.data as ChatMessageReadEvent['data']);
@@ -359,10 +357,14 @@ export class ChatMessage extends AggregateRoot {
         break;
       case ChatMessageEventType.Deleted:
         this._isDeleted = true;
-        this._deletedAt = (event.data as ChatMessageDeletedEvent['data']).deletedAt;
+        this._deletedAt = (
+          event.data as ChatMessageDeletedEvent['data']
+        ).deletedAt;
         break;
       case ChatMessageEventType.TranslationAdded:
-        this.applyTranslationAdded(event.data as ChatMessageTranslationAddedEvent['data']);
+        this.applyTranslationAdded(
+          event.data as ChatMessageTranslationAddedEvent['data']
+        );
         break;
     }
   }
@@ -378,11 +380,11 @@ export class ChatMessage extends AggregateRoot {
     this._fileMetadata = data.fileMetadata;
     this._voiceDuration = data.voiceDuration;
     this._replyToId = data.replyToId;
-    this._status = MessageStatus.SENT;
+    this._status = MessageStatus.Sent;
   }
 
   private applyRead(data: ChatMessageReadEvent['data']): void {
-    this._status = MessageStatus.READ;
+    this._status = MessageStatus.Read;
     this._isRead = true;
     this._readAt = data.readAt;
   }
@@ -396,9 +398,13 @@ export class ChatMessage extends AggregateRoot {
     this._content = data.newContent;
   }
 
-  private applyTranslationAdded(data: ChatMessageTranslationAddedEvent['data']): void {
+  private applyTranslationAdded(
+    data: ChatMessageTranslationAddedEvent['data']
+  ): void {
     // Remove existing translation for this language if exists
-    this._translations = this._translations.filter((t) => t.language !== data.language);
+    this._translations = this._translations.filter(
+      (t) => t.language !== data.language
+    );
     this._translations.push({
       language: data.language,
       content: data.translatedContent,
@@ -447,7 +453,6 @@ export class ChatMessage extends AggregateRoot {
     };
   }
 
-  // Helper methods
   getTranslation(language: string): TranslationEntry | undefined {
     return this._translations.find((t) => t.language === language);
   }
@@ -456,12 +461,13 @@ export class ChatMessage extends AggregateRoot {
     if (this._content) {
       return this._content.substring(0, 100);
     }
-    if (this._type === MessageType.IMAGE) return '[Image]';
-    if (this._type === MessageType.FILE) return `[File: ${this._fileName || 'file'}]`;
-    if (this._type === MessageType.VIDEO) return '[Video]';
-    if (this._type === MessageType.AUDIO) return '[Audio]';
-    if (this._type === MessageType.VOICE) return '[Voice message]';
-    if (this._type === MessageType.GIF) return '[GIF]';
+    if (this._type === MessageType.Image) return '[Image]';
+    if (this._type === MessageType.File)
+      return `[File: ${this._fileName || 'file'}]`;
+    if (this._type === MessageType.Video) return '[Video]';
+    if (this._type === MessageType.Audio) return '[Audio]';
+    if (this._type === MessageType.Voice) return '[Voice message]';
+    if (this._type === MessageType.Gif) return '[GIF]';
     return '[Message]';
   }
 }

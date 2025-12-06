@@ -165,7 +165,7 @@ export class ChatController {
     const message = result.value;
 
     // Emit edit event via WebSocket
-    this.gateway.notifyRoom(message.roomId, ChatEvents.MESSAGE_EDITED, message);
+    this.gateway.notifyRoom(message.roomId, ChatEvents.MessageEdited, message);
 
     return { data: this.mapToMessageResponse(message) };
   }
@@ -186,7 +186,7 @@ export class ChatController {
     // Emit delete event via WebSocket
     // We need to get the message first to know its roomId
     // Since we're deleting, we emit to all rooms the user is in
-    this.gateway.notifyUser(req.user.userId, ChatEvents.MESSAGE_DELETED, {
+    this.gateway.notifyUser(req.user.userId, ChatEvents.MessageDeleted, {
       messageId: id,
     });
 
@@ -207,7 +207,7 @@ export class ChatController {
     }
 
     // Emit delete event via WebSocket
-    this.gateway.notifyRoom(id, ChatEvents.ROOM_DELETED, { roomId: id });
+    this.gateway.notifyRoom(id, ChatEvents.RoomDeleted, { roomId: id });
 
     return { success: true };
   }

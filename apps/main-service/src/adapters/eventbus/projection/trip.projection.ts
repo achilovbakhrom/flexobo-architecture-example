@@ -1,18 +1,18 @@
-import {
-  Injectable,
-  Inject,
-  OnModuleInit,
-  OnModuleDestroy,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
   IncomingMessage,
+  BaseProjection,
+  ProjectionConfig,
+  EventPayload,
+  IEventBuffer,
+  EVENT_BUFFER,
 } from '@flexobo/core';
 import {
   ITripReadRepository,
   TRIP_READ_REPOSITORY,
+  TripReadDto,
 } from '../../../ports/trip.repository';
 import {
   TRIP_EVENT_TYPES,
@@ -22,87 +22,73 @@ import {
 } from '../../../domain/events/trip.events';
 import { TripStatus } from '../../../domain/constants/enums';
 
-interface EventPayload {
-  aggregateId: string;
-  aggregateType: string;
-  type: string;
-  version: number;
-  occurredAt: string;
-  data: Record<string, unknown>;
-  metadata?: Record<string, unknown>;
-}
-
-const QUEUE_NAME = 'main-service.trip.projection';
+type TripEventPayload = EventPayload<
+  TripCreatedEventData | TripUpdatedEventData | TripStatusChangedEventData | Record<string, unknown>
+>;
 
 @Injectable()
-export class TripProjection implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(TripProjection.name);
-  private isSubscribed = false;
-
+export class TripProjection extends BaseProjection<TripReadDto, TripEventPayload> {
   constructor(
     @Inject(TRIP_READ_REPOSITORY)
     private readonly tripRepo: ITripReadRepository,
     @Inject(MESSAGE_CONSUMER)
-    private readonly rabbitMQConsumer: RabbitMQConsumer
-  ) {}
-
-  async onModuleInit() {
-    await this.subscribe();
+    rabbitMQConsumer: RabbitMQConsumer,
+    @Optional()
+    @Inject(EVENT_BUFFER)
+    eventBuffer: IEventBuffer | null
+  ) {
+    super(rabbitMQConsumer, TripProjection.name, eventBuffer);
   }
 
-  async onModuleDestroy() {
-    if (this.isSubscribed) {
-      await this.rabbitMQConsumer.unsubscribe(QUEUE_NAME);
-    }
+  protected getConfig(): ProjectionConfig {
+    return {
+      queueName: 'main-service.trip.projection',
+      routingKeys: ['trip.#'],
+      durable: true,
+      maxRetries: 3,
+      prefetchCount: 10,
+      lockTtlMs: 5000,
+    };
   }
 
-  private async subscribe(): Promise<void> {
-    if (!this.rabbitMQConsumer.isConnected()) {
-      this.logger.warn('RabbitMQ is not connected. Skipping trip projection subscription.');
-      return;
-    }
-
-    await this.rabbitMQConsumer.subscribeToEvents(
-      QUEUE_NAME,
-      ['trip.#'],
-      async (message: IncomingMessage) => {
-        await this.handleEvent(message);
-      },
-      { durable: true, maxRetries: 3 }
-    );
-
-    this.isSubscribed = true;
-    this.logger.log(`Subscribed to queue: ${QUEUE_NAME}`);
+  protected override async getCurrentModelVersion(
+    aggregateId: string
+  ): Promise<number> {
+    const entity = await this.tripRepo.findById(aggregateId);
+    return entity?.version ?? 0;
   }
 
-  private async handleEvent(message: IncomingMessage): Promise<void> {
-    const payload = message.content as EventPayload;
-
-    this.logger.debug(
-      `[Projection] Trip event: ${payload.type} for ${payload.aggregateId} (v${payload.version})`
-    );
-
-    switch (payload.type) {
+  protected override async applyEvent(event: TripEventPayload): Promise<void> {
+    switch (event.type) {
       case TRIP_EVENT_TYPES.CREATED:
-        await this.onTripCreated(payload);
+        await this.onTripCreated(event as EventPayload<TripCreatedEventData>);
         break;
       case TRIP_EVENT_TYPES.UPDATED:
-        await this.onTripUpdated(payload);
+        await this.onTripUpdated(event as EventPayload<TripUpdatedEventData>);
         break;
       case TRIP_EVENT_TYPES.STATUS_CHANGED:
-        await this.onTripStatusChanged(payload);
+        await this.onTripStatusChanged(event as EventPayload<TripStatusChangedEventData>);
         break;
       case TRIP_EVENT_TYPES.DELETED:
-        await this.onTripDeleted(payload);
+        await this.onTripDeleted(event);
         break;
       default:
-        this.logger.warn(`Unknown trip event type: ${payload.type}`);
+        this.logger.warn(`Unknown trip event type: ${event.type}`);
     }
   }
 
-  private async onTripCreated(event: EventPayload): Promise<void> {
-    const data = event.data as unknown as TripCreatedEventData;
+  protected async handleEvent(message: IncomingMessage): Promise<void> {
+    const payload = message.content as TripEventPayload;
+    await this.applyEvent(payload);
+  }
 
+  private async onTripCreated(
+    event: EventPayload<TripCreatedEventData>
+  ): Promise<void> {
+    const existing = await this.tripRepo.findById(event.aggregateId);
+    this.checkCreateIdempotency(existing, event);
+
+    const { data } = event;
     await this.tripRepo.save({
       id: event.aggregateId,
       ownerId: data.ownerId,
@@ -122,14 +108,15 @@ export class TripProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onTripUpdated(event: EventPayload): Promise<void> {
+  private async onTripUpdated(
+    event: EventPayload<TripUpdatedEventData>
+  ): Promise<void> {
     const existing = await this.tripRepo.findById(event.aggregateId);
-    if (!existing) return;
+    this.checkVersion(existing, event);
 
-    const data = event.data as unknown as TripUpdatedEventData;
-
+    const { data } = event;
     await this.tripRepo.save({
-      ...existing,
+      ...existing!,
       ...(data.transport !== undefined && { transport: data.transport }),
       ...(data.loadingPoints !== undefined && { loadingPoints: data.loadingPoints }),
       ...(data.unloadingPoints !== undefined && { unloadingPoints: data.unloadingPoints }),
@@ -143,21 +130,21 @@ export class TripProjection implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  private async onTripStatusChanged(event: EventPayload): Promise<void> {
+  private async onTripStatusChanged(
+    event: EventPayload<TripStatusChangedEventData>
+  ): Promise<void> {
     const existing = await this.tripRepo.findById(event.aggregateId);
-    if (!existing) return;
-
-    const data = event.data as unknown as TripStatusChangedEventData;
+    this.checkVersion(existing, event);
 
     await this.tripRepo.save({
-      ...existing,
-      status: data.newStatus,
+      ...existing!,
+      status: event.data.newStatus,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
   }
 
-  private async onTripDeleted(event: EventPayload): Promise<void> {
+  private async onTripDeleted(event: TripEventPayload): Promise<void> {
     await this.tripRepo.delete(event.aggregateId);
   }
 }

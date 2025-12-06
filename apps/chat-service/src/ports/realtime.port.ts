@@ -1,7 +1,3 @@
-// ============================================================
-// Realtime Notification Service Port
-// ============================================================
-
 export interface IRealtimeService {
   // Room-based notifications
   notifyRoom(roomId: string, event: string, data: unknown): void;
@@ -21,10 +17,6 @@ export interface IRealtimeService {
 }
 
 export const REALTIME_SERVICE = Symbol('IRealtimeService');
-
-// ============================================================
-// WebSocket Event Types
-// ============================================================
 
 export const WS_EVENTS = {
   // Outgoing events (server → client)

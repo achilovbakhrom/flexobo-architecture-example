@@ -5,26 +5,16 @@
   "scripts": {
     "postinstall": "mkdir -p node_modules/@flexobo && ln -sf \"$(pwd)/dist/libs/core\" node_modules/@flexobo/core && ln -sf \"$(pwd)/dist/libs/shared-kernel\" node_modules/@flexobo/shared-kernel",
     "start": "npx tsx scripts/dev.ts all",
-    "start:order": "npx tsx scripts/dev.ts order",
     "start:gateway": "npx tsx scripts/dev.ts gateway",
-    "start:admin": "npx tsx scripts/dev.ts admin",
     "start:users": "npx tsx scripts/dev.ts users",
     "start:chat": "npx tsx scripts/dev.ts chat",
     "start:file": "npx tsx scripts/dev.ts file",
     "start:main": "npx tsx scripts/dev.ts main",
     "stop": "npx tsx scripts/dev.ts stop",
-    "db:migration:create:order": "npx prisma migrate dev --create-only --config apps/order-service/prisma.config.ts",
-    "db:migration:create:admin": "npx prisma migrate dev --create-only --config apps/admin-panel/prisma.config.ts",
     "db:migration:create:gateway": "npx prisma migrate dev --create-only --config apps/api-gateway/prisma.config.ts",
     "db:migration:create:users": "npx prisma migrate dev --create-only --config apps/users-service/prisma.config.ts",
-    "db:migration:create:main": "npx prisma migrate dev --create-only --config apps/main-service/prisma.config.ts",
-    "db:migration:apply:order": "npx prisma migrate deploy --config apps/order-service/prisma.config.ts",
-    "db:migration:apply:admin": "npx prisma migrate deploy --config apps/admin-panel/prisma.config.ts",
     "db:migration:apply:gateway": "npx prisma migrate deploy --config apps/api-gateway/prisma.config.ts",
     "db:migration:apply:users": "npx prisma migrate deploy --config apps/users-service/prisma.config.ts",
-    "db:migration:apply:main": "npx prisma migrate deploy --config apps/main-service/prisma.config.ts",
-    "db:studio:order": "npx prisma studio --config apps/order-service/prisma.config.ts --port 5555",
-    "db:studio:admin": "npx prisma studio --config apps/admin-panel/prisma.config.ts --port 5557",
     "db:studio:gateway": "npx prisma studio --config apps/api-gateway/prisma.config.ts --port 5556",
     "db:studio:users": "npx prisma studio --config apps/users-service/prisma.config.ts --port 5558",
     "db:studio:main": "npx prisma studio --config apps/main-service/prisma.config.ts --port 5559",
@@ -32,11 +22,9 @@
     "test:ci": "npx nx run-many --target=test --all --coverage --coverageReporters=lcov --coverageReporters=text-summary",
     "lint": "npx nx run-many --target=lint --all",
     "build": "npx nx run-many --target=build --all",
-    "docker:build:order": "docker build -f apps/order-service/Dockerfile -t flexobo/order-service:latest .",
     "docker:build:gateway": "docker build -f apps/api-gateway/Dockerfile -t flexobo/api-gateway:latest .",
-    "docker:build:admin": "docker build -f apps/admin-panel/Dockerfile -t flexobo/admin-panel:latest .",
     "docker:build:users": "docker build -f apps/users-service/Dockerfile -t flexobo/users-service:latest .",
-    "docker:build:all": "npm run docker:build:order && npm run docker:build:gateway && npm run docker:build:admin && npm run docker:build:users"
+    "docker:build:all": "npm run docker:build:gateway && npm run docker:build:users"
   },
   "private": true,
   "engines": {
@@ -75,6 +63,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.3",
+    "firebase-admin": "^13.6.0",
     "google-auth-library": "^10.5.0",
     "inquirer": "^8.2.6",
     "ioredis": "^5.8.2",
@@ -102,7 +91,6 @@
     "@nx/nest": "22.1.1",
     "@nx/node": "22.1.1",
     "@nx/web": "22.1.1",
-    "@nx/webpack": "22.1.1",
     "@nx/workspace": "22.1.1",
     "@prisma/client": "7.0.1",
     "@swc-node/register": "~1.9.1",
@@ -137,8 +125,7 @@
     "tslib": "^2.3.0",
     "tsx": "^4.20.6",
     "typescript": "~5.9.2",
-    "typescript-eslint": "^8.40.0",
-    "webpack-cli": "^5.1.4"
+    "typescript-eslint": "^8.40.0"
   },
   "nx": {
     "includedScripts": []

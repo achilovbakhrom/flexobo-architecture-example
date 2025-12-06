@@ -14,6 +14,7 @@ export interface FileReadModelDto {
   s3Key: string;
   s3Bucket: string;
   status: string;
+  version: number;
   uploadedAt: Date;
   createdAt: Date;
   updatedAt: Date;
