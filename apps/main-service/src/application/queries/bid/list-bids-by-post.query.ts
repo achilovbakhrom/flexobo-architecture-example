@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   IBidReadRepository,
   BidReadDto,
@@ -12,8 +12,8 @@ export class ListBidsByPostQuery implements IQuery {
     public readonly postType: string,
     public readonly postId: string,
     public readonly filters?: BidFilters,
-    public readonly page: number = 1,
-    public readonly limit: number = 20
+    public readonly page = 1,
+    public readonly limit = 20
   ) {}
 }
 

@@ -1,5 +1,5 @@
 import { Injectable, Inject, NotFoundException } from '@nestjs/common';
-import { IQuery, IQueryHandler, QueryHandler } from '@nestjs/cqrs';
+import { IQuery, IQueryHandler, QueryHandler } from '@flexobo/core';
 import {
   IBoardReadRepository,
   BoardReadDto,

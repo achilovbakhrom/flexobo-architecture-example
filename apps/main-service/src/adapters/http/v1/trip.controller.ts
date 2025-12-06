@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -34,6 +33,7 @@ import { DeleteTripCommand } from '../../../application/commands/trip/delete-tri
 import { GetTripQuery } from '../../../application/queries/trip/get-trip.query';
 import { ListTripsQuery } from '../../../application/queries/trip/list-trips.query';
 import { SearchTripsQuery } from '../../../application/queries/trip/search-trips.query';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Trips')
 @ApiBearerAuth()
@@ -51,7 +51,7 @@ export class TripController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateTripDto
-  ): Promise<{ id: string }> {
+  ) {
     // TODO: Get companyId from user's company membership
     const companyId = 'default-company';
 
