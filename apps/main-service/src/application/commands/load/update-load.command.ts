@@ -1,8 +1,7 @@
-import { ICommand, ICommandHandler, CommandHandler } from '@nestjs/cqrs';
+import { ICommand, ICommandHandler, CommandHandler, IAggregateStore, Result, Success, Failure } from '@flexobo/core';
 import { Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { Load } from '../../../domain/aggregates/load.aggregate';
 import { LOAD_AGGREGATE_STORE } from '../../../ports/load.repository';
-import { IAggregateStore } from '@flexobo/core';
 import { CargoData, LocationData } from '../../../domain/events/load.events';
 
 export class UpdateLoadCommand implements ICommand {
@@ -30,56 +29,62 @@ export class UpdateLoadCommand implements ICommand {
 }
 
 @CommandHandler(UpdateLoadCommand)
-export class UpdateLoadHandler implements ICommandHandler<UpdateLoadCommand> {
+export class UpdateLoadHandler implements ICommandHandler<UpdateLoadCommand, void> {
   constructor(
     @Inject(LOAD_AGGREGATE_STORE)
     private readonly loadStore: IAggregateStore<Load>
   ) {}
 
-  async execute(command: UpdateLoadCommand): Promise<void> {
-    const load = await this.loadStore.load(command.loadId);
+  async execute(command: UpdateLoadCommand): Promise<Result<void, Error>> {
+    try {
+      const load = await this.loadStore.load(command.loadId);
 
-    if (!load) {
-      throw new NotFoundException(`Load with id ${command.loadId} not found`);
+      if (!load) {
+        throw new NotFoundException(`Load with id ${command.loadId} not found`);
+      }
+
+      const state = load.getState();
+      if (state.ownerId !== command.userId) {
+        throw new ForbiddenException('You can only update your own loads');
+      }
+
+      // Calculate totals if cargos are updated
+      let totalWeight: number | undefined;
+      let totalVolume: number | undefined;
+
+      if (command.cargos) {
+        totalWeight = command.cargos.reduce((sum, c) => sum + c.weight, 0);
+        const volume = command.cargos.reduce((sum, c) => sum + (c.volume ?? 0), 0);
+        totalVolume = volume > 0 ? volume : undefined;
+      }
+
+      load.update({
+        from: command.from,
+        to: command.to,
+        transportType: command.transportType,
+        loadingTypes: command.loadingTypes,
+        cargos: command.cargos,
+        totalWeight,
+        totalVolume,
+        features: command.features,
+        adrClasses: command.adrClasses,
+        temperatureMin: command.temperatureMin,
+        temperatureMax: command.temperatureMax,
+        price: command.price,
+        currency: command.currency,
+        paymentTerms: command.paymentTerms,
+        loadingDate: command.loadingDate,
+        loadingDateTo: command.loadingDateTo,
+        unloadingDate: command.unloadingDate,
+        boardIds: command.boardIds,
+        isPublic: command.isPublic,
+      });
+
+      await this.loadStore.save(load);
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    const state = load.getState();
-    if (state.ownerId !== command.userId) {
-      throw new ForbiddenException('You can only update your own loads');
-    }
-
-    // Calculate totals if cargos are updated
-    let totalWeight: number | undefined;
-    let totalVolume: number | undefined;
-
-    if (command.cargos) {
-      totalWeight = command.cargos.reduce((sum, c) => sum + c.weight, 0);
-      const volume = command.cargos.reduce((sum, c) => sum + (c.volume ?? 0), 0);
-      totalVolume = volume > 0 ? volume : undefined;
-    }
-
-    load.update({
-      from: command.from,
-      to: command.to,
-      transportType: command.transportType,
-      loadingTypes: command.loadingTypes,
-      cargos: command.cargos,
-      totalWeight,
-      totalVolume,
-      features: command.features,
-      adrClasses: command.adrClasses,
-      temperatureMin: command.temperatureMin,
-      temperatureMax: command.temperatureMax,
-      price: command.price,
-      currency: command.currency,
-      paymentTerms: command.paymentTerms,
-      loadingDate: command.loadingDate,
-      loadingDateTo: command.loadingDateTo,
-      unloadingDate: command.unloadingDate,
-      boardIds: command.boardIds,
-      isPublic: command.isPublic,
-    });
-
-    await this.loadStore.save(load);
   }
 }

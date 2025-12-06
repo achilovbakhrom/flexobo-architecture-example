@@ -17,10 +17,7 @@ import { TripController } from './adapters/http/v1/trip.controller';
 import { BidController } from './adapters/http/v1/bid.controller';
 import { BookingController } from './adapters/http/v1/booking.controller';
 import { BoardController } from './adapters/http/v1/board.controller';
-import { CompanyController } from './adapters/http/v1/company.controller';
-import { ReferenceDataController } from './adapters/http/v1/reference-data.controller';
-import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
-import { StatisticsController } from './adapters/http/v1/statistics.controller';
+import { LanguageController } from './adapters/http/v1/language.controller';
 
 // Guards
 import { JwtAuthGuard } from './adapters/http/guards/jwt-auth.guard';
@@ -54,15 +51,7 @@ import {
   BOARD_AGGREGATE_STORE,
   BOARD_READ_REPOSITORY,
 } from './ports/board.repository';
-import {
-  COMPANY_AGGREGATE_STORE,
-  COMPANY_READ_REPOSITORY,
-} from './ports/company.repository';
-import { REFERENCE_DATA_REPOSITORY } from './ports/reference-data.repository';
-import {
-  SAVED_SEARCH_AGGREGATE_STORE,
-  SAVED_SEARCH_READ_REPOSITORY,
-} from './ports/saved-search.repository';
+import { LANGUAGE_REPOSITORY } from './ports/language.repository';
 import { CHAT_SERVICE_CLIENT } from './ports/chat-service.client';
 
 // Aggregate Stores
@@ -89,6 +78,7 @@ import {
   PrismaReferenceDataRepository,
   PrismaSavedSearchReadRepository,
 } from './adapters/persistence/read-model';
+import { PrismaLanguageRepository } from './adapters/persistence/read-model/language.repository';
 
 // Projections
 import {
@@ -151,27 +141,11 @@ import {
   RemoveBoardMemberHandler,
   DeleteBoardHandler,
 } from './application/commands/board';
-
-// Company Command Handlers
 import {
-  CreateCompanyHandler,
-  UpdateCompanyHandler,
-  DeleteCompanyHandler,
-  VerifyCompanyHandler,
-  RejectCompanyHandler,
-  SuspendCompanyHandler,
-  ReactivateCompanyHandler,
-  AddCompanyMemberHandler,
-  UpdateCompanyMemberHandler,
-  RemoveCompanyMemberHandler,
-} from './application/commands/company';
-
-// Saved Search Command Handlers
-import {
-  CreateSavedSearchHandler,
-  UpdateSavedSearchHandler,
-  DeleteSavedSearchHandler,
-} from './application/commands/saved-search';
+  CreateLanguageHandler,
+  UpdateLanguageHandler,
+  DeleteLanguageHandler,
+} from './application/commands/language';
 
 // Transport Query Handlers
 import {
@@ -212,28 +186,10 @@ import {
   GetBoardHandler,
   ListBoardsHandler,
 } from './application/queries/board';
-
-// Company Query Handlers
 import {
-  GetCompanyHandler,
-  GetMyCompanyHandler,
-  ListCompaniesHandler,
-  GetCompanyMembersHandler,
-  GetUserCompaniesHandler,
-} from './application/queries/company';
-
-// Saved Search Query Handlers
-import {
-  GetSavedSearchHandler,
-  ListSavedSearchesHandler,
-} from './application/queries/saved-search';
-
-// Statistics Query Handlers
-import {
-  GetDashboardStatsHandler,
-  GetMarketStatsHandler,
-  GetRouteAnalyticsHandler,
-} from './application/queries/statistics';
+  GetLanguageHandler,
+  ListLanguagesHandler,
+} from './application/queries/language';
 
 const CommandHandlers = [
   // Transport
@@ -268,21 +224,10 @@ const CommandHandlers = [
   AddBoardMemberHandler,
   RemoveBoardMemberHandler,
   DeleteBoardHandler,
-  // Company
-  CreateCompanyHandler,
-  UpdateCompanyHandler,
-  DeleteCompanyHandler,
-  VerifyCompanyHandler,
-  RejectCompanyHandler,
-  SuspendCompanyHandler,
-  ReactivateCompanyHandler,
-  AddCompanyMemberHandler,
-  UpdateCompanyMemberHandler,
-  RemoveCompanyMemberHandler,
-  // Saved Search
-  CreateSavedSearchHandler,
-  UpdateSavedSearchHandler,
-  DeleteSavedSearchHandler,
+  // Language
+  CreateLanguageHandler,
+  UpdateLanguageHandler,
+  DeleteLanguageHandler,
 ];
 
 const QueryHandlers = [
@@ -308,19 +253,9 @@ const QueryHandlers = [
   // Board
   GetBoardHandler,
   ListBoardsHandler,
-  // Company
-  GetCompanyHandler,
-  GetMyCompanyHandler,
-  ListCompaniesHandler,
-  GetCompanyMembersHandler,
-  GetUserCompaniesHandler,
-  // Saved Search
-  GetSavedSearchHandler,
-  ListSavedSearchesHandler,
-  // Statistics
-  GetDashboardStatsHandler,
-  GetMarketStatsHandler,
-  GetRouteAnalyticsHandler,
+  // Language
+  GetLanguageHandler,
+  ListLanguagesHandler,
 ];
 
 @Module({
@@ -369,10 +304,7 @@ const QueryHandlers = [
     BidController,
     BookingController,
     BoardController,
-    CompanyController,
-    ReferenceDataController,
-    SavedSearchController,
-    StatisticsController,
+    LanguageController,
   ],
   providers: [
     // Guards
@@ -446,16 +378,8 @@ const QueryHandlers = [
       useClass: PrismaBoardReadRepository,
     },
     {
-      provide: COMPANY_READ_REPOSITORY,
-      useClass: PrismaCompanyReadRepository,
-    },
-    {
-      provide: REFERENCE_DATA_REPOSITORY,
-      useClass: PrismaReferenceDataRepository,
-    },
-    {
-      provide: SAVED_SEARCH_READ_REPOSITORY,
-      useClass: PrismaSavedSearchReadRepository,
+      provide: LANGUAGE_REPOSITORY,
+      useClass: PrismaLanguageRepository,
     },
 
     // Projections

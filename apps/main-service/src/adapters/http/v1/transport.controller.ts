@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -34,6 +33,7 @@ import { DeleteTransportCommand } from '../../../application/commands/transport/
 import { GetTransportQuery } from '../../../application/queries/transport/get-transport.query';
 import { ListTransportsQuery } from '../../../application/queries/transport/list-transports.query';
 import { UsersGrpcClient } from '../../grpc';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Transports')
 @ApiBearerAuth()
@@ -56,7 +56,7 @@ export class TransportController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateTransportDto
-  ): Promise<{ id: string }> {
+  ) {
     // Get user info to retrieve companyId
     const userInfo = await this.usersGrpcClient.getUser(user.userId);
     // TODO: Get companyId from user's company membership

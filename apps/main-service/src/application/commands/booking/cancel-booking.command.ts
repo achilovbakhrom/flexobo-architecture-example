@@ -1,18 +1,18 @@
 import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
+import { ICommand, ICommandHandler, CommandHandler, IAggregateStore, Result, Success, Failure } from '@flexobo/core';
 import { PostType } from '../../../domain/constants/enums';
+import { Booking } from '../../../domain/aggregates/booking.aggregate';
+import { Load } from '../../../domain/aggregates/load.aggregate';
+import { Trip } from '../../../domain/aggregates/trip.aggregate';
 import {
-  IBookingAggregateStore,
-  BOOKING_AGGREGATE_STORE,
   IBookingReadRepository,
   BOOKING_READ_REPOSITORY,
+  BOOKING_AGGREGATE_STORE,
 } from '../../../ports/booking.repository';
 import {
-  ILoadAggregateStore,
   LOAD_AGGREGATE_STORE,
 } from '../../../ports/load.repository';
 import {
-  ITripAggregateStore,
   TRIP_AGGREGATE_STORE,
 } from '../../../ports/trip.repository';
 
@@ -26,20 +26,21 @@ export class CancelBookingCommand implements ICommand {
 @Injectable()
 @CommandHandler(CancelBookingCommand)
 export class CancelBookingHandler
-  implements ICommandHandler<CancelBookingCommand>
+  implements ICommandHandler<CancelBookingCommand, void>
 {
   constructor(
     @Inject(BOOKING_AGGREGATE_STORE)
-    private readonly bookingStore: IBookingAggregateStore,
+    private readonly bookingStore: IAggregateStore<Booking>,
     @Inject(BOOKING_READ_REPOSITORY)
     private readonly bookingRepo: IBookingReadRepository,
     @Inject(LOAD_AGGREGATE_STORE)
-    private readonly loadStore: ILoadAggregateStore,
+    private readonly loadStore: IAggregateStore<Load>,
     @Inject(TRIP_AGGREGATE_STORE)
-    private readonly tripStore: ITripAggregateStore
+    private readonly tripStore: IAggregateStore<Trip>
   ) {}
 
-  async execute(command: CancelBookingCommand): Promise<void> {
+  async execute(command: CancelBookingCommand): Promise<Result<void, Error>> {
+    try {
     const booking = await this.bookingStore.load(command.bookingId);
     if (!booking) {
       throw new NotFoundException(`Booking ${command.bookingId} not found`);
@@ -73,6 +74,11 @@ export class CancelBookingHandler
           await this.tripStore.save(trip);
         }
       }
+    }
+
+    return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
   }
 }

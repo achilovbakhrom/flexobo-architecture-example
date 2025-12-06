@@ -1,9 +1,7 @@
 import { Injectable, Inject, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import {
-  ITripAggregateStore,
-  TRIP_AGGREGATE_STORE,
-} from '../../../ports/trip.repository';
+import { CommandHandler, ICommand, ICommandHandler, IAggregateStore, Result, Success, Failure } from '@flexobo/core';
+import { Trip } from '../../../domain/aggregates/trip.aggregate';
+import { TRIP_AGGREGATE_STORE } from '../../../ports/trip.repository';
 
 export class UpdateTripCommand implements ICommand {
   constructor(
@@ -50,43 +48,49 @@ export class UpdateTripCommand implements ICommand {
 
 @Injectable()
 @CommandHandler(UpdateTripCommand)
-export class UpdateTripHandler implements ICommandHandler<UpdateTripCommand> {
+export class UpdateTripHandler implements ICommandHandler<UpdateTripCommand, void> {
   constructor(
     @Inject(TRIP_AGGREGATE_STORE)
-    private readonly tripStore: ITripAggregateStore
+    private readonly tripStore: IAggregateStore<Trip>
   ) {}
 
-  async execute(command: UpdateTripCommand): Promise<void> {
-    const trip = await this.tripStore.load(command.tripId);
-    if (!trip) {
-      throw new NotFoundException(`Trip ${command.tripId} not found`);
+  async execute(command: UpdateTripCommand): Promise<Result<void, Error>> {
+    try {
+      const trip = await this.tripStore.load(command.tripId);
+      if (!trip) {
+        throw new NotFoundException(`Trip ${command.tripId} not found`);
+      }
+
+      if (trip.getState().ownerId !== command.userId) {
+        throw new ForbiddenException('Only the owner can update the trip');
+      }
+
+      trip.update({
+        transport: command.transport
+          ? {
+              id: command.transport.id,
+              type: command.transport.type,
+              capacity: command.transport.capacity,
+              dimensions: command.transport.dimensions,
+              loadingTypes: command.transport.loadingTypes,
+              features: command.transport.features ?? [],
+              permits: command.transport.permits ?? [],
+            }
+          : undefined,
+        loadingPoints: command.loadingPoints,
+        unloadingPoints: command.unloadingPoints,
+        price: command.price,
+        currency: command.currency,
+        paymentTerms: command.paymentTerms,
+        boardIds: command.boardIds,
+        isPublic: command.isPublic,
+      });
+
+      await this.tripStore.save(trip);
+
+      return new Success(undefined);
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    if (trip.getState().ownerId !== command.userId) {
-      throw new ForbiddenException('Only the owner can update the trip');
-    }
-
-    trip.update({
-      transport: command.transport
-        ? {
-            id: command.transport.id,
-            type: command.transport.type,
-            capacity: command.transport.capacity,
-            dimensions: command.transport.dimensions,
-            loadingTypes: command.transport.loadingTypes,
-            features: command.transport.features ?? [],
-            permits: command.transport.permits ?? [],
-          }
-        : undefined,
-      loadingPoints: command.loadingPoints,
-      unloadingPoints: command.unloadingPoints,
-      price: command.price,
-      currency: command.currency,
-      paymentTerms: command.paymentTerms,
-      boardIds: command.boardIds,
-      isPublic: command.isPublic,
-    });
-
-    await this.tripStore.save(trip);
   }
 }

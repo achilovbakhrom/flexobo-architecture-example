@@ -11,7 +11,6 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -34,6 +33,7 @@ import { RemoveBoardMemberCommand } from '../../../application/commands/board/re
 import { DeleteBoardCommand } from '../../../application/commands/board/delete-board.command';
 import { GetBoardQuery } from '../../../application/queries/board/get-board.query';
 import { ListBoardsQuery } from '../../../application/queries/board/list-boards.query';
+import { CommandBus, QueryBus } from '@flexobo/core';
 
 @ApiTags('Boards')
 @ApiBearerAuth()
@@ -51,7 +51,7 @@ export class BoardController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateBoardDto
-  ): Promise<{ id: string }> {
+  ) {
     // TODO: Get companyId from user's company membership
     const companyId = 'default-company';
 
