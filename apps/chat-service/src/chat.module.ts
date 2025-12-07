@@ -51,6 +51,14 @@ import {
   ExternalEventsProjection,
 } from './adapters/eventbus/projection';
 
+// Notification Resolvers
+import {
+  CHAT_ROOM_NOTIFICATION_RESOLVER,
+  ChatRoomNotificationResolver,
+  CHAT_MESSAGE_NOTIFICATION_RESOLVER,
+  ChatMessageNotificationResolver,
+} from './adapters/eventbus/notification-resolvers';
+
 // Adapters - gRPC
 import { UsersGrpcClient, ChatGrpcController } from './adapters/grpc';
 
@@ -198,6 +206,16 @@ const QueryHandlers = [
     {
       provide: REALTIME_SERVICE,
       useExisting: ChatGateway,
+    },
+
+    // Notification Resolvers
+    {
+      provide: CHAT_ROOM_NOTIFICATION_RESOLVER,
+      useClass: ChatRoomNotificationResolver,
+    },
+    {
+      provide: CHAT_MESSAGE_NOTIFICATION_RESOLVER,
+      useClass: ChatMessageNotificationResolver,
     },
 
     // Projections

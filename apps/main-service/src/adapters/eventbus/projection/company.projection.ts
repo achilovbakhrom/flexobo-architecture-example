@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   ICompanyReadRepository,
@@ -26,6 +29,7 @@ import {
   CompanyMemberUpdatedEventData,
   CompanyMemberRemovedEventData,
 } from '../../../domain/events/company.events';
+import { COMPANY_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type CompanyEventPayload = EventPayload<
   | CompanyCreatedEventData
@@ -52,9 +56,15 @@ export class CompanyProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(COMPANY_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<CompanyEventPayload> | null
   ) {
-    super(rabbitMQConsumer, CompanyProjection.name, eventBuffer);
+    super(rabbitMQConsumer, CompanyProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

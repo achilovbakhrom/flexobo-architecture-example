@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   IChatMessageRepository,
@@ -22,6 +25,7 @@ import {
   EVENT_TYPES,
   QUEUES,
 } from '../../../domain/events/event.constants';
+import { CHAT_MESSAGE_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 interface MessageSentData {
   roomId: string;
@@ -83,9 +87,15 @@ export class ChatMessageProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(CHAT_MESSAGE_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<ChatMessageEventPayload> | null
   ) {
-    super(rabbitMQConsumer, ChatMessageProjection.name, eventBuffer);
+    super(rabbitMQConsumer, ChatMessageProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {
