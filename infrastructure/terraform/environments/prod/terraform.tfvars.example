@@ -1,0 +1,11 @@
+# Copy this file to terraform.tfvars and fill in the values
+# Do NOT commit terraform.tfvars to version control
+
+aws_region         = "us-east-1"
+project_name       = "flexobo"
+environment        = "prod"
+kubernetes_version = "1.29"
+
+# Database password - use a strong password!
+# Consider using AWS Secrets Manager in production
+db_password = "your-secure-password-here"

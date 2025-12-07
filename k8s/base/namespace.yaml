@@ -3,5 +3,5 @@ kind: Namespace
 metadata:
   name: flexobo
   labels:
-    name: flexobo
-    environment: base
+    app.kubernetes.io/name: flexobo
+    app.kubernetes.io/managed-by: kustomize

@@ -3,46 +3,108 @@ kind: Kustomization
 
 namespace: flexobo-prod
 
-bases:
+resources:
   - ../../base
 
-nameSuffix: -prod
+namePrefix: prod-
 
 commonLabels:
   environment: production
 
+# Production: increase replicas and resources
 patches:
-  - patch: |-
+  # Users Service - increase for production
+  - target:
+      kind: Deployment
+      name: users-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: users-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+
+  # Chat Service
+  - target:
+      kind: Deployment
+      name: chat-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: chat-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+
+  # Main Service
+  - target:
+      kind: Deployment
+      name: main-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: main-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+
+  # Increase resources for production
+  - target:
+      kind: Deployment
+    patch: |-
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/memory
-        value: 1Gi
+        value: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "200m"
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 2Gi
-    target:
-      kind: Deployment
-      name: order-service
-  - patch: |-
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1000m"
+
+  # RabbitMQ - 3 replicas for HA
+  - target:
+      kind: StatefulSet
+      name: rabbitmq
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
       - op: replace
         path: /spec/template/spec/containers/0/resources/requests/memory
-        value: 1Gi
+        value: "512Mi"
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
-        value: 2Gi
-    target:
-      kind: Deployment
-      name: admin-panel
+        value: "1Gi"
 
 configMapGenerator:
   - name: flexobo-config
     behavior: merge
     literals:
-      - LOG_LEVEL=info
       - NODE_ENV=production
-      - RATE_LIMIT_MAX=1000
-
-images:
-  - name: flexobo/order-service
-    newTag: v1.0.0
-  - name: flexobo/admin-panel
-    newTag: v1.0.0
+      - LOG_LEVEL=warn

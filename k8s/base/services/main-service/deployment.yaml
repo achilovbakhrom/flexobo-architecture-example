@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: main-service
+  namespace: flexobo
+  labels:
+    app: main-service
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: main-service
+  template:
+    metadata:
+      labels:
+        app: main-service
+        tier: backend
+    spec:
+      containers:
+        - name: main-service
+          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/main-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3008
+              name: http
+          envFrom:
+            - configMapRef:
+                name: flexobo-config
+            - secretRef:
+                name: flexobo-secrets
+          env:
+            - name: PORT
+              value: "3008"
+            - name: DATABASE_URL
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=main"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3008
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3008
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: main-service
+                topologyKey: kubernetes.io/hostname

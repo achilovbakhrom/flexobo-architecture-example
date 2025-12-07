@@ -11,18 +11,27 @@ async function bootstrap() {
   const logger = new Logger('UsersService');
 
   const isDev = process.env.MODE !== 'prod';
+  console.log(`Running in ${isDev ? 'development' : 'production'} mode`);
 
-  // Enable CORS
-  app.enableCors(
-    isDev
-      ? {
-          origin: '*',
-          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-          preflightContinue: false,
-          optionsSuccessStatus: 204,
-        }
-      : undefined
-  );
+  // if (!isDev) {
+  app.enableCors({
+    origin: isDev
+      ? [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+        ]
+      : [
+          'https://app.flexobo.com',
+          'https://admin.flexobo.com',
+          'https://flexobo.com',
+        ],
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
+  // }
 
   // Validation pipe
   app.useGlobalPipes(
