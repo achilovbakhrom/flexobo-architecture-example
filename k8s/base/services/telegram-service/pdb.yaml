@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: telegram-service-pdb
+  namespace: flexobo
+spec:
+  minAvailable: 0  # Allow disruption since this is a single instance
+  selector:
+    matchLabels:
+      app: telegram-service

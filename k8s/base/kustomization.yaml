@@ -5,16 +5,20 @@ namespace: flexobo
 
 resources:
   - namespace.yaml
+  - storage-class.yaml
   - configmap.yaml
   - secrets.yaml
-  - postgres.yaml
-  - rabbitmq.yaml
-  - redis.yaml
-  - order-service.yaml
-  - admin-panel.yaml
-  - ingress.yaml
-  - pdb.yaml
-  - hpa.yaml
+  - rabbitmq
+  - redis
+  - vault
+  - services/users-service
+  - services/chat-service
+  - services/file-service
+  - services/main-service
+  - services/billing-service
+  - services/notification-service
+  - services/telegram-service
+  - ingress
 
 commonLabels:
   app.kubernetes.io/name: flexobo

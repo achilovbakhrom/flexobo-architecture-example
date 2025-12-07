@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: billing-service
+  namespace: flexobo
+  labels:
+    app: billing-service
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: billing-service
+  template:
+    metadata:
+      labels:
+        app: billing-service
+        tier: backend
+    spec:
+      containers:
+        - name: billing-service
+          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/billing-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3009
+              name: http
+          envFrom:
+            - configMapRef:
+                name: flexobo-config
+            - secretRef:
+                name: flexobo-secrets
+          env:
+            - name: PORT
+              value: "3009"
+            - name: DATABASE_URL
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=billing"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3009
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: billing-service
+                topologyKey: kubernetes.io/hostname

@@ -75,34 +75,54 @@ export class CompanyProjection extends BaseProjection<
     return entity?.version ?? 0;
   }
 
-  protected override async applyEvent(event: CompanyEventPayload): Promise<void> {
+  protected override async applyEvent(
+    event: CompanyEventPayload
+  ): Promise<void> {
     switch (event.type) {
       case COMPANY_EVENT_TYPES.CREATED:
-        await this.onCompanyCreated(event as EventPayload<CompanyCreatedEventData>);
+        await this.onCompanyCreated(
+          event as EventPayload<CompanyCreatedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.UPDATED:
-        await this.onCompanyUpdated(event as EventPayload<CompanyUpdatedEventData>);
+        await this.onCompanyUpdated(
+          event as EventPayload<CompanyUpdatedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.VERIFIED:
-        await this.onCompanyVerified(event as EventPayload<CompanyVerifiedEventData>);
+        await this.onCompanyVerified(
+          event as EventPayload<CompanyVerifiedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.REJECTED:
-        await this.onCompanyRejected(event as EventPayload<CompanyRejectedEventData>);
+        await this.onCompanyRejected(
+          event as EventPayload<CompanyRejectedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.SUSPENDED:
-        await this.onCompanySuspended(event as EventPayload<CompanySuspendedEventData>);
+        await this.onCompanySuspended(
+          event as EventPayload<CompanySuspendedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.REACTIVATED:
-        await this.onCompanyReactivated(event as EventPayload<CompanyReactivatedEventData>);
+        await this.onCompanyReactivated(
+          event as EventPayload<CompanyReactivatedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.MEMBER_ADDED:
-        await this.onMemberAdded(event as EventPayload<CompanyMemberAddedEventData>);
+        await this.onMemberAdded(
+          event as EventPayload<CompanyMemberAddedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.MEMBER_UPDATED:
-        await this.onMemberUpdated(event as EventPayload<CompanyMemberUpdatedEventData>);
+        await this.onMemberUpdated(
+          event as EventPayload<CompanyMemberUpdatedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.MEMBER_REMOVED:
-        await this.onMemberRemoved(event as EventPayload<CompanyMemberRemovedEventData>);
+        await this.onMemberRemoved(
+          event as EventPayload<CompanyMemberRemovedEventData>
+        );
         break;
       case COMPANY_EVENT_TYPES.DELETED:
         await this.onCompanyDeleted(event);
@@ -269,7 +289,11 @@ export class CompanyProjection extends BaseProjection<
     this.checkVersion(existing, event);
 
     const { data } = event;
-    await this.companyRepo.updateMember(event.aggregateId, data.memberId, data.role);
+    await this.companyRepo.updateMember(
+      event.aggregateId,
+      data.memberId,
+      data.role
+    );
 
     // Update version
     await this.companyRepo.save({
