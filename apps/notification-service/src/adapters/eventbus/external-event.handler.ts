@@ -2,6 +2,12 @@ import { Injectable, Logger, OnModuleInit, Inject } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { RabbitMQConsumer, MESSAGE_CONSUMER, CommandBus } from '@flexobo/core';
 import {
+  SendOtpSmsPayload,
+  SendOtpEmailPayload,
+  SendSmsPayload,
+  SendEmailPayload,
+} from '@flexobo/shared-kernel';
+import {
   SendNotificationCommand,
   BroadcastNotificationCommand,
 } from '../../application/commands';
@@ -12,6 +18,8 @@ import {
   NotificationSeverity,
 } from '../../domain/constants/enums';
 import { ISSEManager, SSE_MANAGER } from '../../ports/sse-service.port';
+import { ISmsService, SMS_SERVICE } from '../../ports/sms-service.port';
+import { IEmailService, EMAIL_SERVICE } from '../../ports/email-service.port';
 
 interface ProjectionCompletedEvent {
   type: 'system';
@@ -71,7 +79,11 @@ export class ExternalEventHandler implements OnModuleInit {
     private readonly rabbitMQConsumer: RabbitMQConsumer,
     private readonly commandBus: CommandBus,
     @Inject(SSE_MANAGER)
-    private readonly sseManager: ISSEManager
+    private readonly sseManager: ISSEManager,
+    @Inject(SMS_SERVICE)
+    private readonly smsService: ISmsService,
+    @Inject(EMAIL_SERVICE)
+    private readonly emailService: IEmailService
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -83,6 +95,11 @@ export class ExternalEventHandler implements OnModuleInit {
     await this.rabbitMQConsumer.subscribeToEvents(
       'notification.events',
       [
+        // OTP and direct send patterns
+        'notification.otp.sms',
+        'notification.otp.email',
+        'notification.sms',
+        'notification.email',
         // New resolver-based notification patterns
         'notification.user.*',
         'notification.broadcast',
@@ -120,8 +137,18 @@ export class ExternalEventHandler implements OnModuleInit {
   ): Promise<void> {
     this.logger.debug(`Handling event: ${routingKey}`);
 
+    // OTP and direct send patterns
+    if (routingKey === 'notification.otp.sms') {
+      await this.handleOtpSms(content as SendOtpSmsPayload);
+    } else if (routingKey === 'notification.otp.email') {
+      await this.handleOtpEmail(content as SendOtpEmailPayload);
+    } else if (routingKey === 'notification.sms') {
+      await this.handleSms(content as SendSmsPayload);
+    } else if (routingKey === 'notification.email') {
+      await this.handleEmail(content as SendEmailPayload);
+    }
     // New resolver-based notifications
-    if (routingKey.startsWith('notification.user.')) {
+    else if (routingKey.startsWith('notification.user.')) {
       await this.handleUserNotification(content as ResolverNotificationPayload);
     } else if (routingKey === 'notification.broadcast') {
       await this.handleBroadcastNotification(
@@ -140,6 +167,68 @@ export class ExternalEventHandler implements OnModuleInit {
       await this.handleOrderEvent(routingKey, content as OrderEvent);
     } else if (routingKey.startsWith('payment.')) {
       await this.handlePaymentEvent(routingKey, content as PaymentEvent);
+    }
+  }
+
+  // ============ OTP & DIRECT SEND HANDLERS ============
+
+  private async handleOtpSms(payload: SendOtpSmsPayload): Promise<void> {
+    const result = await this.smsService.sendOtp({
+      to: payload.to,
+      code: payload.code,
+      expiresInMinutes: payload.expiresInMinutes,
+      type: payload.type,
+    });
+
+    if (result.success) {
+      this.logger.log(`OTP SMS sent to ${payload.to}`);
+    } else {
+      this.logger.error(`Failed to send OTP SMS to ${payload.to}: ${result.error}`);
+    }
+  }
+
+  private async handleOtpEmail(payload: SendOtpEmailPayload): Promise<void> {
+    const result = await this.emailService.sendOtp({
+      to: payload.to,
+      code: payload.code,
+      expiresInMinutes: payload.expiresInMinutes,
+      type: payload.type,
+    });
+
+    if (result) {
+      this.logger.log(`OTP Email sent to ${payload.to.email}`);
+    } else {
+      this.logger.error(`Failed to send OTP Email to ${payload.to.email}`);
+    }
+  }
+
+  private async handleSms(payload: SendSmsPayload): Promise<void> {
+    const result = await this.smsService.send({
+      to: payload.to,
+      message: payload.message,
+    });
+
+    if (result.success) {
+      this.logger.log(`SMS sent successfully`);
+    } else {
+      this.logger.error(`Failed to send SMS: ${result.error}`);
+    }
+  }
+
+  private async handleEmail(payload: SendEmailPayload): Promise<void> {
+    const recipients = Array.isArray(payload.to) ? payload.to : [payload.to];
+    const result = await this.emailService.send({
+      to: recipients,
+      subject: payload.subject,
+      html: payload.html,
+      text: payload.text,
+      replyTo: payload.replyTo,
+    });
+
+    if (result) {
+      this.logger.log(`Email sent successfully`);
+    } else {
+      this.logger.error(`Failed to send Email`);
     }
   }
 

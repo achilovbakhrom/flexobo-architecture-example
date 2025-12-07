@@ -51,8 +51,7 @@ import { SubscriptionProjection } from './adapters/eventbus/projection/subscript
 import { PaymentProjection } from './adapters/eventbus/projection/payment.projection';
 import { InvoiceProjection } from './adapters/eventbus/projection/invoice.projection';
 
-// Publishers and Consumers
-import { DomainEventsPublisher } from './adapters/eventbus/publisher/domain-events.publisher';
+// Consumers
 import { UsageEventsConsumer } from './adapters/eventbus/consumer/usage-events.consumer';
 
 // Payment Providers
@@ -192,8 +191,7 @@ const Projections = [
     // Projections
     ...Projections,
 
-    // Publishers and Consumers
-    DomainEventsPublisher,
+    // Consumers
     UsageEventsConsumer,
 
     // Payment Providers

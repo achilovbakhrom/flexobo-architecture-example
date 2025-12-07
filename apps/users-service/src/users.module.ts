@@ -24,8 +24,6 @@ import {
   TOKEN_SERVICE,
   PASSWORD_SERVICE,
   OTP_SERVICE,
-  SMS_SERVICE,
-  EMAIL_SERVICE,
   GOOGLE_AUTH_SERVICE,
   ROLE_REPOSITORY,
   INVITATION_REPOSITORY,
@@ -49,8 +47,6 @@ import {
   JwtTokenService,
   BcryptPasswordService,
   OTPService,
-  SmsService,
-  EmailService,
   GoogleAuthService,
 } from './adapters/services';
 
@@ -213,14 +209,6 @@ const QueryHandlers = [
     {
       provide: OTP_SERVICE,
       useClass: OTPService,
-    },
-    {
-      provide: SMS_SERVICE,
-      useClass: SmsService,
-    },
-    {
-      provide: EMAIL_SERVICE,
-      useClass: EmailService,
     },
     {
       provide: GOOGLE_AUTH_SERVICE,

@@ -4,8 +4,11 @@ import {
   Result,
   Success,
   Failure,
+  IMessagePublisher,
+  MESSAGE_PUBLISHER,
 } from '@flexobo/core';
 import { Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import { ROUTING_KEYS } from '@flexobo/shared-kernel';
 import {
   SendOTPCommand,
   VerifyOTPCommand,
@@ -16,10 +19,6 @@ import {
   USER_REPOSITORY,
   IOTPService,
   OTP_SERVICE,
-  ISmsService,
-  SMS_SERVICE,
-  IEmailService,
-  EMAIL_SERVICE,
   IUser,
   ErrorCodes,
   ErrorMessages,
@@ -48,8 +47,8 @@ export class SendOTPHandler
     @Inject(USER_AGGREGATE_STORE)
     private readonly userAggregateStore: IUserAggregateStore,
     @Inject(OTP_SERVICE) private readonly otpService: IOTPService,
-    @Inject(SMS_SERVICE) private readonly smsService: ISmsService,
-    @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService
+    @Inject(MESSAGE_PUBLISHER)
+    private readonly messagePublisher: IMessagePublisher
   ) {}
 
   async execute(
@@ -108,14 +107,30 @@ export class SendOTPHandler
       // Save the aggregate
       await this.userAggregateStore.save(userAggregate);
 
-      // Send OTP via appropriate channel
+      // Send OTP via notification service
       if (
         command.authMethod === AuthMethod.PhoneNumber &&
         command.phoneNumber
       ) {
-        await this.smsService.send(String(code), command.phoneNumber);
+        await this.messagePublisher.publish(
+          ROUTING_KEYS.NOTIFICATION.OTP_SMS,
+          {
+            to: command.phoneNumber,
+            code: String(code),
+            expiresInMinutes: 5,
+            type: 'LOGIN',
+          }
+        );
       } else if (command.authMethod === AuthMethod.Email && command.email) {
-        await this.emailService.sendOTP(command.email, String(code));
+        await this.messagePublisher.publish(
+          ROUTING_KEYS.NOTIFICATION.OTP_EMAIL,
+          {
+            to: { email: command.email },
+            code: String(code),
+            expiresInMinutes: 5,
+            type: 'LOGIN',
+          }
+        );
       }
 
       return new Success({
@@ -225,8 +240,8 @@ export class ForgotPasswordHandler
     @Inject(USER_AGGREGATE_STORE)
     private readonly userAggregateStore: IUserAggregateStore,
     @Inject(OTP_SERVICE) private readonly otpService: IOTPService,
-    @Inject(SMS_SERVICE) private readonly smsService: ISmsService,
-    @Inject(EMAIL_SERVICE) private readonly emailService: IEmailService
+    @Inject(MESSAGE_PUBLISHER)
+    private readonly messagePublisher: IMessagePublisher
   ) {}
 
   async execute(
@@ -276,14 +291,30 @@ export class ForgotPasswordHandler
       // Save the aggregate
       await this.userAggregateStore.save(userAggregate);
 
-      // Send OTP via appropriate channel
+      // Send OTP via notification service
       if (
         command.authMethod === AuthMethod.PhoneNumber &&
         command.phoneNumber
       ) {
-        await this.smsService.send(String(code), command.phoneNumber);
+        await this.messagePublisher.publish(
+          ROUTING_KEYS.NOTIFICATION.OTP_SMS,
+          {
+            to: command.phoneNumber,
+            code: String(code),
+            expiresInMinutes: 5,
+            type: 'RESET_PASSWORD',
+          }
+        );
       } else if (command.authMethod === AuthMethod.Email && command.email) {
-        await this.emailService.sendOTP(command.email, String(code));
+        await this.messagePublisher.publish(
+          ROUTING_KEYS.NOTIFICATION.OTP_EMAIL,
+          {
+            to: { email: command.email },
+            code: String(code),
+            expiresInMinutes: 5,
+            type: 'RESET_PASSWORD',
+          }
+        );
       }
 
       return new Success({

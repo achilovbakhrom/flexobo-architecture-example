@@ -4,8 +4,6 @@ export * from './token-repository.port';
 export * from './token-service.port';
 export * from './password-service.port';
 export * from './otp-service.port';
-export * from './sms-service.port';
-export * from './email-service.port';
 export * from './google-auth-service.port';
 export * from './role.repository';
 export * from './invitation.repository';

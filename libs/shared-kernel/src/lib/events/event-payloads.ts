@@ -221,3 +221,52 @@ export interface DomainEventPayload<T = unknown> {
   data: T;
   metadata?: Record<string, unknown>;
 }
+
+// ============ NOTIFICATION PAYLOADS ============
+
+export type OtpType = 'REGISTRATION' | 'LOGIN' | 'RESET_PASSWORD';
+
+/**
+ * Payload for sending OTP via SMS
+ */
+export interface SendOtpSmsPayload {
+  to: string;
+  code: string;
+  expiresInMinutes: number;
+  type: OtpType;
+}
+
+/**
+ * Payload for sending OTP via Email
+ */
+export interface SendOtpEmailPayload {
+  to: {
+    email: string;
+    name?: string;
+  };
+  code: string;
+  expiresInMinutes: number;
+  type: OtpType;
+}
+
+/**
+ * Payload for sending a generic email
+ */
+export interface SendEmailPayload {
+  to: {
+    email: string;
+    name?: string;
+  } | Array<{ email: string; name?: string }>;
+  subject: string;
+  html: string;
+  text?: string;
+  replyTo?: string;
+}
+
+/**
+ * Payload for sending a generic SMS
+ */
+export interface SendSmsPayload {
+  to: string | string[];
+  message: string;
+}

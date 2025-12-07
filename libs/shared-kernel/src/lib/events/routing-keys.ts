@@ -146,6 +146,20 @@ export const ROUTING_KEYS = {
     },
     ALL: 'billing.#',
   },
+  NOTIFICATION: {
+    // OTP notifications (direct sends)
+    OTP_SMS: 'notification.otp.sms',
+    OTP_EMAIL: 'notification.otp.email',
+    // General external sends
+    EMAIL: 'notification.email',
+    SMS: 'notification.sms',
+    PUSH: 'notification.push',
+    // User-targeted notifications (resolver-based)
+    USER: 'notification.user',
+    // Broadcast notifications
+    BROADCAST: 'notification.broadcast',
+    ALL: 'notification.#',
+  },
   DEAD_LETTER: {
     ALL: '#',
   },
