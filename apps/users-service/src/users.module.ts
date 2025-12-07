@@ -57,6 +57,12 @@ import {
 // Adapters - Eventbus
 import { UserProjection } from './adapters/eventbus/projection/user.projection';
 
+// Notification Resolvers
+import {
+  USER_NOTIFICATION_RESOLVER,
+  UserNotificationResolver,
+} from './adapters/eventbus/notification-resolvers';
+
 // Command Handlers
 import {
   RegisterUserHandler,
@@ -241,6 +247,11 @@ const QueryHandlers = [
     {
       provide: COMPANY_MEMBERSHIP_REPOSITORY,
       useClass: PrismaCompanyMembershipRepository,
+    },
+    // Notification Resolvers
+    {
+      provide: USER_NOTIFICATION_RESOLVER,
+      useClass: UserNotificationResolver,
     },
     // Projections
     UserProjection,

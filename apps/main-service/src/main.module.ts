@@ -116,6 +116,26 @@ import {
   SavedSearchProjection,
 } from './adapters/eventbus/projection';
 
+// Notification Resolvers
+import {
+  BID_NOTIFICATION_RESOLVER,
+  BidNotificationResolver,
+  BOOKING_NOTIFICATION_RESOLVER,
+  BookingNotificationResolver,
+  BOARD_NOTIFICATION_RESOLVER,
+  BoardNotificationResolver,
+  COMPANY_NOTIFICATION_RESOLVER,
+  CompanyNotificationResolver,
+  LOAD_NOTIFICATION_RESOLVER,
+  LoadNotificationResolver,
+  TRIP_NOTIFICATION_RESOLVER,
+  TripNotificationResolver,
+  TRANSPORT_NOTIFICATION_RESOLVER,
+  TransportNotificationResolver,
+  SAVED_SEARCH_NOTIFICATION_RESOLVER,
+  SavedSearchNotificationResolver,
+} from './adapters/eventbus/notification-resolvers';
+
 // Transport Command Handlers
 import {
   CreateTransportHandler,
@@ -550,6 +570,40 @@ const QueryHandlers = [
     {
       provide: LOCATION_SERVICE,
       useClass: OsmLocationService,
+    },
+
+    // Notification Resolvers
+    {
+      provide: BID_NOTIFICATION_RESOLVER,
+      useClass: BidNotificationResolver,
+    },
+    {
+      provide: BOOKING_NOTIFICATION_RESOLVER,
+      useClass: BookingNotificationResolver,
+    },
+    {
+      provide: BOARD_NOTIFICATION_RESOLVER,
+      useClass: BoardNotificationResolver,
+    },
+    {
+      provide: COMPANY_NOTIFICATION_RESOLVER,
+      useClass: CompanyNotificationResolver,
+    },
+    {
+      provide: LOAD_NOTIFICATION_RESOLVER,
+      useClass: LoadNotificationResolver,
+    },
+    {
+      provide: TRIP_NOTIFICATION_RESOLVER,
+      useClass: TripNotificationResolver,
+    },
+    {
+      provide: TRANSPORT_NOTIFICATION_RESOLVER,
+      useClass: TransportNotificationResolver,
+    },
+    {
+      provide: SAVED_SEARCH_NOTIFICATION_RESOLVER,
+      useClass: SavedSearchNotificationResolver,
     },
 
     // Projections

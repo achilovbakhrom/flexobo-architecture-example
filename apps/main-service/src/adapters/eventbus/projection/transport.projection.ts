@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   ITransportReadRepository,
@@ -19,6 +22,7 @@ import {
   TransportCreatedEventData,
   TransportUpdatedEventData,
 } from '../../../domain/events/transport.events';
+import { TRANSPORT_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type TransportEventPayload = EventPayload<
   TransportCreatedEventData | TransportUpdatedEventData | Record<string, unknown>
@@ -36,9 +40,15 @@ export class TransportProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(TRANSPORT_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<TransportEventPayload> | null
   ) {
-    super(rabbitMQConsumer, TransportProjection.name, eventBuffer);
+    super(rabbitMQConsumer, TransportProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

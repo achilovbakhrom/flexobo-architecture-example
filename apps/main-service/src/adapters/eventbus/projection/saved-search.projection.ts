@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   ISavedSearchReadRepository,
@@ -20,6 +23,7 @@ import {
   SavedSearchUpdatedEventData,
   SavedSearchUsedEventData,
 } from '../../../domain/events/saved-search.events';
+import { SAVED_SEARCH_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type SavedSearchEventPayload = EventPayload<
   | SavedSearchCreatedEventData
@@ -40,9 +44,15 @@ export class SavedSearchProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(SAVED_SEARCH_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<SavedSearchEventPayload> | null
   ) {
-    super(rabbitMQConsumer, SavedSearchProjection.name, eventBuffer);
+    super(rabbitMQConsumer, SavedSearchProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

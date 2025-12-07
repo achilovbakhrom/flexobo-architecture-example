@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   ILoadReadRepository,
@@ -21,13 +24,20 @@ import {
   LoadStatusChangedEventData,
 } from '../../../domain/events/load.events';
 import { LoadStatus } from '../../../domain/constants/enums';
+import { LOAD_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type LoadEventPayload = EventPayload<
-  LoadCreatedEventData | LoadUpdatedEventData | LoadStatusChangedEventData | Record<string, unknown>
+  | LoadCreatedEventData
+  | LoadUpdatedEventData
+  | LoadStatusChangedEventData
+  | Record<string, unknown>
 >;
 
 @Injectable()
-export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload> {
+export class LoadProjection extends BaseProjection<
+  LoadReadDto,
+  LoadEventPayload
+> {
   constructor(
     @Inject(LOAD_READ_REPOSITORY)
     private readonly loadRepo: ILoadReadRepository,
@@ -35,9 +45,21 @@ export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(LOAD_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<LoadEventPayload> | null
   ) {
-    super(rabbitMQConsumer, LoadProjection.name, eventBuffer);
+    super(
+      rabbitMQConsumer,
+      LoadProjection.name,
+      eventBuffer,
+      messagePublisher,
+      notificationResolver
+    );
   }
 
   protected getConfig(): ProjectionConfig {
@@ -67,7 +89,9 @@ export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload
         await this.onLoadUpdated(event as EventPayload<LoadUpdatedEventData>);
         break;
       case LOAD_EVENT_TYPES.STATUS_CHANGED:
-        await this.onLoadStatusChanged(event as EventPayload<LoadStatusChangedEventData>);
+        await this.onLoadStatusChanged(
+          event as EventPayload<LoadStatusChangedEventData>
+        );
         break;
       case LOAD_EVENT_TYPES.DELETED:
         await this.onLoadDeleted(event);
@@ -117,8 +141,12 @@ export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload
       currency: data.currency,
       paymentTerms: data.paymentTerms,
       loadingDate: new Date(data.loadingDate),
-      loadingDateTo: data.loadingDateTo ? new Date(data.loadingDateTo) : undefined,
-      unloadingDate: data.unloadingDate ? new Date(data.unloadingDate) : undefined,
+      loadingDateTo: data.loadingDateTo
+        ? new Date(data.loadingDateTo)
+        : undefined,
+      unloadingDate: data.unloadingDate
+        ? new Date(data.unloadingDate)
+        : undefined,
       boardIds: data.boardIds,
       isPublic: data.isPublic,
       version: event.version,
@@ -137,37 +165,47 @@ export class LoadProjection extends BaseProjection<LoadReadDto, LoadEventPayload
     const updated = { ...existing! };
 
     if (data.from) {
-      updated.fromCountry = data.from.country ?? existing!.fromCountry;
-      updated.fromCity = data.from.city ?? existing!.fromCity;
-      updated.fromAddress = data.from.address ?? existing!.fromAddress;
-      updated.fromLat = data.from.lat ?? existing!.fromLat;
-      updated.fromLng = data.from.lng ?? existing!.fromLng;
+      updated.fromCountry = data.from.country ?? existing?.fromCountry;
+      updated.fromCity = data.from.city ?? existing?.fromCity;
+      updated.fromAddress = data.from.address ?? existing?.fromAddress;
+      updated.fromLat = data.from.lat ?? existing?.fromLat;
+      updated.fromLng = data.from.lng ?? existing?.fromLng;
     }
     if (data.to) {
-      updated.toCountry = data.to.country ?? existing!.toCountry;
-      updated.toCity = data.to.city ?? existing!.toCity;
-      updated.toAddress = data.to.address ?? existing!.toAddress;
-      updated.toLat = data.to.lat ?? existing!.toLat;
-      updated.toLng = data.to.lng ?? existing!.toLng;
+      updated.toCountry = data.to.country ?? existing?.toCountry;
+      updated.toCity = data.to.city ?? existing?.toCity;
+      updated.toAddress = data.to.address ?? existing?.toAddress;
+      updated.toLat = data.to.lat ?? existing?.toLat;
+      updated.toLng = data.to.lng ?? existing?.toLng;
     }
 
-    if (data.transportType !== undefined) updated.transportType = data.transportType;
-    if (data.loadingTypes !== undefined) updated.loadingTypes = data.loadingTypes;
+    if (data.transportType !== undefined)
+      updated.transportType = data.transportType;
+    if (data.loadingTypes !== undefined)
+      updated.loadingTypes = data.loadingTypes;
     if (data.cargos !== undefined) updated.cargos = data.cargos;
     if (data.totalWeight !== undefined) updated.totalWeight = data.totalWeight;
     if (data.totalVolume !== undefined) updated.totalVolume = data.totalVolume;
     if (data.features !== undefined) updated.features = data.features;
     if (data.adrClasses !== undefined) updated.adrClasses = data.adrClasses;
-    if (data.temperatureMin !== undefined) updated.temperatureMin = data.temperatureMin;
-    if (data.temperatureMax !== undefined) updated.temperatureMax = data.temperatureMax;
+    if (data.temperatureMin !== undefined)
+      updated.temperatureMin = data.temperatureMin;
+    if (data.temperatureMax !== undefined)
+      updated.temperatureMax = data.temperatureMax;
     if (data.price !== undefined) updated.price = data.price;
     if (data.currency !== undefined) updated.currency = data.currency;
-    if (data.paymentTerms !== undefined) updated.paymentTerms = data.paymentTerms;
-    if (data.loadingDate !== undefined) updated.loadingDate = new Date(data.loadingDate);
+    if (data.paymentTerms !== undefined)
+      updated.paymentTerms = data.paymentTerms;
+    if (data.loadingDate !== undefined)
+      updated.loadingDate = new Date(data.loadingDate);
     if (data.loadingDateTo !== undefined)
-      updated.loadingDateTo = data.loadingDateTo ? new Date(data.loadingDateTo) : undefined;
+      updated.loadingDateTo = data.loadingDateTo
+        ? new Date(data.loadingDateTo)
+        : undefined;
     if (data.unloadingDate !== undefined)
-      updated.unloadingDate = data.unloadingDate ? new Date(data.unloadingDate) : undefined;
+      updated.unloadingDate = data.unloadingDate
+        ? new Date(data.unloadingDate)
+        : undefined;
     if (data.boardIds !== undefined) updated.boardIds = data.boardIds;
     if (data.isPublic !== undefined) updated.isPublic = data.isPublic;
 
