@@ -18,7 +18,12 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, AuthenticatedUser, CurrentUser } from '@flexobo/shared-kernel';
+import {
+  JwtAuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  Public,
+} from '@flexobo/shared-kernel';
 import {
   CreateLoadDto,
   UpdateLoadDto,
@@ -138,14 +143,12 @@ export class LoadController {
     );
   }
 
+  @Public()
   @Get('search')
-  @ApiOperation({ summary: 'Search loads (respects board visibility)' })
+  @ApiOperation({ summary: 'Search loads (public endpoint)' })
   @ApiResponse({ status: 200, description: 'Search results' })
-  async search(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query() query: SearchLoadsQueryDto
-  ) {
-    // TODO: Get user's accessible board IDs from board membership
+  async search(@Query() query: SearchLoadsQueryDto) {
+    // Public endpoint - no user-specific board filtering
     const userBoardIds: string[] = [];
 
     return this.queryBus.execute(

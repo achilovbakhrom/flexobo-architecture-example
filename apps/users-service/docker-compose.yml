@@ -1,16 +1,18 @@
 # ===========================================
 # Users Service - Docker Compose
 # ===========================================
-# Prerequisites: Start shared infrastructure first
-#   cd infrastructure && docker-compose up -d
+# Development mode (infrastructure only):
+#   docker-compose up -d
 #
-# Then run: docker-compose up -d
+# Full deployment (with service container):
+#   docker-compose --profile full up -d
 
 services:
   # ===========================================
   # Users Service Application
   # ===========================================
   users-service:
+    profiles: ["full"] # Only run when --profile full is specified
     build:
       context: ../..
       dockerfile: apps/users-service/Dockerfile
