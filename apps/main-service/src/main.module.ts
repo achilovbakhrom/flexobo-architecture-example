@@ -22,7 +22,7 @@ import { CompanyController } from './adapters/http/v1/company.controller';
 import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
 import { LocationController } from './adapters/http/v1/location.controller';
 import { StatisticsController } from './adapters/http/v1/statistics.controller';
-import { ReferenceDataAdminController } from './adapters/http/v1/reference-data-admin.controller';
+import { ReferenceDataManagementController } from './adapters/http/v1/reference-data-admin.controller';
 
 // Auth (from shared-kernel)
 import {
@@ -115,6 +115,26 @@ import {
   CompanyProjection,
   SavedSearchProjection,
 } from './adapters/eventbus/projection';
+
+// Notification Resolvers
+import {
+  BID_NOTIFICATION_RESOLVER,
+  BidNotificationResolver,
+  BOOKING_NOTIFICATION_RESOLVER,
+  BookingNotificationResolver,
+  BOARD_NOTIFICATION_RESOLVER,
+  BoardNotificationResolver,
+  COMPANY_NOTIFICATION_RESOLVER,
+  CompanyNotificationResolver,
+  LOAD_NOTIFICATION_RESOLVER,
+  LoadNotificationResolver,
+  TRIP_NOTIFICATION_RESOLVER,
+  TripNotificationResolver,
+  TRANSPORT_NOTIFICATION_RESOLVER,
+  TransportNotificationResolver,
+  SAVED_SEARCH_NOTIFICATION_RESOLVER,
+  SavedSearchNotificationResolver,
+} from './adapters/eventbus/notification-resolvers';
 
 // Transport Command Handlers
 import {
@@ -455,7 +475,7 @@ const QueryHandlers = [
     SavedSearchController,
     LocationController,
     StatisticsController,
-    ReferenceDataAdminController,
+    ReferenceDataManagementController,
   ],
   providers: [
     // Auth Guard (from shared-kernel)
@@ -550,6 +570,40 @@ const QueryHandlers = [
     {
       provide: LOCATION_SERVICE,
       useClass: OsmLocationService,
+    },
+
+    // Notification Resolvers
+    {
+      provide: BID_NOTIFICATION_RESOLVER,
+      useClass: BidNotificationResolver,
+    },
+    {
+      provide: BOOKING_NOTIFICATION_RESOLVER,
+      useClass: BookingNotificationResolver,
+    },
+    {
+      provide: BOARD_NOTIFICATION_RESOLVER,
+      useClass: BoardNotificationResolver,
+    },
+    {
+      provide: COMPANY_NOTIFICATION_RESOLVER,
+      useClass: CompanyNotificationResolver,
+    },
+    {
+      provide: LOAD_NOTIFICATION_RESOLVER,
+      useClass: LoadNotificationResolver,
+    },
+    {
+      provide: TRIP_NOTIFICATION_RESOLVER,
+      useClass: TripNotificationResolver,
+    },
+    {
+      provide: TRANSPORT_NOTIFICATION_RESOLVER,
+      useClass: TransportNotificationResolver,
+    },
+    {
+      provide: SAVED_SEARCH_NOTIFICATION_RESOLVER,
+      useClass: SavedSearchNotificationResolver,
     },
 
     // Projections

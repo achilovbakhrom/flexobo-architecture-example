@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: telegram-service
+  namespace: flexobo
+  labels:
+    app: telegram-service
+    tier: backend
+spec:
+  replicas: 1  # Single instance for Telegram bot to avoid duplicate message handling
+  selector:
+    matchLabels:
+      app: telegram-service
+  template:
+    metadata:
+      labels:
+        app: telegram-service
+        tier: backend
+    spec:
+      containers:
+        - name: telegram-service
+          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/telegram-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3012
+              name: http
+          envFrom:
+            - configMapRef:
+                name: flexobo-config
+            - secretRef:
+                name: flexobo-secrets
+          env:
+            - name: PORT
+              value: "3012"
+            - name: DATABASE_URL
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=telegram"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3012
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3012
+            initialDelaySeconds: 30
+            periodSeconds: 30

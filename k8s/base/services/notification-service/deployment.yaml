@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: flexobo
+  labels:
+    app: notification-service
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        tier: backend
+    spec:
+      containers:
+        - name: notification-service
+          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/notification-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3010
+              name: http
+          envFrom:
+            - configMapRef:
+                name: flexobo-config
+            - secretRef:
+                name: flexobo-secrets
+          env:
+            - name: PORT
+              value: "3010"
+            - name: DATABASE_URL
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=notifications"
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3010
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3010
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: notification-service
+                topologyKey: kubernetes.io/hostname

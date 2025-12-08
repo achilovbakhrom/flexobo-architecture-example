@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ChatModule } from './chat.module';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 import * as express from 'express';
 import { join } from 'path';
 
@@ -38,6 +39,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   // Serve static files for uploads (will be removed when file service is fully integrated)
   app.use('/uploads', express.static(join(process.cwd(), 'uploads')));

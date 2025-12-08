@@ -19,16 +19,27 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { JwtAuthGuard, AuthenticatedUser, CurrentUser } from '@flexobo/shared-kernel';
+import {
+  JwtAuthGuard,
+  AuthenticatedUser,
+  CurrentUser,
+  Public,
+} from '@flexobo/shared-kernel';
 import {
   CreateCompanyDto,
+  CreateMyCompanyDto,
   UpdateCompanyDto,
   VerifyCompanyDto,
   RejectCompanyDto,
   SuspendCompanyDto,
   AddCompanyMemberDto,
+  AddMembersDto,
   UpdateCompanyMemberDto,
+  AddDocumentDto,
   ListCompaniesQueryDto,
+  CompanyResponseDto,
+  CompanyMemberResponseDto,
+  CompanyDocumentResponseDto,
 } from '../dto/company.dto';
 import {
   CreateCompanyCommand,
@@ -41,6 +52,8 @@ import {
   AddCompanyMemberCommand,
   UpdateCompanyMemberCommand,
   RemoveCompanyMemberCommand,
+  AddCompanyDocumentCommand,
+  RemoveCompanyDocumentCommand,
 } from '../../../application/commands/company';
 import {
   GetCompanyQuery,
@@ -52,6 +65,7 @@ import {
   GetCompanyRatingsQuery,
   GetCompanyBookingsQuery,
 } from '../../../application/queries/company';
+import { CompanyDocumentType } from '../../../domain/events/company.events';
 
 @ApiTags('Companies')
 @ApiBearerAuth()
@@ -63,8 +77,94 @@ export class CompanyController {
     private readonly queryBus: QueryBus
   ) {}
 
+  // Create company for current user (POST /me)
+  @Post('me')
+  @ApiOperation({ summary: 'Create company for current user' })
+  @ApiResponse({
+    status: 201,
+    description: 'Company created successfully',
+    type: CompanyResponseDto,
+  })
+  async createMyCompany(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateMyCompanyDto
+  ) {
+    const companyId = await this.commandBus.execute(
+      new CreateCompanyCommand(
+        user.userId,
+        dto.company_type,
+        dto.company_name,
+        dto.company_description,
+        dto.avatar,
+        dto.phone_number,
+        dto.email,
+        dto.country,
+        dto.city,
+        dto.dot_mc,
+        dto.is_legal_entity,
+        dto.documents?.map((doc) => ({
+          type: doc.type.toUpperCase() as CompanyDocumentType,
+          url: doc.url,
+        }))
+      )
+    );
+
+    return { _id: companyId };
+  }
+
+  // Get current user's company (GET /me)
+  @Get('me')
+  @ApiOperation({ summary: "Get current user's company" })
+  @ApiResponse({
+    status: 200,
+    description: "User's company",
+    type: CompanyResponseDto,
+  })
+  async getMyCompany(@CurrentUser() user: AuthenticatedUser) {
+    return this.queryBus.execute(new GetMyCompanyQuery(user.userId));
+  }
+
+  // Update current user's company (PUT /)
+  @Put()
+  @ApiOperation({ summary: "Update current user's company" })
+  @ApiResponse({ status: 200, description: 'Company updated successfully' })
+  @HttpCode(HttpStatus.OK)
+  async updateMyCompany(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateCompanyDto
+  ) {
+    // First get the user's company
+    const company = (await this.queryBus.execute(
+      new GetMyCompanyQuery(user.userId)
+    )) as { id: string } | null;
+    if (!company) {
+      throw new Error('Company not found');
+    }
+
+    await this.commandBus.execute(
+      new UpdateCompanyCommand(
+        company.id,
+        user.userId,
+        dto.company_name,
+        dto.company_type,
+        dto.company_description,
+        dto.avatar,
+        dto.phone_number,
+        dto.email,
+        dto.country,
+        dto.city,
+        dto.dot_mc,
+        dto.is_legal_entity,
+        dto.status
+          ? (dto.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'BLOCKED')
+          : undefined
+      )
+    );
+  }
+
+  // Admin: Create company (POST /)
   @Post()
-  @ApiOperation({ summary: 'Create a new company' })
+  @ApiOperation({ summary: 'Create a new company (admin)' })
   @ApiResponse({ status: 201, description: 'Company created successfully' })
   async create(
     @CurrentUser() user: AuthenticatedUser,
@@ -73,35 +173,46 @@ export class CompanyController {
     const companyId = await this.commandBus.execute(
       new CreateCompanyCommand(
         user.userId,
-        dto.name,
-        dto.type,
-        dto.description,
-        dto.logo,
-        dto.phone,
+        dto.company_type,
+        dto.company_name,
+        dto.company_description,
+        dto.avatar,
+        dto.phone_number,
         dto.email,
-        dto.address,
         dto.country,
         dto.city,
-        dto.taxId,
-        dto.website
+        dto.dot_mc,
+        dto.is_legal_entity,
+        dto.documents?.map((doc) => ({
+          type: doc.type.toUpperCase() as CompanyDocumentType,
+          url: doc.url,
+        }))
       )
     );
 
-    return { id: companyId };
+    return { _id: companyId };
   }
 
+  @Public()
   @Get()
-  @ApiOperation({ summary: 'List all companies with filters' })
+  @ApiOperation({ summary: 'List all companies with filters (public)' })
   @ApiResponse({ status: 200, description: 'List of companies' })
   async list(@Query() query: ListCompaniesQueryDto) {
     return this.queryBus.execute(
       new ListCompaniesQuery(
         {
-          status: query.status,
-          type: query.type,
-          country: query.country,
+          status: query.status
+            ? (query.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'BLOCKED')
+            : undefined,
+          verifyStatus: query.verify_status
+            ? (query.verify_status.toUpperCase() as
+                | 'PENDING'
+                | 'VERIFIED'
+                | 'REJECTED')
+            : undefined,
+          companyTypeId: query.company_type,
+          countryId: query.country,
           city: query.city,
-          isActive: query.isActive,
           search: query.search,
         },
         query.page ?? 1,
@@ -110,16 +221,15 @@ export class CompanyController {
     );
   }
 
-  @Get('my')
-  @ApiOperation({ summary: 'Get current user\'s company' })
-  @ApiResponse({ status: 200, description: 'User\'s company' })
-  async getMyCompany(@CurrentUser() user: AuthenticatedUser) {
-    return this.queryBus.execute(new GetMyCompanyQuery(user.userId));
-  }
-
   @Get('user-companies')
-  @ApiOperation({ summary: 'Get all companies the current user is a member of' })
-  @ApiResponse({ status: 200, description: 'List of user\'s companies' })
+  @ApiOperation({
+    summary: 'Get all companies the current user is a member of',
+  })
+  @ApiResponse({
+    status: 200,
+    description: "List of user's companies",
+    type: [CompanyResponseDto],
+  })
   async getUserCompanies(@CurrentUser() user: AuthenticatedUser) {
     return this.queryBus.execute(new GetUserCompaniesQuery(user.userId));
   }
@@ -127,14 +237,18 @@ export class CompanyController {
   @Get(':id')
   @ApiOperation({ summary: 'Get company by ID' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiResponse({ status: 200, description: 'Company details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company details',
+    type: CompanyResponseDto,
+  })
   @ApiResponse({ status: 404, description: 'Company not found' })
   async getById(@Param('id') id: string) {
     return this.queryBus.execute(new GetCompanyQuery(id));
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update company' })
+  @ApiOperation({ summary: 'Update company by ID' })
   @ApiParam({ name: 'id', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'Company updated successfully' })
   @HttpCode(HttpStatus.OK)
@@ -147,16 +261,19 @@ export class CompanyController {
       new UpdateCompanyCommand(
         id,
         user.userId,
-        dto.name,
-        dto.description,
-        dto.logo,
-        dto.phone,
+        dto.company_name,
+        dto.company_type,
+        dto.company_description,
+        dto.avatar,
+        dto.phone_number,
         dto.email,
-        dto.address,
         dto.country,
         dto.city,
-        dto.taxId,
-        dto.website
+        dto.dot_mc,
+        dto.is_legal_entity,
+        dto.status
+          ? (dto.status.toUpperCase() as 'ACTIVE' | 'INACTIVE' | 'BLOCKED')
+          : undefined
       )
     );
   }
@@ -174,7 +291,7 @@ export class CompanyController {
   }
 
   // Admin actions for company verification
-  @Post(':id/verify')
+  @Post('verify/:id')
   @ApiOperation({ summary: 'Verify company (admin only)' })
   @ApiParam({ name: 'id', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'Company verified successfully' })
@@ -190,7 +307,7 @@ export class CompanyController {
     );
   }
 
-  @Post(':id/reject')
+  @Post('reject/:id')
   @ApiOperation({ summary: 'Reject company (admin only)' })
   @ApiParam({ name: 'id', description: 'Company ID' })
   @ApiResponse({ status: 200, description: 'Company rejected successfully' })
@@ -232,7 +349,9 @@ export class CompanyController {
     @CurrentUser() user: AuthenticatedUser
   ) {
     // TODO: Add admin role check
-    await this.commandBus.execute(new ReactivateCompanyCommand(id, user.userId));
+    await this.commandBus.execute(
+      new ReactivateCompanyCommand(id, user.userId)
+    );
   }
 
   // Company statistics and data
@@ -277,55 +396,87 @@ export class CompanyController {
   @Get(':id/members')
   @ApiOperation({ summary: 'Get company members' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiResponse({ status: 200, description: 'List of company members' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of company members',
+    type: [CompanyMemberResponseDto],
+  })
   async getMembers(@Param('id') id: string) {
     return this.queryBus.execute(new GetCompanyMembersQuery(id));
   }
 
   @Post(':id/members')
-  @ApiOperation({ summary: 'Add member to company' })
+  @ApiOperation({ summary: 'Add members to company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiResponse({ status: 201, description: 'Member added successfully' })
-  async addMember(
+  @ApiResponse({ status: 201, description: 'Members added successfully' })
+  async addMembers(
     @Param('id') id: string,
     @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: AddCompanyMemberDto
+    @Body() dto: AddMembersDto
   ) {
-    await this.commandBus.execute(
-      new AddCompanyMemberCommand(id, user.userId, dto.userId, dto.role)
-    );
+    // Add each member
+    for (const memberId of dto.members) {
+      await this.commandBus.execute(
+        new AddCompanyMemberCommand(id, user.userId, memberId, 'MEMBER')
+      );
+    }
   }
 
-  @Put(':id/members/:memberId')
-  @ApiOperation({ summary: 'Update member role' })
-  @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
-  @ApiResponse({ status: 200, description: 'Member updated successfully' })
-  @HttpCode(HttpStatus.OK)
-  async updateMember(
-    @Param('id') id: string,
-    @Param('memberId') memberId: string,
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: UpdateCompanyMemberDto
-  ) {
-    await this.commandBus.execute(
-      new UpdateCompanyMemberCommand(id, user.userId, memberId, dto.role)
-    );
-  }
-
-  @Delete(':id/members/:memberId')
+  @Delete(':id/members/:member_id')
   @ApiOperation({ summary: 'Remove member from company' })
   @ApiParam({ name: 'id', description: 'Company ID' })
-  @ApiParam({ name: 'memberId', description: 'Member ID' })
+  @ApiParam({ name: 'member_id', description: 'Member ID' })
   @ApiResponse({ status: 204, description: 'Member removed successfully' })
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeMember(
     @Param('id') id: string,
-    @Param('memberId') memberId: string,
+    @Param('member_id') memberId: string,
     @CurrentUser() user: AuthenticatedUser
   ) {
     await this.commandBus.execute(
       new RemoveCompanyMemberCommand(id, user.userId, memberId)
+    );
+  }
+
+  // Document management
+  @Post(':id/documents')
+  @ApiOperation({ summary: 'Add document to company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiResponse({
+    status: 201,
+    description: 'Document added successfully',
+    type: CompanyDocumentResponseDto,
+  })
+  async addDocument(
+    @Param('id') id: string,
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AddDocumentDto
+  ) {
+    const documentId = await this.commandBus.execute(
+      new AddCompanyDocumentCommand(
+        id,
+        user.userId,
+        dto.type.toUpperCase() as CompanyDocumentType,
+        dto.url
+      )
+    );
+
+    return { id: documentId, type: dto.type, url: dto.url };
+  }
+
+  @Delete(':id/documents/:documentId')
+  @ApiOperation({ summary: 'Remove document from company' })
+  @ApiParam({ name: 'id', description: 'Company ID' })
+  @ApiParam({ name: 'documentId', description: 'Document ID' })
+  @ApiResponse({ status: 204, description: 'Document removed successfully' })
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async removeDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @CurrentUser() user: AuthenticatedUser
+  ) {
+    await this.commandBus.execute(
+      new RemoveCompanyDocumentCommand(id, user.userId, documentId)
     );
   }
 }

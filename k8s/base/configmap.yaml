@@ -4,23 +4,25 @@ metadata:
   name: flexobo-config
   namespace: flexobo
 data:
-  # Infrastructure
-  POSTGRES_HOST: postgres-service
-  POSTGRES_PORT: "5432"
-  POSTGRES_DB: flexobo
-  RABBITMQ_HOST: rabbitmq-service
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+
+  # RabbitMQ
+  RABBITMQ_HOST: "rabbitmq.flexobo.svc.cluster.local"
   RABBITMQ_PORT: "5672"
-  REDIS_HOST: redis-service
+  RABBITMQ_URL: "amqp://flexobo:flexobo-rabbitmq-pass@rabbitmq.flexobo.svc.cluster.local:5672"
+
+  # Redis
+  REDIS_HOST: "redis.flexobo.svc.cluster.local"
   REDIS_PORT: "6379"
-  
-  # Application
-  NODE_ENV: production
-  LOG_LEVEL: info
-  
-  # Services
-  ORDER_SERVICE_URL: http://order-service:3000
-  ADMIN_PANEL_URL: http://admin-panel:3002
-  
-  # Rate Limiting
-  RATE_LIMIT_TTL: "60"
-  RATE_LIMIT_MAX: "100"
+  REDIS_URL: "redis://:flexobo-redis-pass@redis.flexobo.svc.cluster.local:6379"
+
+  # Service Discovery (gRPC)
+  USERS_SERVICE_HOST: "users-service.flexobo.svc.cluster.local"
+  USERS_SERVICE_GRPC_PORT: "50052"
+  CHAT_SERVICE_HOST: "chat-service.flexobo.svc.cluster.local"
+  FILE_SERVICE_HOST: "file-service.flexobo.svc.cluster.local"
+  MAIN_SERVICE_HOST: "main-service.flexobo.svc.cluster.local"
+  BILLING_SERVICE_HOST: "billing-service.flexobo.svc.cluster.local"
+  NOTIFICATION_SERVICE_HOST: "notification-service.flexobo.svc.cluster.local"
+  TELEGRAM_SERVICE_HOST: "telegram-service.flexobo.svc.cluster.local"

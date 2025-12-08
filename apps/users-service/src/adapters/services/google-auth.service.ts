@@ -14,12 +14,31 @@ export class GoogleAuthService implements IGoogleAuthService {
   constructor(private readonly configService: ConfigService) {
     this.clientId = this.configService.get<string>('google.clientId', '');
     if (!this.clientId) {
-      throw new Error('Google Client ID is not configured');
+      console.warn(
+        '⚠️  Google OAuth is not configured. Set GOOGLE_CLIENT_ID environment variable.'
+      );
     }
     this.oAuth2Client = new OAuth2Client(this.clientId);
   }
 
   async verifyIdToken(idToken: string): Promise<GoogleUserInfo | null> {
+    if (!this.clientId) {
+      console.error('Google OAuth: Missing GOOGLE_CLIENT_ID configuration');
+      return null;
+    }
+
+    // Validate token format - ID tokens are JWTs with 3 parts separated by dots
+    const tokenParts = idToken.split('.');
+    if (tokenParts.length !== 3) {
+      console.error(
+        'Invalid token format: Expected ID token (JWT), but received an access token or malformed token.',
+        '\nID tokens have 3 segments (header.payload.signature).',
+        '\nAccess tokens are opaque strings and cannot be used for authentication.',
+        '\nPlease send the ID token from the Google Sign-In response.'
+      );
+      return null;
+    }
+
     try {
       const ticket = await this.oAuth2Client.verifyIdToken({
         idToken,

@@ -33,6 +33,7 @@ import {
   ForgotPasswordDto,
   ResetPasswordDto,
   ChangePasswordDto,
+  USER_LANGS,
   LinkTelegramDto,
   RegisterWithTelegramDto,
   LoginWithTelegramDto,
@@ -438,19 +439,22 @@ export class AuthController {
 
   private mapToUserResponse(user: IUser): UserResponseDto {
     return {
-      id: user.id,
-      uniqueId: user.uniqueId,
+      _id: user.id,
+      user_unique_id: user.uniqueId,
       email: user.email ?? undefined,
-      phoneNumber: user.phoneNumber ?? undefined,
-      telegramId: user.telegramId ?? undefined,
+      phone_number: user.phoneNumber ?? undefined,
+      telegram_id: user.telegramId ?? undefined,
       fio: user.fio,
       avatar: user.avatar ?? undefined,
       role: user.role,
-      userType: user.userType ?? undefined,
+      user_type: user.userType ?? undefined,
       status: user.status,
-      language: user.language,
-      isVerified: user.isVerified,
-      createdAt: user.createdAt,
+      user_lang: user.language as USER_LANGS,
+      is_subscribed_newsletter: user.isSubscribedNewsletter,
+      is_privacy_policy_accepted: user.isPrivacyPolicyAccepted,
+      platform: user.platform ?? undefined,
+      created_at: user.createdAt.toISOString(),
+      updated_at: user.updatedAt.toISOString(),
     };
   }
 }

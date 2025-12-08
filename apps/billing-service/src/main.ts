@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { join } from 'path';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 import { BillingModule } from './billing.module';
 
 async function bootstrap() {
@@ -25,6 +26,9 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   // Enable CORS
   app.enableCors({
