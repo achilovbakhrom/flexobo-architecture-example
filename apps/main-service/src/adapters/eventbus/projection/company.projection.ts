@@ -28,6 +28,10 @@ import {
   CompanyMemberAddedEventData,
   CompanyMemberUpdatedEventData,
   CompanyMemberRemovedEventData,
+  CompanyDocumentAddedEventData,
+  CompanyDocumentRemovedEventData,
+  CompanyRatingUpdatedEventData,
+  CompanyStatusHistoryItem,
 } from '../../../domain/events/company.events';
 import { COMPANY_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
@@ -41,6 +45,9 @@ type CompanyEventPayload = EventPayload<
   | CompanyMemberAddedEventData
   | CompanyMemberUpdatedEventData
   | CompanyMemberRemovedEventData
+  | CompanyDocumentAddedEventData
+  | CompanyDocumentRemovedEventData
+  | CompanyRatingUpdatedEventData
   | Record<string, unknown>
 >;
 
@@ -134,6 +141,21 @@ export class CompanyProjection extends BaseProjection<
           event as EventPayload<CompanyMemberRemovedEventData>
         );
         break;
+      case COMPANY_EVENT_TYPES.DOCUMENT_ADDED:
+        await this.onDocumentAdded(
+          event as EventPayload<CompanyDocumentAddedEventData>
+        );
+        break;
+      case COMPANY_EVENT_TYPES.DOCUMENT_REMOVED:
+        await this.onDocumentRemoved(
+          event as EventPayload<CompanyDocumentRemovedEventData>
+        );
+        break;
+      case COMPANY_EVENT_TYPES.RATING_UPDATED:
+        await this.onRatingUpdated(
+          event as EventPayload<CompanyRatingUpdatedEventData>
+        );
+        break;
       case COMPANY_EVENT_TYPES.DELETED:
         await this.onCompanyDeleted(event);
         break;
@@ -147,6 +169,15 @@ export class CompanyProjection extends BaseProjection<
     await this.applyEvent(payload);
   }
 
+  private generateCompanyUniqueId(name: string): string {
+    const slug = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const random = Math.random().toString(36).substring(2, 8);
+    return `${slug}-${random}`;
+  }
+
   private async onCompanyCreated(
     event: EventPayload<CompanyCreatedEventData>
   ): Promise<void> {
@@ -154,23 +185,34 @@ export class CompanyProjection extends BaseProjection<
     this.checkCreateIdempotency(existing, event);
 
     const { data } = event;
+    const initialStatusHistory: CompanyStatusHistoryItem[] = [
+      {
+        status: 'ACTIVE',
+        changedAt: event.occurredAt,
+      },
+    ];
+
     await this.companyRepo.save({
       id: event.aggregateId,
       ownerId: data.ownerId,
-      name: data.name,
-      type: data.type,
-      status: 'PENDING',
-      description: data.description,
-      logo: data.logo,
-      phone: data.phone,
+      companyUniqueId: this.generateCompanyUniqueId(data.companyName || 'company'),
+      companyName: data.companyName || '',
+      companyTypeId: data.companyTypeId,
+      companyDescription: data.companyDescription,
+      avatar: data.avatar,
+      phoneNumber: data.phoneNumber,
       email: data.email,
-      address: data.address,
-      country: data.country,
+      countryId: data.countryId,
       city: data.city,
-      taxId: data.taxId,
-      website: data.website,
+      dotMc: data.dotMc,
+      status: 'ACTIVE',
+      statusHistory: initialStatusHistory,
+      verifyStatus: 'PENDING',
+      isLegalEntity: data.isLegalEntity ?? true,
+      rating: 0,
+      countRatings: 0,
+      documents: data.documents || [],
       members: [],
-      isActive: true,
       version: event.version,
       createdAt: new Date(event.occurredAt),
       updatedAt: new Date(event.occurredAt),
@@ -187,24 +229,47 @@ export class CompanyProjection extends BaseProjection<
   }
 
   private async onCompanyUpdated(
-    event: EventPayload<CompanyUpdatedEventData>
+    event: EventPayload<CompanyUpdatedEventData & { resetVerification?: boolean }>
   ): Promise<void> {
     const existing = await this.companyRepo.findById(event.aggregateId);
     this.checkVersion(existing, event);
 
     const { data } = event;
+    let statusHistory = existing!.statusHistory || [];
+    let verifyStatus = existing!.verifyStatus;
+
+    // Handle status change
+    if (data.status !== undefined && data.status !== existing!.status) {
+      statusHistory = [
+        ...statusHistory,
+        {
+          status: data.status,
+          reason: data.statusReason,
+          changedAt: event.occurredAt,
+        },
+      ];
+    }
+
+    // Reset verification if key fields changed
+    if (data.resetVerification) {
+      verifyStatus = 'PENDING';
+    }
+
     await this.companyRepo.save({
       ...existing!,
-      ...(data.name !== undefined && { name: data.name }),
-      ...(data.description !== undefined && { description: data.description }),
-      ...(data.logo !== undefined && { logo: data.logo }),
-      ...(data.phone !== undefined && { phone: data.phone }),
+      ...(data.companyName !== undefined && { companyName: data.companyName }),
+      ...(data.companyTypeId !== undefined && { companyTypeId: data.companyTypeId }),
+      ...(data.companyDescription !== undefined && { companyDescription: data.companyDescription }),
+      ...(data.avatar !== undefined && { avatar: data.avatar }),
+      ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
       ...(data.email !== undefined && { email: data.email }),
-      ...(data.address !== undefined && { address: data.address }),
-      ...(data.country !== undefined && { country: data.country }),
+      ...(data.countryId !== undefined && { countryId: data.countryId }),
       ...(data.city !== undefined && { city: data.city }),
-      ...(data.taxId !== undefined && { taxId: data.taxId }),
-      ...(data.website !== undefined && { website: data.website }),
+      ...(data.dotMc !== undefined && { dotMc: data.dotMc }),
+      ...(data.isLegalEntity !== undefined && { isLegalEntity: data.isLegalEntity }),
+      ...(data.status !== undefined && { status: data.status }),
+      statusHistory,
+      verifyStatus,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
@@ -218,7 +283,7 @@ export class CompanyProjection extends BaseProjection<
 
     await this.companyRepo.save({
       ...existing!,
-      status: 'VERIFIED',
+      verifyStatus: 'VERIFIED',
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
@@ -232,8 +297,7 @@ export class CompanyProjection extends BaseProjection<
 
     await this.companyRepo.save({
       ...existing!,
-      status: 'REJECTED',
-      isActive: false,
+      verifyStatus: 'REJECTED',
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
@@ -245,10 +309,21 @@ export class CompanyProjection extends BaseProjection<
     const existing = await this.companyRepo.findById(event.aggregateId);
     this.checkVersion(existing, event);
 
+    const { data } = event;
+    const statusHistory = [
+      ...(existing!.statusHistory || []),
+      {
+        status: 'BLOCKED' as const,
+        reason: data.reason,
+        changedAt: event.occurredAt,
+        changedBy: data.suspendedBy,
+      },
+    ];
+
     await this.companyRepo.save({
       ...existing!,
-      status: 'SUSPENDED',
-      isActive: false,
+      status: 'BLOCKED',
+      statusHistory,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
@@ -260,10 +335,20 @@ export class CompanyProjection extends BaseProjection<
     const existing = await this.companyRepo.findById(event.aggregateId);
     this.checkVersion(existing, event);
 
+    const { data } = event;
+    const statusHistory = [
+      ...(existing!.statusHistory || []),
+      {
+        status: 'ACTIVE' as const,
+        changedAt: event.occurredAt,
+        changedBy: data.reactivatedBy,
+      },
+    ];
+
     await this.companyRepo.save({
       ...existing!,
-      status: 'VERIFIED',
-      isActive: true,
+      status: 'ACTIVE',
+      statusHistory,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });
@@ -325,6 +410,66 @@ export class CompanyProjection extends BaseProjection<
     // Update version
     await this.companyRepo.save({
       ...existing!,
+      version: event.version,
+      updatedAt: new Date(event.occurredAt),
+    });
+  }
+
+  private async onDocumentAdded(
+    event: EventPayload<CompanyDocumentAddedEventData>
+  ): Promise<void> {
+    const existing = await this.companyRepo.findById(event.aggregateId);
+    this.checkVersion(existing, event);
+
+    const { data } = event;
+    const documents = [
+      ...(existing!.documents || []),
+      {
+        id: data.documentId,
+        type: data.type,
+        url: data.url,
+        addedAt: event.occurredAt,
+      },
+    ];
+
+    await this.companyRepo.save({
+      ...existing!,
+      documents,
+      version: event.version,
+      updatedAt: new Date(event.occurredAt),
+    });
+  }
+
+  private async onDocumentRemoved(
+    event: EventPayload<CompanyDocumentRemovedEventData>
+  ): Promise<void> {
+    const existing = await this.companyRepo.findById(event.aggregateId);
+    this.checkVersion(existing, event);
+
+    const { data } = event;
+    const documents = (existing!.documents || []).filter(
+      (doc) => doc.id !== data.documentId
+    );
+
+    await this.companyRepo.save({
+      ...existing!,
+      documents,
+      version: event.version,
+      updatedAt: new Date(event.occurredAt),
+    });
+  }
+
+  private async onRatingUpdated(
+    event: EventPayload<CompanyRatingUpdatedEventData>
+  ): Promise<void> {
+    const existing = await this.companyRepo.findById(event.aggregateId);
+    this.checkVersion(existing, event);
+
+    const { data } = event;
+    await this.companyRepo.save({
+      ...existing!,
+      rating: data.rating,
+      countRatings: data.countRatings,
       version: event.version,
       updatedAt: new Date(event.occurredAt),
     });

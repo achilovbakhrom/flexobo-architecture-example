@@ -11,6 +11,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { enableGracefulShutdown } from '@flexobo/core';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 import { FileModule } from './file.module';
 
 async function bootstrap() {
@@ -38,6 +39,9 @@ async function bootstrap() {
       whitelist: true,
     })
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   app.setGlobalPrefix(globalPrefix);
 

@@ -1,5 +1,6 @@
 import { Inject, NotFoundException } from '@nestjs/common';
 import { ICommand, ICommandHandler, CommandHandler, Result, Success, Failure } from '@flexobo/core';
+import { CompanyStatus } from '../../../domain/events/company.events';
 import {
   ICompanyAggregateStore,
   COMPANY_AGGREGATE_STORE,
@@ -9,16 +10,18 @@ export class UpdateCompanyCommand implements ICommand {
   constructor(
     public readonly companyId: string,
     public readonly userId: string,
-    public readonly name?: string,
-    public readonly description?: string,
-    public readonly logo?: string,
-    public readonly phone?: string,
+    public readonly companyName?: string,
+    public readonly companyTypeId?: string,
+    public readonly companyDescription?: string,
+    public readonly avatar?: string,
+    public readonly phoneNumber?: string,
     public readonly email?: string,
-    public readonly address?: string,
-    public readonly country?: string,
+    public readonly countryId?: string,
     public readonly city?: string,
-    public readonly taxId?: string,
-    public readonly website?: string
+    public readonly dotMc?: string,
+    public readonly isLegalEntity?: boolean,
+    public readonly status?: CompanyStatus,
+    public readonly statusReason?: string
   ) {}
 }
 
@@ -39,16 +42,18 @@ export class UpdateCompanyHandler implements ICommandHandler<UpdateCompanyComman
 
       company.update(
         {
-          name: command.name,
-          description: command.description,
-          logo: command.logo,
-          phone: command.phone,
+          companyName: command.companyName,
+          companyTypeId: command.companyTypeId,
+          companyDescription: command.companyDescription,
+          avatar: command.avatar,
+          phoneNumber: command.phoneNumber,
           email: command.email,
-          address: command.address,
-          country: command.country,
+          countryId: command.countryId,
           city: command.city,
-          taxId: command.taxId,
-          website: command.website,
+          dotMc: command.dotMc,
+          isLegalEntity: command.isLegalEntity,
+          status: command.status,
+          statusReason: command.statusReason,
         },
         command.userId
       );

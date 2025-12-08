@@ -1,6 +1,22 @@
-import { IsString, IsOptional } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
+
+export enum USER_LANGS {
+  UZ = 'uz',
+  RU = 'ru',
+  EN = 'en',
+}
+
+export class UpdateUserLanguageDto {
+  @ApiProperty({
+    example: 'en',
+    description: 'Language code (en, ru, uz)',
+    enum: USER_LANGS,
+  })
+  @IsEnum(USER_LANGS)
+  lang!: USER_LANGS;
+}
 
 export class UpdateUserDto {
   @ApiPropertyOptional({

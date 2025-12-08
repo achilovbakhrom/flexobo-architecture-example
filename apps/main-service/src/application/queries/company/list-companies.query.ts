@@ -6,16 +6,16 @@ import {
   CompanyReadDto,
   CompanyFilters,
 } from '../../../ports/company.repository';
-import { CompanyType, CompanyStatus } from '../../../domain/events/company.events';
+import { CompanyStatus, CompanyVerifyStatus } from '../../../domain/events/company.events';
 
 export class ListCompaniesQuery implements IQuery {
   constructor(
     public readonly filters: {
       status?: CompanyStatus;
-      type?: CompanyType;
-      country?: string;
+      verifyStatus?: CompanyVerifyStatus;
+      companyTypeId?: string;
+      countryId?: string;
       city?: string;
-      isActive?: boolean;
       search?: string;
     } = {},
     public readonly page: number = 1,
