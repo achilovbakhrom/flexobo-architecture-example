@@ -2,10 +2,13 @@ import { AggregateRoot, DomainEvent } from '@flexobo/core';
 import { v4 as uuidv4 } from 'uuid';
 import {
   COMPANY_EVENT_TYPES,
-  CompanyType,
   CompanyStatus,
+  CompanyVerifyStatus,
   CompanyMemberRole,
   CompanyMemberData,
+  CompanyDocumentData,
+  CompanyStatusHistoryItem,
+  CompanyDocumentType,
   CompanyCreatedEventData,
   CompanyUpdatedEventData,
   CompanyVerifiedEventData,
@@ -16,44 +19,67 @@ import {
   CompanyMemberUpdatedEventData,
   CompanyMemberRemovedEventData,
   CompanyDeletedEventData,
+  CompanyDocumentAddedEventData,
+  CompanyDocumentRemovedEventData,
+  CompanyRatingUpdatedEventData,
 } from '../events/company.events';
+
+// Helper to generate company unique ID from name
+function generateCompanyUniqueId(name: string): string {
+  const slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  const random = Math.random().toString(36).substring(2, 8);
+  return `${slug}-${random}`;
+}
 
 export interface CompanyState {
   ownerId: string;
-  name: string;
-  type: CompanyType;
-  status: CompanyStatus;
-  description?: string;
-  logo?: string;
-  phone?: string;
+  companyUniqueId: string;
+  companyName: string;
+  companyTypeId: string;
+  companyDescription?: string;
+  avatar?: string;
+  phoneNumber?: string;
   email?: string;
-  address?: string;
-  country?: string;
+  countryId?: string;
   city?: string;
-  taxId?: string;
-  website?: string;
+  dotMc?: string;
+  status: CompanyStatus;
+  statusHistory: CompanyStatusHistoryItem[];
+  verifyStatus: CompanyVerifyStatus;
+  isLegalEntity: boolean;
+  rating: number;
+  countRatings: number;
+  documents: CompanyDocumentData[];
   members: CompanyMemberData[];
-  isActive: boolean;
   isDeleted: boolean;
+  createdAt: string;
 }
 
 export class Company extends AggregateRoot {
   private ownerId!: string;
-  private name!: string;
-  private type!: CompanyType;
-  private status: CompanyStatus = 'PENDING';
-  private description?: string;
-  private logo?: string;
-  private phone?: string;
+  private companyUniqueId!: string;
+  private companyName!: string;
+  private companyTypeId!: string;
+  private companyDescription?: string;
+  private avatar?: string;
+  private phoneNumber?: string;
   private email?: string;
-  private address?: string;
-  private country?: string;
+  private countryId?: string;
   private city?: string;
-  private taxId?: string;
-  private website?: string;
+  private dotMc?: string;
+  private status: CompanyStatus = 'ACTIVE';
+  private statusHistory: CompanyStatusHistoryItem[] = [];
+  private verifyStatus: CompanyVerifyStatus = 'PENDING';
+  private isLegalEntity = true;
+  private rating = 0;
+  private countRatings = 0;
+  private documents: CompanyDocumentData[] = [];
   private members: CompanyMemberData[] = [];
-  private isActive = true;
   private isDeleted = false;
+  private createdAt!: string;
 
   static create(companyId: string, data: CompanyCreatedEventData): Company {
     const company = new Company(companyId);
@@ -77,14 +103,25 @@ export class Company extends AggregateRoot {
     if (!this.canUserManage(userId)) {
       throw new Error('Only owner or admin can update company');
     }
-    const event = this.createEvent(COMPANY_EVENT_TYPES.UPDATED, data);
+
+    // If company is verified and key fields change, reset to pending
+    const shouldResetVerification =
+      this.verifyStatus === 'VERIFIED' &&
+      (data.companyName !== undefined ||
+        data.companyTypeId !== undefined ||
+        data.dotMc !== undefined);
+
+    const event = this.createEvent(COMPANY_EVENT_TYPES.UPDATED, {
+      ...data,
+      resetVerification: shouldResetVerification,
+    });
     this.addEvent(event);
     this.apply(event);
   }
 
   verify(verifiedBy: string, notes?: string): void {
     if (this.isDeleted) throw new Error('Cannot verify deleted company');
-    if (this.status === 'VERIFIED')
+    if (this.verifyStatus === 'VERIFIED')
       throw new Error('Company is already verified');
     const event = this.createEvent<
       typeof COMPANY_EVENT_TYPES.VERIFIED,
@@ -100,7 +137,7 @@ export class Company extends AggregateRoot {
 
   reject(rejectedBy: string, reason: string): void {
     if (this.isDeleted) throw new Error('Cannot reject deleted company');
-    if (this.status === 'REJECTED')
+    if (this.verifyStatus === 'REJECTED')
       throw new Error('Company is already rejected');
     const event = this.createEvent<
       typeof COMPANY_EVENT_TYPES.REJECTED,
@@ -116,8 +153,8 @@ export class Company extends AggregateRoot {
 
   suspend(suspendedBy: string, reason: string): void {
     if (this.isDeleted) throw new Error('Cannot suspend deleted company');
-    if (this.status === 'SUSPENDED')
-      throw new Error('Company is already suspended');
+    if (this.status === 'BLOCKED')
+      throw new Error('Company is already blocked');
     const event = this.createEvent<
       typeof COMPANY_EVENT_TYPES.SUSPENDED,
       CompanySuspendedEventData
@@ -132,14 +169,75 @@ export class Company extends AggregateRoot {
 
   reactivate(reactivatedBy: string): void {
     if (this.isDeleted) throw new Error('Cannot reactivate deleted company');
-    if (this.status !== 'SUSPENDED')
-      throw new Error('Only suspended companies can be reactivated');
+    if (this.status === 'ACTIVE')
+      throw new Error('Company is already active');
     const event = this.createEvent<
       typeof COMPANY_EVENT_TYPES.REACTIVATED,
       CompanyReactivatedEventData
     >(COMPANY_EVENT_TYPES.REACTIVATED, {
       reactivatedAt: new Date().toISOString(),
       reactivatedBy,
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  addDocument(
+    type: CompanyDocumentType,
+    url: string,
+    addedBy: string
+  ): string {
+    if (this.isDeleted) throw new Error('Cannot add document to deleted company');
+    if (!this.canUserManage(addedBy)) {
+      throw new Error('Only owner or admin can add documents');
+    }
+
+    const documentId = uuidv4();
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.DOCUMENT_ADDED,
+      CompanyDocumentAddedEventData
+    >(COMPANY_EVENT_TYPES.DOCUMENT_ADDED, {
+      documentId,
+      type,
+      url,
+      addedBy,
+    });
+    this.addEvent(event);
+    this.apply(event);
+    return documentId;
+  }
+
+  removeDocument(documentId: string, removedBy: string): void {
+    if (this.isDeleted)
+      throw new Error('Cannot remove document from deleted company');
+    if (!this.canUserManage(removedBy)) {
+      throw new Error('Only owner or admin can remove documents');
+    }
+
+    const document = this.documents.find((d) => d.id === documentId);
+    if (!document) {
+      throw new Error('Document not found');
+    }
+
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.DOCUMENT_REMOVED,
+      CompanyDocumentRemovedEventData
+    >(COMPANY_EVENT_TYPES.DOCUMENT_REMOVED, {
+      documentId,
+      removedBy,
+    });
+    this.addEvent(event);
+    this.apply(event);
+  }
+
+  updateRating(rating: number, countRatings: number): void {
+    if (this.isDeleted) throw new Error('Cannot update rating of deleted company');
+    const event = this.createEvent<
+      typeof COMPANY_EVENT_TYPES.RATING_UPDATED,
+      CompanyRatingUpdatedEventData
+    >(COMPANY_EVENT_TYPES.RATING_UPDATED, {
+      rating,
+      countRatings,
     });
     this.addEvent(event);
     this.apply(event);
@@ -253,21 +351,26 @@ export class Company extends AggregateRoot {
   getState(): CompanyState {
     return {
       ownerId: this.ownerId,
-      name: this.name,
-      type: this.type,
-      status: this.status,
-      description: this.description,
-      logo: this.logo,
-      phone: this.phone,
+      companyUniqueId: this.companyUniqueId,
+      companyName: this.companyName,
+      companyTypeId: this.companyTypeId,
+      companyDescription: this.companyDescription,
+      avatar: this.avatar,
+      phoneNumber: this.phoneNumber,
       email: this.email,
-      address: this.address,
-      country: this.country,
+      countryId: this.countryId,
       city: this.city,
-      taxId: this.taxId,
-      website: this.website,
+      dotMc: this.dotMc,
+      status: this.status,
+      statusHistory: [...this.statusHistory],
+      verifyStatus: this.verifyStatus,
+      isLegalEntity: this.isLegalEntity,
+      rating: this.rating,
+      countRatings: this.countRatings,
+      documents: this.documents.map((d) => ({ ...d })),
       members: this.members.filter((m) => m.isActive).map((m) => ({ ...m })),
-      isActive: this.isActive,
       isDeleted: this.isDeleted,
+      createdAt: this.createdAt,
     };
   }
 
@@ -291,22 +394,28 @@ export class Company extends AggregateRoot {
         this.applyCreated(event.data as CompanyCreatedEventData);
         break;
       case COMPANY_EVENT_TYPES.UPDATED:
-        this.applyUpdated(event.data as CompanyUpdatedEventData);
+        this.applyUpdated(event.data as CompanyUpdatedEventData & { resetVerification?: boolean });
         break;
       case COMPANY_EVENT_TYPES.VERIFIED:
-        this.status = 'VERIFIED';
+        this.verifyStatus = 'VERIFIED';
         break;
       case COMPANY_EVENT_TYPES.REJECTED:
-        this.status = 'REJECTED';
-        this.isActive = false;
+        this.verifyStatus = 'REJECTED';
         break;
       case COMPANY_EVENT_TYPES.SUSPENDED:
-        this.status = 'SUSPENDED';
-        this.isActive = false;
+        this.applyStatusChange('BLOCKED', (event.data as CompanySuspendedEventData).reason);
         break;
       case COMPANY_EVENT_TYPES.REACTIVATED:
-        this.status = 'VERIFIED';
-        this.isActive = true;
+        this.applyStatusChange('ACTIVE');
+        break;
+      case COMPANY_EVENT_TYPES.DOCUMENT_ADDED:
+        this.applyDocumentAdded(event.data as CompanyDocumentAddedEventData);
+        break;
+      case COMPANY_EVENT_TYPES.DOCUMENT_REMOVED:
+        this.applyDocumentRemoved(event.data as CompanyDocumentRemovedEventData);
+        break;
+      case COMPANY_EVENT_TYPES.RATING_UPDATED:
+        this.applyRatingUpdated(event.data as CompanyRatingUpdatedEventData);
         break;
       case COMPANY_EVENT_TYPES.MEMBER_ADDED:
         this.applyMemberAdded(event.data as CompanyMemberAddedEventData);
@@ -319,26 +428,48 @@ export class Company extends AggregateRoot {
         break;
       case COMPANY_EVENT_TYPES.DELETED:
         this.isDeleted = true;
-        this.isActive = false;
+        this.applyStatusChange('INACTIVE');
         break;
     }
   }
 
   private applyCreated(data: CompanyCreatedEventData): void {
     this.ownerId = data.ownerId;
-    this.name = data.name;
-    this.type = data.type;
-    this.status = 'PENDING';
-    this.description = data.description;
-    this.logo = data.logo;
-    this.phone = data.phone;
+    this.companyName = data.companyName;
+    this.companyUniqueId = generateCompanyUniqueId(data.companyName);
+    this.companyTypeId = data.companyTypeId;
+    this.companyDescription = data.companyDescription;
+    this.avatar = data.avatar;
+    this.phoneNumber = data.phoneNumber;
     this.email = data.email;
-    this.address = data.address;
-    this.country = data.country;
+    this.countryId = data.countryId;
     this.city = data.city;
-    this.taxId = data.taxId;
-    this.website = data.website;
-    this.isActive = true;
+    this.dotMc = data.dotMc;
+    this.isLegalEntity = data.isLegalEntity ?? true;
+    this.status = 'ACTIVE';
+    this.verifyStatus = 'PENDING';
+    this.rating = 0;
+    this.countRatings = 0;
+    this.createdAt = new Date().toISOString();
+
+    // Initialize status history
+    this.statusHistory = [
+      {
+        status: 'ACTIVE',
+        changedAt: this.createdAt,
+      },
+    ];
+
+    // Initialize documents if provided
+    if (data.documents) {
+      this.documents = data.documents.map((doc) => ({
+        ...doc,
+        id: doc.id || uuidv4(),
+        addedAt: doc.addedAt || this.createdAt,
+      }));
+    } else {
+      this.documents = [];
+    }
 
     // Add owner as first member
     const ownerMemberId = uuidv4();
@@ -348,22 +479,59 @@ export class Company extends AggregateRoot {
         userId: data.ownerId,
         role: 'OWNER',
         isActive: true,
-        joinedAt: new Date().toISOString(),
+        joinedAt: this.createdAt,
       },
     ];
   }
 
-  private applyUpdated(data: CompanyUpdatedEventData): void {
-    if (data.name !== undefined) this.name = data.name;
-    if (data.description !== undefined) this.description = data.description;
-    if (data.logo !== undefined) this.logo = data.logo;
-    if (data.phone !== undefined) this.phone = data.phone;
+  private applyUpdated(data: CompanyUpdatedEventData & { resetVerification?: boolean }): void {
+    if (data.companyName !== undefined) this.companyName = data.companyName;
+    if (data.companyTypeId !== undefined) this.companyTypeId = data.companyTypeId;
+    if (data.companyDescription !== undefined) this.companyDescription = data.companyDescription;
+    if (data.avatar !== undefined) this.avatar = data.avatar;
+    if (data.phoneNumber !== undefined) this.phoneNumber = data.phoneNumber;
     if (data.email !== undefined) this.email = data.email;
-    if (data.address !== undefined) this.address = data.address;
-    if (data.country !== undefined) this.country = data.country;
+    if (data.countryId !== undefined) this.countryId = data.countryId;
     if (data.city !== undefined) this.city = data.city;
-    if (data.taxId !== undefined) this.taxId = data.taxId;
-    if (data.website !== undefined) this.website = data.website;
+    if (data.dotMc !== undefined) this.dotMc = data.dotMc;
+    if (data.isLegalEntity !== undefined) this.isLegalEntity = data.isLegalEntity;
+
+    // Handle status change
+    if (data.status !== undefined && data.status !== this.status) {
+      this.applyStatusChange(data.status, data.statusReason);
+    }
+
+    // Reset verification if key fields changed
+    if (data.resetVerification) {
+      this.verifyStatus = 'PENDING';
+    }
+  }
+
+  private applyStatusChange(newStatus: CompanyStatus, reason?: string): void {
+    this.status = newStatus;
+    this.statusHistory.push({
+      status: newStatus,
+      reason,
+      changedAt: new Date().toISOString(),
+    });
+  }
+
+  private applyDocumentAdded(data: CompanyDocumentAddedEventData): void {
+    this.documents.push({
+      id: data.documentId,
+      type: data.type,
+      url: data.url,
+      addedAt: new Date().toISOString(),
+    });
+  }
+
+  private applyDocumentRemoved(data: CompanyDocumentRemovedEventData): void {
+    this.documents = this.documents.filter((d) => d.id !== data.documentId);
+  }
+
+  private applyRatingUpdated(data: CompanyRatingUpdatedEventData): void {
+    this.rating = data.rating;
+    this.countRatings = data.countRatings;
   }
 
   private applyMemberAdded(data: CompanyMemberAddedEventData): void {

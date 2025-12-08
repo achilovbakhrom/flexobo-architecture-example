@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 
 import { UsersModule } from './users.module';
 
@@ -11,9 +12,7 @@ async function bootstrap() {
   const logger = new Logger('UsersService');
 
   const isDev = process.env.MODE !== 'prod';
-  console.log(`Running in ${isDev ? 'development' : 'production'} mode`);
 
-  // if (!isDev) {
   app.enableCors({
     origin: isDev
       ? [
@@ -31,7 +30,6 @@ async function bootstrap() {
     preflightContinue: false,
     optionsSuccessStatus: 204,
   });
-  // }
 
   // Validation pipe
   app.useGlobalPipes(
@@ -41,6 +39,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   // Swagger setup
   const config = new DocumentBuilder()

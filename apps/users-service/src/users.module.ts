@@ -12,6 +12,8 @@ import {
 } from '@flexobo/core';
 import { PrismaModule } from './prisma.module';
 import { AuthController } from './adapters/http/v1/auth.controller';
+import { RoleController } from './adapters/http/v1/role.controller';
+import { UsersController } from './adapters/http/v1/users.controller';
 import { UsersGrpcController } from './adapters/grpc/users.grpc.controller';
 import { JwtAuthGuard } from './adapters/http/guards';
 import configuration from './config/configuration';
@@ -193,7 +195,7 @@ const QueryHandlers = [
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, UsersGrpcController],
+  controllers: [AuthController, RoleController, UsersController, UsersGrpcController],
   providers: [
     // Port implementations
     {

@@ -36,6 +36,7 @@ export class UserNotificationResolver
         return this.onGoogleLinked(event);
       case EVENT_TYPES.USER.PROFILE_UPDATED:
       case EVENT_TYPES.USER.LOGGED_IN:
+        return this.onLoggedIn(event);
       case EVENT_TYPES.USER.LOGGED_OUT:
       case EVENT_TYPES.USER.OTP_REQUESTED:
       case EVENT_TYPES.USER.OTP_USED:
@@ -153,6 +154,25 @@ export class UserNotificationResolver
         severity: NotificationSeverity.Success,
         title: 'Google Linked',
         body: 'Your Google account has been linked successfully',
+        data: {
+          userId: event.aggregateId,
+        },
+      },
+      correlationId: event.metadata?.['correlationId'] as string,
+    };
+  }
+
+  private onLoggedIn(event: UserEventPayload): NotificationIntent {
+    return {
+      target: NotificationTarget.User,
+      userIds: [event.aggregateId],
+      channels: [NotificationChannel.Sse],
+      payload: {
+        type: NotificationType.User,
+        category: NotificationCategory.System,
+        severity: NotificationSeverity.Info,
+        title: 'Logged In',
+        body: 'You have logged in successfully',
         data: {
           userId: event.aggregateId,
         },

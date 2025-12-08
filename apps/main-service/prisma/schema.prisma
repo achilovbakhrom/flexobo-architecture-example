@@ -313,23 +313,37 @@ model BoardReadModel {
 
 // ============ COMPANY ============
 
-model CompanyReadModel {
-  id          String  @id
-  ownerId     String
-  name        String
-  type        String  // LOGISTICS, CARRIER, FORWARDER, BROKER, SHIPPER
-  status      String  @default("PENDING") // PENDING, VERIFIED, REJECTED, SUSPENDED
-  description String?
-  logo        String?
-  phone       String?
-  email       String?
-  address     String?
-  country     String?
-  city        String?
-  taxId       String?
-  website     String?
+model CompanyTypeReadModel {
+  id          String   @id @default(uuid())
+  name        Json     // { en: "...", ru: "...", uz: "..." }
+  description Json?    // { en: "...", ru: "...", uz: "..." }
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  isActive Boolean @default(true)
+  @@map("company_types")
+}
+
+model CompanyReadModel {
+  id                 String  @id
+  ownerId            String
+  companyUniqueId    String  @unique
+  companyName        String
+  companyTypeId      String  // Reference to CompanyTypeReadModel
+  companyDescription String?
+  avatar             String?
+  phoneNumber        String?
+  email              String?
+  countryId          String? // Reference to CountryReadModel
+  city               String?
+  dotMc              String? // DOT/MC number for carriers
+  status             String  @default("ACTIVE") // ACTIVE, INACTIVE, BLOCKED
+  statusHistory      Json    @default("[]") // Array of { status, reason, changedAt, changedBy }
+  verifyStatus       String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  isLegalEntity      Boolean @default(true)
+  rating             Float   @default(0)
+  countRatings       Int     @default(0)
+  documents          Json    @default("[]") // Array of { id, type, url, addedAt }
 
   version   Int      @default(1)
   createdAt DateTime @default(now())
@@ -337,8 +351,10 @@ model CompanyReadModel {
 
   @@index([ownerId])
   @@index([status])
-  @@index([type])
-  @@index([country, city])
+  @@index([verifyStatus])
+  @@index([companyTypeId])
+  @@index([countryId])
+  @@index([city])
   @@map("companies")
 }
 
@@ -394,7 +410,7 @@ model LanguageReadModel {
 model CountryReadModel {
   id           String  @id @default(uuid())
   code         String  @unique // ISO 3166-1 alpha-2
-  name         String
+  name         Json    // { en: "...", ru: "...", uz: "..." } - multilingual
   currencyCode String?
   phoneCode    String?
   isActive     Boolean @default(true)
