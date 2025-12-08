@@ -24,6 +24,8 @@ interface ConnectionInfo {
   connectedAt: Date;
   heartbeatInterval: NodeJS.Timeout;
   maxDurationTimeout: NodeJS.Timeout;
+  isAuthenticated: boolean;
+  userId: string | null; // Actual user ID if authenticated
 }
 
 // Max connection duration: 4 hours (client should auto-reconnect)
@@ -99,16 +101,21 @@ export class SSEManagerService
     this.logger.log('All SSE connections closed');
   }
 
-  addConnection(userId: string, response: Response): boolean {
-    const existingConnection = this.connections.get(userId);
+  addConnection(
+    connectionId: string,
+    response: Response,
+    isAuthenticated = false,
+    userId: string | null = null
+  ): boolean {
+    const existingConnection = this.connections.get(connectionId);
     let replacedExisting = false;
 
-    // If user already has a connection, close it gracefully
+    // If connection already exists, close it gracefully
     if (existingConnection) {
       this.logger.debug(
-        `Closing existing connection for user ${userId} (new connection)`
+        `Closing existing connection: ${connectionId} (new connection)`
       );
-      this.closeConnection(userId, existingConnection, {
+      this.closeConnection(connectionId, existingConnection, {
         reason: 'new_connection',
         message: 'New connection established from another client',
       });
@@ -117,49 +124,53 @@ export class SSEManagerService
 
     // Set up heartbeat interval
     const heartbeatInterval = setInterval(() => {
-      this.sendHeartbeat(userId, response);
+      this.sendHeartbeat(connectionId, response);
     }, HEARTBEAT_INTERVAL_MS);
 
     // Set up max duration timeout
     const maxDurationTimeout = setTimeout(() => {
       this.logger.debug(
-        `Max connection duration reached for user ${userId}, closing connection`
+        `Max connection duration reached for ${connectionId}, closing connection`
       );
-      const conn = this.connections.get(userId);
+      const conn = this.connections.get(connectionId);
       if (conn && conn.response === response) {
-        this.closeConnection(userId, conn, {
+        this.closeConnection(connectionId, conn, {
           reason: 'max_duration',
           message: 'Maximum connection duration reached, please reconnect',
         });
-        this.connections.delete(userId);
+        this.connections.delete(connectionId);
       }
     }, MAX_CONNECTION_DURATION_MS);
 
     // Store the connection info
-    this.connections.set(userId, {
+    this.connections.set(connectionId, {
       response,
       connectedAt: new Date(),
       heartbeatInterval,
       maxDurationTimeout,
+      isAuthenticated,
+      userId,
     });
 
     this.logger.debug(
-      `Added connection for user ${userId}. Total connections: ${this.connections.size}`
+      `Added connection: ${connectionId} (auth: ${isAuthenticated}, user: ${
+        userId || 'N/A'
+      }). Total: ${this.connections.size}`
     );
 
     return replacedExisting;
   }
 
-  removeConnection(userId: string, response: Response): void {
-    const connectionInfo = this.connections.get(userId);
+  removeConnection(connectionId: string, response: Response): void {
+    const connectionInfo = this.connections.get(connectionId);
 
     // Only remove if it's the same response object (prevent removing new connection)
     if (connectionInfo && connectionInfo.response === response) {
       this.cleanupConnection(connectionInfo);
-      this.connections.delete(userId);
+      this.connections.delete(connectionId);
 
       this.logger.debug(
-        `Removed connection for user ${userId}. Total connections: ${this.connections.size}`
+        `Removed connection: ${connectionId}. Total connections: ${this.connections.size}`
       );
     }
   }
@@ -171,7 +182,9 @@ export class SSEManagerService
   }
 
   async sendToUsers(userIds: string[], payload: SSEPayload): Promise<void> {
-    await Promise.all(userIds.map((userId) => this.sendToUser(userId, payload)));
+    await Promise.all(
+      userIds.map((userId) => this.sendToUser(userId, payload))
+    );
   }
 
   async broadcast(payload: SSEPayload): Promise<void> {
@@ -189,61 +202,95 @@ export class SSEManagerService
   }
 
   private sendToUserLocal(userId: string, payload: SSEPayload): void {
-    const connectionInfo = this.connections.get(userId);
+    // Find all connections for this user (supports multiple devices/tabs)
+    const userConnections: Array<{
+      connectionId: string;
+      info: ConnectionInfo;
+    }> = [];
 
-    if (!connectionInfo) {
+    for (const [connectionId, info] of this.connections) {
+      if (info.userId === userId && info.isAuthenticated) {
+        userConnections.push({ connectionId, info });
+      }
+    }
+
+    if (userConnections.length === 0) {
       return;
     }
 
     const data = `event: notification\ndata: ${JSON.stringify(payload)}\n\n`;
+    const brokenConnections: string[] = [];
 
-    try {
-      connectionInfo.response.write(data);
-    } catch (error) {
-      this.logger.error(`Error sending SSE to user ${userId}: ${error}`);
-      // Connection is broken, clean it up
-      this.cleanupConnection(connectionInfo);
-      this.connections.delete(userId);
+    // Send to all user's connections
+    for (const { connectionId, info } of userConnections) {
+      try {
+        info.response.write(data);
+      } catch (error) {
+        this.logger.error(
+          `Error sending SSE to user ${userId} (connection ${connectionId}): ${error}`
+        );
+        // Mark for cleanup
+        brokenConnections.push(connectionId);
+      }
     }
+
+    // Clean up broken connections
+    for (const connectionId of brokenConnections) {
+      const connectionInfo = this.connections.get(connectionId);
+      if (connectionInfo) {
+        this.cleanupConnection(connectionInfo);
+        this.connections.delete(connectionId);
+      }
+    }
+
+    this.logger.debug(
+      `Sent notification to user ${userId}: ${userConnections.length} connection(s), ${brokenConnections.length} failed`
+    );
   }
 
   private broadcastLocal(payload: SSEPayload): void {
     const data = `event: notification\ndata: ${JSON.stringify(payload)}\n\n`;
 
-    for (const [userId, connectionInfo] of this.connections) {
+    for (const [connectionId, connectionInfo] of this.connections) {
       try {
         connectionInfo.response.write(data);
       } catch (error) {
-        this.logger.error(`Error broadcasting SSE to user ${userId}: ${error}`);
+        this.logger.error(
+          `Error broadcasting SSE to connection ${connectionId}: ${error}`
+        );
         // Connection is broken, clean it up
         this.cleanupConnection(connectionInfo);
-        this.connections.delete(userId);
+        this.connections.delete(connectionId);
       }
     }
   }
 
-  private sendHeartbeat(userId: string, response: Response): void {
-    const connectionInfo = this.connections.get(userId);
+  private sendHeartbeat(connectionId: string, response: Response): void {
+    const connectionInfo = this.connections.get(connectionId);
 
-    // Verify the response is still the current one for this user
+    // Verify the response is still the current one for this connection
     if (!connectionInfo || connectionInfo.response !== response) {
       return;
     }
 
     try {
       response.write(
-        `event: heartbeat\ndata: ${JSON.stringify({ timestamp: Date.now() })}\n\n`
+        `event: heartbeat\ndata: ${JSON.stringify({
+          timestamp: Date.now(),
+        })}\n\n`
       );
     } catch (error) {
-      this.logger.error(`Error sending heartbeat to user ${userId}: ${error}`);
+      this.logger.error(
+        `Error sending heartbeat to connection ${connectionId}: ${error}`
+      );
       // Connection is broken, clean it up
       this.cleanupConnection(connectionInfo);
-      this.connections.delete(userId);
+      this.connections.delete(connectionId);
     }
   }
 
   private closeConnection(
-    userId: string,
+    connectionId: string,
     connectionInfo: ConnectionInfo,
     reason: DisconnectReason
   ): void {

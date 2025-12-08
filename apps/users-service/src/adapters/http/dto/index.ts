@@ -21,3 +21,6 @@ export * from './google.dto';
 
 // Profile DTOs
 export * from './profile.dto';
+
+// Role DTOs
+export * from './role.dto';

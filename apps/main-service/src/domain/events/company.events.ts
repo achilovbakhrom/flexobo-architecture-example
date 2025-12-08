@@ -9,11 +9,19 @@ export const COMPANY_EVENT_TYPES = {
   MEMBER_UPDATED: 'company.member_updated',
   MEMBER_REMOVED: 'company.member_removed',
   DELETED: 'company.deleted',
+  DOCUMENT_ADDED: 'company.document_added',
+  DOCUMENT_REMOVED: 'company.document_removed',
+  RATING_UPDATED: 'company.rating_updated',
 } as const;
 
-export type CompanyType = 'LOGISTICS' | 'CARRIER' | 'FORWARDER' | 'SHIPPER';
-export type CompanyStatus = 'PENDING' | 'VERIFIED' | 'REJECTED' | 'SUSPENDED';
+export type CompanyStatus = 'ACTIVE' | 'INACTIVE' | 'BLOCKED';
+export type CompanyVerifyStatus = 'PENDING' | 'VERIFIED' | 'REJECTED';
 export type CompanyMemberRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+export type CompanyDocumentType =
+  | 'CERTIFICATE'
+  | 'BUSINESS_ACTIVITY_LICENSE'
+  | 'DIRECTOR_PASSPORT'
+  | 'OTHER';
 
 export interface CompanyMemberData {
   id: string;
@@ -23,32 +31,48 @@ export interface CompanyMemberData {
   joinedAt: string;
 }
 
+export interface CompanyDocumentData {
+  id: string;
+  type: CompanyDocumentType;
+  url: string;
+  addedAt: string;
+}
+
+export interface CompanyStatusHistoryItem {
+  status: CompanyStatus;
+  reason?: string;
+  changedAt: string;
+  changedBy?: string;
+}
+
 export interface CompanyCreatedEventData extends Record<string, unknown> {
   ownerId: string;
-  name: string;
-  type: CompanyType;
-  description?: string;
-  logo?: string;
-  phone?: string;
+  companyName: string;
+  companyTypeId: string; // Reference to CompanyType entity
+  companyDescription?: string;
+  avatar?: string;
+  phoneNumber?: string;
   email?: string;
-  address?: string;
-  country?: string;
+  countryId?: string; // Reference to Country entity
   city?: string;
-  taxId?: string;
-  website?: string;
+  dotMc?: string; // DOT/MC number for carriers
+  isLegalEntity?: boolean;
+  documents?: CompanyDocumentData[];
 }
 
 export interface CompanyUpdatedEventData extends Record<string, unknown> {
-  name?: string;
-  description?: string;
-  logo?: string;
-  phone?: string;
+  companyName?: string;
+  companyTypeId?: string;
+  companyDescription?: string;
+  avatar?: string;
+  phoneNumber?: string;
   email?: string;
-  address?: string;
-  country?: string;
+  countryId?: string;
   city?: string;
-  taxId?: string;
-  website?: string;
+  dotMc?: string;
+  isLegalEntity?: boolean;
+  status?: CompanyStatus;
+  statusReason?: string;
 }
 
 export interface CompanyVerifiedEventData extends Record<string, unknown> {
@@ -97,4 +121,21 @@ export interface CompanyMemberRemovedEventData extends Record<string, unknown> {
 export interface CompanyDeletedEventData extends Record<string, unknown> {
   deletedAt: string;
   deletedBy: string;
+}
+
+export interface CompanyDocumentAddedEventData extends Record<string, unknown> {
+  documentId: string;
+  type: CompanyDocumentType;
+  url: string;
+  addedBy: string;
+}
+
+export interface CompanyDocumentRemovedEventData extends Record<string, unknown> {
+  documentId: string;
+  removedBy: string;
+}
+
+export interface CompanyRatingUpdatedEventData extends Record<string, unknown> {
+  rating: number;
+  countRatings: number;
 }

@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 
 import { UsersModule } from './users.module';
 
@@ -12,17 +13,23 @@ async function bootstrap() {
 
   const isDev = process.env.MODE !== 'prod';
 
-  // Enable CORS
-  app.enableCors(
-    isDev
-      ? {
-          origin: '*',
-          methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
-          preflightContinue: false,
-          optionsSuccessStatus: 204,
-        }
-      : undefined
-  );
+  app.enableCors({
+    origin: isDev
+      ? [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+        ]
+      : [
+          'https://app.flexobo.com',
+          'https://admin.flexobo.com',
+          'https://flexobo.com',
+        ],
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
 
   // Validation pipe
   app.useGlobalPipes(
@@ -32,6 +39,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   // Swagger setup
   const config = new DocumentBuilder()

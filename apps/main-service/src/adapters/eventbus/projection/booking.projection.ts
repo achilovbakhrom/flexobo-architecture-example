@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   IBookingReadRepository,
@@ -22,6 +25,7 @@ import {
   OwnerRatedEventData,
 } from '../../../domain/events/booking.events';
 import { BookingStatus } from '../../../domain/constants/enums';
+import { BOOKING_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type BookingEventPayload = EventPayload<
   | BookingCreatedEventData
@@ -43,9 +47,15 @@ export class BookingProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(BOOKING_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<BookingEventPayload> | null
   ) {
-    super(rabbitMQConsumer, BookingProjection.name, eventBuffer);
+    super(rabbitMQConsumer, BookingProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

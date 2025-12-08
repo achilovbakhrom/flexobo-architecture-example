@@ -1,0 +1,141 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: flexobo
+type: Opaque
+stringData:
+  REDIS_PASSWORD: flexobo-redis-pass
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: flexobo
+data:
+  redis.conf: |
+    # Redis Configuration
+    bind 0.0.0.0
+    port 6379
+
+    # Security
+    requirepass flexobo-redis-pass
+
+    # Memory management
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+
+    # Persistence (disable for cache-only usage)
+    save ""
+    appendonly no
+
+    # Logging
+    loglevel notice
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-headless
+  namespace: flexobo
+  labels:
+    app: redis
+spec:
+  clusterIP: None
+  ports:
+    - port: 6379
+      name: redis
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: flexobo
+  labels:
+    app: redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+      name: redis
+  selector:
+    app: redis
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: flexobo
+  labels:
+    app: redis
+spec:
+  serviceName: redis-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - redis-server
+            - /etc/redis/redis.conf
+          ports:
+            - containerPort: 6379
+              name: redis
+          envFrom:
+            - secretRef:
+                name: redis-secret
+          volumeMounts:
+            - name: config
+              mountPath: /etc/redis
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
+          readinessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - redis-cli
+                - -a
+                - $(REDIS_PASSWORD)
+                - ping
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: redis-config
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3
+        resources:
+          requests:
+            storage: 5Gi

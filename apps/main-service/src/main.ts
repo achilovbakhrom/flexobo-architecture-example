@@ -2,7 +2,10 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MainModule } from './main.module';
-import { TransformResponseInterceptor } from '@flexobo/shared-kernel';
+import {
+  TransformResponseInterceptor,
+  SnakeCaseInterceptor,
+} from '@flexobo/shared-kernel';
 
 async function bootstrap() {
   const app = await NestFactory.create(MainModule);
@@ -10,6 +13,28 @@ async function bootstrap() {
   // Global prefix
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
+
+  const isDev = process.env.MODE !== 'prod';
+
+  console.log('------------isDev 2--------', isDev);
+
+  app.enableCors({
+    origin: isDev
+      ? [
+          'http://localhost:3000',
+          'http://localhost:3001',
+          'http://localhost:5173',
+        ]
+      : [
+          'https://app.flexobo.com',
+          'https://admin.flexobo.com',
+          'https://flexobo.com',
+        ],
+    credentials: true,
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
+  });
 
   // Validation
   app.useGlobalPipes(
@@ -19,13 +44,10 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
-
-  // CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  });
+  app.useGlobalInterceptors(
+    new TransformResponseInterceptor(),
+    new SnakeCaseInterceptor()
+  );
 
   // Swagger
   const config = new DocumentBuilder()

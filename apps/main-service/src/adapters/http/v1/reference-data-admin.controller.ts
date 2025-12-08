@@ -10,6 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import {
+  ApiBody,
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
@@ -31,10 +32,10 @@ import {
   ReferenceDataListQueryDto,
 } from '../dto/reference-data.dto';
 
-@ApiTags('Reference Data Admin')
+@ApiTags('Reference Data')
 @ApiBearerAuth()
-@Controller('v1/admin/reference-data')
-export class ReferenceDataAdminController {
+@Controller('v1/reference-data')
+export class ReferenceDataManagementController {
   constructor(
     @Inject('PrismaClient') private readonly prisma: any
   ) {}
@@ -71,6 +72,8 @@ export class ReferenceDataAdminController {
 
   @Post('countries')
   @ApiOperation({ summary: 'Create a country' })
+  @ApiBody({ type: CreateCountryDto })
+  @ApiResponse({ status: 201, description: 'Country created successfully' })
   async createCountry(@Body() dto: CreateCountryDto) {
     const country = await this.prisma.countryReadModel.create({
       data: {
@@ -87,6 +90,8 @@ export class ReferenceDataAdminController {
   @Put('countries/:id')
   @ApiOperation({ summary: 'Update a country' })
   @ApiParam({ name: 'id', description: 'Country ID' })
+  @ApiBody({ type: UpdateCountryDto })
+  @ApiResponse({ status: 200, description: 'Country updated successfully' })
   async updateCountry(@Param('id') id: string, @Body() dto: UpdateCountryDto) {
     const data: Record<string, unknown> = {};
     if (dto.code !== undefined) data.code = dto.code.toUpperCase();
@@ -142,6 +147,8 @@ export class ReferenceDataAdminController {
 
   @Post('currencies')
   @ApiOperation({ summary: 'Create a currency' })
+  @ApiBody({ type: CreateCurrencyDto })
+  @ApiResponse({ status: 201, description: 'Currency created successfully' })
   async createCurrency(@Body() dto: CreateCurrencyDto) {
     const currency = await this.prisma.currencyReadModel.create({
       data: {
@@ -158,6 +165,8 @@ export class ReferenceDataAdminController {
   @Put('currencies/:id')
   @ApiOperation({ summary: 'Update a currency' })
   @ApiParam({ name: 'id', description: 'Currency ID' })
+  @ApiBody({ type: UpdateCurrencyDto })
+  @ApiResponse({ status: 200, description: 'Currency updated successfully' })
   async updateCurrency(@Param('id') id: string, @Body() dto: UpdateCurrencyDto) {
     const data: Record<string, unknown> = {};
     if (dto.code !== undefined) data.code = dto.code.toUpperCase();
@@ -209,6 +218,8 @@ export class ReferenceDataAdminController {
 
   @Post('transport-types')
   @ApiOperation({ summary: 'Create a transport type' })
+  @ApiBody({ type: CreateTransportTypeDto })
+  @ApiResponse({ status: 201, description: 'Transport type created successfully' })
   async createTransportType(@Body() dto: CreateTransportTypeDto) {
     const item = await this.prisma.transportTypeReadModel.create({
       data: {
@@ -223,6 +234,8 @@ export class ReferenceDataAdminController {
   @Put('transport-types/:id')
   @ApiOperation({ summary: 'Update a transport type' })
   @ApiParam({ name: 'id', description: 'Transport type ID' })
+  @ApiBody({ type: UpdateReferenceItemDto })
+  @ApiResponse({ status: 200, description: 'Transport type updated successfully' })
   async updateTransportType(@Param('id') id: string, @Body() dto: UpdateReferenceItemDto) {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -272,6 +285,8 @@ export class ReferenceDataAdminController {
 
   @Post('load-types')
   @ApiOperation({ summary: 'Create a load type' })
+  @ApiBody({ type: CreateLoadTypeDto })
+  @ApiResponse({ status: 201, description: 'Load type created successfully' })
   async createLoadType(@Body() dto: CreateLoadTypeDto) {
     const item = await this.prisma.loadTypeReadModel.create({
       data: {
@@ -286,6 +301,8 @@ export class ReferenceDataAdminController {
   @Put('load-types/:id')
   @ApiOperation({ summary: 'Update a load type' })
   @ApiParam({ name: 'id', description: 'Load type ID' })
+  @ApiBody({ type: UpdateReferenceItemDto })
+  @ApiResponse({ status: 200, description: 'Load type updated successfully' })
   async updateLoadType(@Param('id') id: string, @Body() dto: UpdateReferenceItemDto) {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name;
@@ -335,6 +352,8 @@ export class ReferenceDataAdminController {
 
   @Post('loading-types')
   @ApiOperation({ summary: 'Create a loading type' })
+  @ApiBody({ type: CreateLoadingTypeDto })
+  @ApiResponse({ status: 201, description: 'Loading type created successfully' })
   async createLoadingType(@Body() dto: CreateLoadingTypeDto) {
     const item = await this.prisma.loadingTypeReadModel.create({
       data: {
@@ -349,6 +368,8 @@ export class ReferenceDataAdminController {
   @Put('loading-types/:id')
   @ApiOperation({ summary: 'Update a loading type' })
   @ApiParam({ name: 'id', description: 'Loading type ID' })
+  @ApiBody({ type: UpdateReferenceItemDto })
+  @ApiResponse({ status: 200, description: 'Loading type updated successfully' })
   async updateLoadingType(@Param('id') id: string, @Body() dto: UpdateReferenceItemDto) {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name.toUpperCase();
@@ -401,6 +422,8 @@ export class ReferenceDataAdminController {
 
   @Post('adr-classifications')
   @ApiOperation({ summary: 'Create an ADR classification' })
+  @ApiBody({ type: CreateADRClassificationDto })
+  @ApiResponse({ status: 201, description: 'ADR classification created successfully' })
   async createADRClassification(@Body() dto: CreateADRClassificationDto) {
     const item = await this.prisma.aDRClassificationReadModel.create({
       data: {
@@ -416,6 +439,8 @@ export class ReferenceDataAdminController {
   @Put('adr-classifications/:id')
   @ApiOperation({ summary: 'Update an ADR classification' })
   @ApiParam({ name: 'id', description: 'ADR classification ID' })
+  @ApiBody({ type: UpdateADRClassificationDto })
+  @ApiResponse({ status: 200, description: 'ADR classification updated successfully' })
   async updateADRClassification(@Param('id') id: string, @Body() dto: UpdateADRClassificationDto) {
     const data: Record<string, unknown> = {};
     if (dto.code !== undefined) data.code = dto.code;
@@ -466,6 +491,8 @@ export class ReferenceDataAdminController {
 
   @Post('permits')
   @ApiOperation({ summary: 'Create a permit' })
+  @ApiBody({ type: CreatePermitDto })
+  @ApiResponse({ status: 201, description: 'Permit created successfully' })
   async createPermit(@Body() dto: CreatePermitDto) {
     const item = await this.prisma.permitReadModel.create({
       data: {
@@ -480,6 +507,8 @@ export class ReferenceDataAdminController {
   @Put('permits/:id')
   @ApiOperation({ summary: 'Update a permit' })
   @ApiParam({ name: 'id', description: 'Permit ID' })
+  @ApiBody({ type: UpdateReferenceItemDto })
+  @ApiResponse({ status: 200, description: 'Permit updated successfully' })
   async updatePermit(@Param('id') id: string, @Body() dto: UpdateReferenceItemDto) {
     const data: Record<string, unknown> = {};
     if (dto.name !== undefined) data.name = dto.name.toUpperCase();

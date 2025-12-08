@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { CqrsModule } from '@flexobo/core';
+import { CqrsModule, MessagingModule } from '@flexobo/core';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ClientsModule, Transport } from '@nestjs/microservices';
@@ -55,6 +55,13 @@ import { InvoiceProjection } from './adapters/eventbus/projection/invoice.projec
 import { DomainEventsPublisher } from './adapters/eventbus/publisher/domain-events.publisher';
 import { UsageEventsConsumer } from './adapters/eventbus/consumer/usage-events.consumer';
 
+// Notification Handlers
+import {
+  SubscriptionNotificationHandler,
+  PaymentNotificationHandler,
+  InvoiceNotificationHandler,
+} from './adapters/eventbus/notification-handlers';
+
 // Payment Providers
 import { StripeProvider } from './adapters/payment-providers/stripe.provider';
 import { ClickProvider } from './adapters/payment-providers/click.provider';
@@ -89,6 +96,12 @@ const Projections = [
   InvoiceProjection,
 ];
 
+const NotificationHandlers = [
+  SubscriptionNotificationHandler,
+  PaymentNotificationHandler,
+  InvoiceNotificationHandler,
+];
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -98,6 +111,15 @@ const Projections = [
     ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     PrismaModule,
+    MessagingModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        config: {
+          url: configService.get('RABBITMQ_URL', 'amqp://localhost:5672'),
+          exchange: configService.get('RABBITMQ_EXCHANGE', 'flexobo.events'),
+        },
+      }),
+      inject: [ConfigService],
+    }),
     ClientsModule.registerAsync([
       {
         name: 'RABBITMQ_CLIENT',
@@ -191,6 +213,9 @@ const Projections = [
 
     // Projections
     ...Projections,
+
+    // Notification Handlers
+    ...NotificationHandlers,
 
     // Publishers and Consumers
     DomainEventsPublisher,
