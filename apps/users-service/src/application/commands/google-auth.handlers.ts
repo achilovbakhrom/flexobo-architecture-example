@@ -57,8 +57,8 @@ export class AuthWithGoogleHandler
       if (!googleUserInfo) {
         return new Failure(
           new UnauthorizedException(
-            ErrorMessages[ErrorCodes.INVALID_GOOGLE_TOKEN] ||
-              'Invalid Google token'
+            'Invalid Google token. Please provide a valid ID token (JWT format), not an access token. ' +
+              'ID tokens are obtained from Google Sign-In and have 3 segments separated by dots.'
           )
         );
       }
@@ -126,7 +126,8 @@ export class AuthWithGoogleHandler
         // New user - register
         isNewUser = true;
 
-        const fio = `${googleUserInfo.firstName} ${googleUserInfo.lastName}`.trim();
+        const fio =
+          `${googleUserInfo.firstName} ${googleUserInfo.lastName}`.trim();
         const uniqueId = await this.userRepository.generateUniqueId(fio);
 
         const user = User.create();
