@@ -5,6 +5,8 @@ export const SSE_MANAGER = Symbol('SSE_MANAGER');
 export interface SSEPayload {
   type: string;
   category?: string;
+  /** Message severity: info, success, warning, error */
+  severity?: string;
   title?: string;
   body?: string;
   data?: Record<string, unknown>;

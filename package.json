@@ -9,6 +9,9 @@
     "start:chat": "npx tsx scripts/dev.ts chat",
     "start:file": "npx tsx scripts/dev.ts file",
     "start:main": "npx tsx scripts/dev.ts main",
+    "start:billing": "npx tsx scripts/dev.ts billing",
+    "start:notification": "npx tsx scripts/dev.ts notification",
+    "start:telegram": "npx tsx scripts/dev.ts telegram",
     "stop": "npx tsx scripts/dev.ts stop",
     "db:generate:users": "npx prisma generate --config apps/users-service/prisma.config.ts",
     "db:generate:chat": "npx prisma generate --config apps/chat-service/prisma.config.ts",
@@ -53,8 +56,13 @@
     "lint": "npx nx run-many --target=lint --all",
     "build": "npx nx run-many --target=build --all",
     "docker:build:users": "docker build -f apps/users-service/Dockerfile -t flexobo/users-service:latest .",
+    "docker:build:chat": "docker build -f apps/chat-service/Dockerfile -t flexobo/chat-service:latest .",
+    "docker:build:file": "docker build -f apps/file-service/Dockerfile -t flexobo/file-service:latest .",
     "docker:build:main": "docker build -f apps/main-service/Dockerfile -t flexobo/main-service:latest .",
-    "docker:build:all": "npm run docker:build:users && npm run docker:build:main"
+    "docker:build:billing": "docker build -f apps/billing-service/Dockerfile -t flexobo/billing-service:latest .",
+    "docker:build:notification": "docker build -f apps/notification-service/Dockerfile -t flexobo/notification-service:latest .",
+    "docker:build:telegram": "docker build -f apps/telegram-service/Dockerfile -t flexobo/telegram-service:latest .",
+    "docker:build:all": "npm run docker:build:users && npm run docker:build:chat && npm run docker:build:file && npm run docker:build:main && npm run docker:build:billing && npm run docker:build:notification && npm run docker:build:telegram"
   },
   "private": true,
   "engines": {
@@ -86,6 +94,7 @@
     "@opentelemetry/sdk-node": "^0.208.0",
     "@opentelemetry/semantic-conventions": "^1.38.0",
     "@prisma/adapter-pg": "^7.0.1",
+    "amqp-connection-manager": "^5.0.0",
     "amqplib": "^0.10.9",
     "axios": "^1.6.0",
     "bcrypt": "^6.0.0",

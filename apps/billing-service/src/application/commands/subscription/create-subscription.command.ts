@@ -1,5 +1,4 @@
-import { CommandHandler, ICommand, ICommandHandler } from '@nestjs/cqrs';
-import { IAggregateStore } from '@flexobo/core';
+import { CommandHandler, ICommand, ICommandHandler, Result, Success, Failure, IAggregateStore } from '@flexobo/core';
 import { Inject, Injectable, BadRequestException } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { SubscriptionAggregate } from '../../../domain/aggregates/subscription.aggregate';
@@ -39,42 +38,46 @@ export class CreateSubscriptionCommandHandler
     private readonly planRepository: IPlanReadRepository
   ) {}
 
-  async execute(command: CreateSubscriptionCommand): Promise<CreateSubscriptionResult> {
-    // Check if company already has a subscription
-    const existing = await this.subscriptionRepository.findByCompanyId(
-      command.data.companyId
-    );
-    if (existing) {
-      throw new BadRequestException('Company already has an active subscription');
+  async execute(command: CreateSubscriptionCommand): Promise<Result<CreateSubscriptionResult, Error>> {
+    try {
+      // Check if company already has a subscription
+      const existing = await this.subscriptionRepository.findByCompanyId(
+        command.data.companyId
+      );
+      if (existing) {
+        return new Failure(new BadRequestException('Company already has an active subscription'));
+      }
+
+      // Get plan to check trial days
+      const plan = await this.planRepository.findById(command.data.planId);
+      if (!plan) {
+        return new Failure(new BadRequestException(`Plan ${command.data.planId} not found`));
+      }
+
+      if (!plan.isActive) {
+        return new Failure(new BadRequestException('Cannot subscribe to an inactive plan'));
+      }
+
+      const id = uuidv4();
+      const aggregate = SubscriptionAggregate.create({
+        id,
+        companyId: command.data.companyId,
+        planId: command.data.planId,
+        billingCycle: command.data.billingCycle,
+        trialDays: plan.trialDays,
+      });
+
+      await this.aggregateStore.save(aggregate);
+
+      return new Success({
+        id,
+        companyId: aggregate.companyId,
+        planId: aggregate.planId,
+        status: aggregate.status,
+        trialEnd: aggregate.trialEnd,
+      });
+    } catch (error) {
+      return new Failure(error instanceof Error ? error : new Error(String(error)));
     }
-
-    // Get plan to check trial days
-    const plan = await this.planRepository.findById(command.data.planId);
-    if (!plan) {
-      throw new BadRequestException(`Plan ${command.data.planId} not found`);
-    }
-
-    if (!plan.isActive) {
-      throw new BadRequestException('Cannot subscribe to an inactive plan');
-    }
-
-    const id = uuidv4();
-    const aggregate = SubscriptionAggregate.create({
-      id,
-      companyId: command.data.companyId,
-      planId: command.data.planId,
-      billingCycle: command.data.billingCycle,
-      trialDays: plan.trialDays,
-    });
-
-    await this.aggregateStore.save(aggregate);
-
-    return {
-      id,
-      companyId: aggregate.companyId,
-      planId: aggregate.planId,
-      status: aggregate.status,
-      trialEnd: aggregate.trialEnd,
-    };
   }
 }

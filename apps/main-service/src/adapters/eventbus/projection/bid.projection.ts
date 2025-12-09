@@ -3,12 +3,15 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   IBidReadRepository,
@@ -21,6 +24,7 @@ import {
   BidCounteredEventData,
 } from '../../../domain/events/bid.events';
 import { BidStatus } from '../../../domain/constants/enums';
+import { BID_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type BidEventPayload = EventPayload<
   BidCreatedEventData | BidCounteredEventData | Record<string, unknown>
@@ -35,9 +39,15 @@ export class BidProjection extends BaseProjection<BidReadDto, BidEventPayload> {
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(BID_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<BidEventPayload> | null
   ) {
-    super(rabbitMQConsumer, BidProjection.name, eventBuffer);
+    super(rabbitMQConsumer, BidProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

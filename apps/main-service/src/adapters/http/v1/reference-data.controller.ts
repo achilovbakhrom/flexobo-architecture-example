@@ -6,12 +6,7 @@ import {
   Param,
   UseInterceptors,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { ResponseDTO } from '@flexobo/shared-kernel';
 import {
   IReferenceDataRepository,
@@ -41,7 +36,11 @@ export class ReferenceDataController {
   @Get('countries')
   @ResponseDTO(ResponseCountryDto, { isArray: true })
   @ApiOperation({ summary: 'Get all countries' })
-  @ApiResponse({ status: 200, description: 'List of countries' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of countries',
+    type: [CountryResponseDto],
+  })
   async getCountries() {
     return this.referenceDataRepo.findAllCountries();
   }
@@ -49,8 +48,16 @@ export class ReferenceDataController {
   @Get('countries/by-code/:code')
   @ResponseDTO(ResponseCountryDto)
   @ApiOperation({ summary: 'Get country by code' })
-  @ApiParam({ name: 'code', description: 'ISO 3166-1 alpha-2 country code (e.g., UZ, RU)' })
-  @ApiResponse({ status: 200, description: 'Country details' })
+  @ApiParam({
+    name: 'code',
+    description: 'ISO 3166-1 alpha-2 country code (e.g., UZ, RU)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Country details',
+    type: CountryResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Country not found' })
   async getCountryByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findCountryByCode(code.toUpperCase());
   }
@@ -73,7 +80,11 @@ export class ReferenceDataController {
   @Get('languages')
   @ResponseDTO(ResponseLanguageDto, { isArray: true })
   @ApiOperation({ summary: 'Get all languages' })
-  @ApiResponse({ status: 200, description: 'List of languages' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of languages',
+    type: [LanguageResponseDto],
+  })
   async getLanguages() {
     return this.referenceDataRepo.findAllLanguages();
   }
@@ -81,8 +92,16 @@ export class ReferenceDataController {
   @Get('languages/by-code/:code')
   @ResponseDTO(ResponseLanguageDto)
   @ApiOperation({ summary: 'Get language by code' })
-  @ApiParam({ name: 'code', description: 'ISO 639-1 language code (e.g., uz, ru, en)' })
-  @ApiResponse({ status: 200, description: 'Language details' })
+  @ApiParam({
+    name: 'code',
+    description: 'ISO 639-1 language code (e.g., uz, ru, en)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Language details',
+    type: LanguageResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Language not found' })
   async getLanguageByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findLanguageByCode(code.toLowerCase());
   }
@@ -105,7 +124,11 @@ export class ReferenceDataController {
   @Get('currencies')
   @ResponseDTO(ResponseCurrencyDto, { isArray: true })
   @ApiOperation({ summary: 'Get all currencies' })
-  @ApiResponse({ status: 200, description: 'List of currencies' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of currencies',
+    type: [CurrencyResponseDto],
+  })
   async getCurrencies() {
     return this.referenceDataRepo.findAllCurrencies();
   }
@@ -113,8 +136,16 @@ export class ReferenceDataController {
   @Get('currencies/by-code/:code')
   @ResponseDTO(ResponseCurrencyDto)
   @ApiOperation({ summary: 'Get currency by code' })
-  @ApiParam({ name: 'code', description: 'ISO 4217 currency code (e.g., USD, UZS, RUB)' })
-  @ApiResponse({ status: 200, description: 'Currency details' })
+  @ApiParam({
+    name: 'code',
+    description: 'ISO 4217 currency code (e.g., USD, UZS, RUB)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Currency details',
+    type: CurrencyResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Currency not found' })
   async getCurrencyByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findCurrencyByCode(code.toUpperCase());
   }
@@ -137,7 +168,11 @@ export class ReferenceDataController {
   @Get('load-types')
   @ResponseDTO(ResponseLoadTypeDto, { isArray: true })
   @ApiOperation({ summary: 'Get all load/cargo types' })
-  @ApiResponse({ status: 200, description: 'List of load types' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of load types',
+    type: [ReferenceItemResponseDto],
+  })
   async getLoadTypes() {
     return this.referenceDataRepo.findAllLoadTypes();
   }
@@ -146,7 +181,12 @@ export class ReferenceDataController {
   @ResponseDTO(ResponseLoadTypeDto)
   @ApiOperation({ summary: 'Get load type by code' })
   @ApiParam({ name: 'code', description: 'Load type code' })
-  @ApiResponse({ status: 200, description: 'Load type details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Load type details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Load type not found' })
   async getLoadTypeByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findLoadTypeByCode(code);
   }
@@ -169,7 +209,11 @@ export class ReferenceDataController {
   @Get('transport-types')
   @ResponseDTO(ResponseTransportTypeDto, { isArray: true })
   @ApiOperation({ summary: 'Get all transport types' })
-  @ApiResponse({ status: 200, description: 'List of transport types' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of transport types',
+    type: [ReferenceItemResponseDto],
+  })
   async getTransportTypes() {
     return this.referenceDataRepo.findAllTransportTypes();
   }
@@ -178,7 +222,12 @@ export class ReferenceDataController {
   @ResponseDTO(ResponseTransportTypeDto)
   @ApiOperation({ summary: 'Get transport type by code' })
   @ApiParam({ name: 'code', description: 'Transport type code' })
-  @ApiResponse({ status: 200, description: 'Transport type details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Transport type details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Transport type not found' })
   async getTransportTypeByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findTransportTypeByCode(code);
   }
@@ -201,7 +250,11 @@ export class ReferenceDataController {
   @Get('loading-types')
   @ResponseDTO(ResponseLoadingTypeDto, { isArray: true })
   @ApiOperation({ summary: 'Get all loading types (TOP, SIDE, REAR, etc.)' })
-  @ApiResponse({ status: 200, description: 'List of loading types' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of loading types',
+    type: [ReferenceItemResponseDto],
+  })
   async getLoadingTypes() {
     return this.referenceDataRepo.findAllLoadingTypes();
   }
@@ -209,8 +262,16 @@ export class ReferenceDataController {
   @Get('loading-types/by-code/:code')
   @ResponseDTO(ResponseLoadingTypeDto)
   @ApiOperation({ summary: 'Get loading type by code' })
-  @ApiParam({ name: 'code', description: 'Loading type code (e.g., TOP, SIDE, REAR)' })
-  @ApiResponse({ status: 200, description: 'Loading type details' })
+  @ApiParam({
+    name: 'code',
+    description: 'Loading type code (e.g., TOP, SIDE, REAR)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Loading type details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Loading type not found' })
   async getLoadingTypeByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findLoadingTypeByCode(code.toUpperCase());
   }
@@ -233,7 +294,11 @@ export class ReferenceDataController {
   @Get('company-types')
   @ResponseDTO(ResponseCompanyTypeDto, { isArray: true })
   @ApiOperation({ summary: 'Get all company types' })
-  @ApiResponse({ status: 200, description: 'List of company types' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of company types',
+    type: [ReferenceItemResponseDto],
+  })
   async getCompanyTypes() {
     return this.referenceDataRepo.findAllCompanyTypes();
   }
@@ -242,7 +307,12 @@ export class ReferenceDataController {
   @ResponseDTO(ResponseCompanyTypeDto)
   @ApiOperation({ summary: 'Get company type by code' })
   @ApiParam({ name: 'code', description: 'Company type code' })
-  @ApiResponse({ status: 200, description: 'Company type details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Company type details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Company type not found' })
   async getCompanyTypeByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findCompanyTypeByCode(code);
   }
@@ -265,7 +335,11 @@ export class ReferenceDataController {
   @Get('adr-classifications')
   @ResponseDTO(ResponseADRClassificationDto, { isArray: true })
   @ApiOperation({ summary: 'Get all ADR (hazardous goods) classifications' })
-  @ApiResponse({ status: 200, description: 'List of ADR classifications' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of ADR classifications',
+    type: [ReferenceItemResponseDto],
+  })
   async getADRClassifications() {
     return this.referenceDataRepo.findAllADRClassifications();
   }
@@ -273,8 +347,16 @@ export class ReferenceDataController {
   @Get('adr-classifications/by-code/:code')
   @ResponseDTO(ResponseADRClassificationDto)
   @ApiOperation({ summary: 'Get ADR classification by code' })
-  @ApiParam({ name: 'code', description: 'ADR classification code (e.g., 1, 2, 3, 4.1)' })
-  @ApiResponse({ status: 200, description: 'ADR classification details' })
+  @ApiParam({
+    name: 'code',
+    description: 'ADR classification code (e.g., 1, 2, 3, 4.1)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'ADR classification details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'ADR classification not found' })
   async getADRClassificationByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findADRClassificationByCode(code);
   }
@@ -297,7 +379,11 @@ export class ReferenceDataController {
   @Get('permits')
   @ResponseDTO(ResponsePermitDto, { isArray: true })
   @ApiOperation({ summary: 'Get all available permits' })
-  @ApiResponse({ status: 200, description: 'List of permits' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of permits',
+    type: [ReferenceItemResponseDto],
+  })
   async getPermits() {
     return this.referenceDataRepo.findAllPermits();
   }
@@ -306,7 +392,12 @@ export class ReferenceDataController {
   @ResponseDTO(ResponsePermitDto)
   @ApiOperation({ summary: 'Get permit by code' })
   @ApiParam({ name: 'code', description: 'Permit code (e.g., TIR, CMR, EKMT)' })
-  @ApiResponse({ status: 200, description: 'Permit details' })
+  @ApiResponse({
+    status: 200,
+    description: 'Permit details',
+    type: ReferenceItemResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Permit not found' })
   async getPermitByCode(@Param('code') code: string) {
     return this.referenceDataRepo.findPermitByCode(code.toUpperCase());
   }

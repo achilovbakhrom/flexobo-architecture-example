@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   ITripReadRepository,
@@ -21,6 +24,7 @@ import {
   TripStatusChangedEventData,
 } from '../../../domain/events/trip.events';
 import { TripStatus } from '../../../domain/constants/enums';
+import { TRIP_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type TripEventPayload = EventPayload<
   TripCreatedEventData | TripUpdatedEventData | TripStatusChangedEventData | Record<string, unknown>
@@ -35,9 +39,15 @@ export class TripProjection extends BaseProjection<TripReadDto, TripEventPayload
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(TRIP_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<TripEventPayload> | null
   ) {
-    super(rabbitMQConsumer, TripProjection.name, eventBuffer);
+    super(rabbitMQConsumer, TripProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

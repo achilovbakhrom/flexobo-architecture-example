@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   IUserReadModelRepository,
@@ -21,6 +24,7 @@ import {
   EVENT_TYPES,
   QUEUES,
 } from '../../../domain/events/event.constants';
+import { USER_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 interface UserRegisteredData {
   uniqueId: string;
@@ -104,9 +108,15 @@ export class UserProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(USER_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<UserEventPayload> | null
   ) {
-    super(rabbitMQConsumer, UserProjection.name, eventBuffer);
+    super(rabbitMQConsumer, UserProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

@@ -11,7 +11,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { CommandBus, QueryBus } from '@nestjs/cqrs';
+import { CommandBus, QueryBus } from '@flexobo/core';
 import { JwtAuthGuard, AuthenticatedUser } from '@flexobo/shared-kernel';
 import {
   CreateSubscriptionDto,
@@ -63,10 +63,7 @@ export class SubscriptionController {
     // For now, use userId as companyId (in production, get actual companyId)
     const companyId = req.user.userId;
 
-    const result = await this.commandBus.execute<
-      CreateSubscriptionCommand,
-      CreateSubscriptionResult
-    >(
+    const result = await this.commandBus.execute<CreateSubscriptionResult>(
       new CreateSubscriptionCommand({
         companyId,
         planId: dto.planId,
@@ -74,10 +71,13 @@ export class SubscriptionController {
       }),
     );
 
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionQuery(result.id));
+    if (result.isFailure) {
+      throw result.error;
+    }
+
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionQuery(result.value.id),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -96,10 +96,9 @@ export class SubscriptionController {
     // For now, use userId as companyId
     const companyId = req.user.userId;
 
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionByCompanyQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionByCompanyQuery(companyId));
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionByCompanyQuery(companyId),
+    );
 
     if (!subscription) {
       throw new NotFoundException('No subscription found for this company');
@@ -115,10 +114,9 @@ export class SubscriptionController {
   async getSubscription(
     @Param('id') id: string,
   ): Promise<SubscriptionResponseDto> {
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionQuery(id));
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionQuery(id),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -136,17 +134,20 @@ export class SubscriptionController {
     @Param('id') id: string,
     @Body() dto: ChangePlanDto,
   ): Promise<SubscriptionResponseDto> {
-    await this.commandBus.execute(
+    const result = await this.commandBus.execute(
       new ChangePlanCommand({
         subscriptionId: id,
         newPlanId: dto.newPlanId,
       }),
     );
 
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionQuery(id));
+    if (result.isFailure) {
+      throw result.error;
+    }
+
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionQuery(id),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -164,7 +165,7 @@ export class SubscriptionController {
     @Param('id') id: string,
     @Body() dto: CancelSubscriptionDto,
   ): Promise<SubscriptionResponseDto> {
-    await this.commandBus.execute(
+    const result = await this.commandBus.execute(
       new CancelSubscriptionCommand({
         subscriptionId: id,
         reason: dto.reason,
@@ -172,10 +173,13 @@ export class SubscriptionController {
       }),
     );
 
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionQuery(id));
+    if (result.isFailure) {
+      throw result.error;
+    }
+
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionQuery(id),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -188,10 +192,9 @@ export class SubscriptionController {
   @ApiOperation({ summary: 'Get subscription usage data' })
   @ApiResponse({ status: 200, type: SubscriptionResponseDto })
   async getUsage(@Param('id') id: string): Promise<SubscriptionResponseDto> {
-    const subscription = await this.queryBus.execute<
-      GetSubscriptionQuery,
-      SubscriptionReadData | null
-    >(new GetSubscriptionQuery(id));
+    const subscription = await this.queryBus.execute<SubscriptionReadData | null>(
+      new GetSubscriptionQuery(id),
+    );
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
@@ -211,7 +214,7 @@ export class SubscriptionController {
     // For now, use userId as companyId
     const companyId = req.user.userId;
 
-    return this.queryBus.execute<CheckUsageLimitQuery, CheckUsageLimitResult>(
+    return this.queryBus.execute<CheckUsageLimitResult>(
       new CheckUsageLimitQuery({
         companyId,
         usageType: dto.usageType,

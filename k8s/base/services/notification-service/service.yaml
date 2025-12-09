@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: flexobo
+  labels:
+    app: notification-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3010
+      targetPort: 3010
+      name: http
+  selector:
+    app: notification-service
