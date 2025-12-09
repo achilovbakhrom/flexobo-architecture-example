@@ -321,33 +321,36 @@ model BoardReadModel {
 // ============ COMPANY ============
 
 model CompanyReadModel {
-  id          String  @id
-  ownerId     String
-  name        String
-  type        String // LOGISTICS, CARRIER, FORWARDER, BROKER, SHIPPER
-  status      String  @default("PENDING") // PENDING, VERIFIED, REJECTED, SUSPENDED
-  description String?
-  logo        String?
-  phone       String?
-  email       String?
-  address     String?
-  country     String?
-  city        String?
-  taxId       String?
-  website     String?
-
-  isActive Boolean @default(true)
+  id                 String  @id
+  ownerId            String
+  companyUniqueId    String  @unique
+  companyName        String
+  companyTypeId      String // Reference to CompanyTypeReadModel
+  companyDescription String?
+  avatar             String?
+  phoneNumber        String?
+  email              String?
+  countryId          String? // Reference to CountryReadModel
+  city               String?
+  dotMc              String? // DOT/MC number for carriers
+  status             String  @default("ACTIVE") // ACTIVE, INACTIVE, BLOCKED
+  statusHistory      Json    @default("[]") // Array of { status, reason, changedAt, changedBy }
+  verifyStatus       String  @default("PENDING") // PENDING, VERIFIED, REJECTED
+  isLegalEntity      Boolean @default(true)
+  rating             Float   @default(0)
+  countRatings       Int     @default(0)
+  documents          Json    @default("[]") // Array of { id, type, url, addedAt }
 
   version   Int      @default(1)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members CompanyMemberReadModel[]
-
   @@index([ownerId])
   @@index([status])
-  @@index([type])
-  @@index([country, city])
+  @@index([verifyStatus])
+  @@index([companyTypeId])
+  @@index([countryId])
+  @@index([city])
   @@map("companies")
 }
 
@@ -359,9 +362,8 @@ model CompanyMemberReadModel {
   isActive  Boolean  @default(true)
   joinedAt  DateTime @default(now())
 
-  company CompanyReadModel @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
   @@unique([companyId, userId])
+  @@index([companyId])
   @@index([userId])
   @@map("company_members")
 }

@@ -7,11 +7,13 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to deploy to (production only - development is automatic)'
+        description: 'Environment to deploy to'
         required: true
         type: choice
-        default: 'production'
+        default: 'development'
         options:
+          - development
+          - staging
           - production
       service:
         description: 'Service to deploy (leave empty for all affected)'
@@ -53,10 +55,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          cache: 'yarn'
 
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: yarn install --frozen-lockfile
 
       - name: Derive SHAs for NX affected
         run: |
@@ -66,7 +68,12 @@ jobs:
       - name: Get affected projects
         id: affected
         run: |
-          AFFECTED=$(npx nx show projects --affected --type=app 2>/dev/null || echo "")
+          # If specific service is selected, use that
+          if [ -n "${{ github.event.inputs.service }}" ]; then
+            AFFECTED="${{ github.event.inputs.service }}"
+          else
+            AFFECTED=$(npx nx show projects --affected --type=app 2>/dev/null || echo "")
+          fi
           echo "affected=$AFFECTED" >> $GITHUB_OUTPUT
           echo "Affected projects: $AFFECTED"
 
@@ -143,11 +150,10 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-  deploy-development:
+  deploy-infrastructure:
     needs: [detect-affected, build-and-push]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/dev' && github.event_name == 'push'
-    environment: development
+    if: needs.detect-affected.outputs.affected != ''
 
     steps:
       - name: Checkout
@@ -160,63 +166,150 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            ENV="development"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="production"
+          else
+            ENV="development"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+          case $ENV in
+            development)
+              echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
+              echo "overlay=development" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "overlay=staging" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "overlay=production" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
       - name: Update kubeconfig for EKS
-        run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_DEV }} --region ${{ env.AWS_REGION }}
+        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
 
-      - name: Deploy users-service
-        if: needs.detect-affected.outputs.users-service == 'true'
+      - name: Apply base infrastructure (RabbitMQ, Redis, Vault)
         run: |
-          kubectl apply -k apps/users-service/k8s/overlays/development
-          kubectl set image deployment/users-service users-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/users-service:${{ github.sha }} -n users-service
-          kubectl rollout status deployment/users-service -n users-service --timeout=300s
+          kubectl apply -k k8s/overlays/${{ steps.env.outputs.overlay }}
 
-      - name: Deploy chat-service
-        if: needs.detect-affected.outputs.chat-service == 'true'
+      - name: Wait for infrastructure to be ready
         run: |
-          kubectl apply -k apps/chat-service/k8s/overlays/development
-          kubectl set image deployment/chat-service chat-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/chat-service:${{ github.sha }} -n chat-service
-          kubectl rollout status deployment/chat-service -n chat-service --timeout=300s
+          kubectl wait --for=condition=ready pod -l app=rabbitmq -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
+          kubectl wait --for=condition=ready pod -l app=redis -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
+          kubectl wait --for=condition=ready pod -l app=vault -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
 
-      - name: Deploy file-service
-        if: needs.detect-affected.outputs.file-service == 'true'
-        run: |
-          kubectl apply -k apps/file-service/k8s/overlays/development
-          kubectl set image deployment/file-service file-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/file-service:${{ github.sha }} -n file-service
-          kubectl rollout status deployment/file-service -n file-service --timeout=300s
-
-      - name: Deploy main-service
-        if: needs.detect-affected.outputs.main-service == 'true'
-        run: |
-          kubectl apply -k apps/main-service/k8s/overlays/development
-          kubectl set image deployment/main-service main-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/main-service:${{ github.sha }} -n main-service
-          kubectl rollout status deployment/main-service -n main-service --timeout=300s
-
-      - name: Deploy billing-service
-        if: needs.detect-affected.outputs.billing-service == 'true'
-        run: |
-          kubectl apply -k apps/billing-service/k8s/overlays/development
-          kubectl set image deployment/billing-service billing-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/billing-service:${{ github.sha }} -n billing-service
-          kubectl rollout status deployment/billing-service -n billing-service --timeout=300s
-
-      - name: Deploy notification-service
-        if: needs.detect-affected.outputs.notification-service == 'true'
-        run: |
-          kubectl apply -k apps/notification-service/k8s/overlays/development
-          kubectl set image deployment/notification-service notification-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/notification-service:${{ github.sha }} -n notification-service
-          kubectl rollout status deployment/notification-service -n notification-service --timeout=300s
-
-      - name: Deploy telegram-service
-        if: needs.detect-affected.outputs.telegram-service == 'true'
-        run: |
-          kubectl apply -k apps/telegram-service/k8s/overlays/development
-          kubectl set image deployment/telegram-service telegram-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/telegram-service:${{ github.sha }} -n telegram-service
-          kubectl rollout status deployment/telegram-service -n telegram-service --timeout=300s
-
-  deploy-production:
-    needs: [detect-affected, build-and-push]
+  deploy-services:
+    needs: [detect-affected, build-and-push, deploy-infrastructure]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
-    environment: production
+    if: needs.detect-affected.outputs.affected != ''
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: users-service
+            affected: ${{ needs.detect-affected.outputs.users-service }}
+          - name: chat-service
+            affected: ${{ needs.detect-affected.outputs.chat-service }}
+          - name: file-service
+            affected: ${{ needs.detect-affected.outputs.file-service }}
+          - name: main-service
+            affected: ${{ needs.detect-affected.outputs.main-service }}
+          - name: billing-service
+            affected: ${{ needs.detect-affected.outputs.billing-service }}
+          - name: notification-service
+            affected: ${{ needs.detect-affected.outputs.notification-service }}
+          - name: telegram-service
+            affected: ${{ needs.detect-affected.outputs.telegram-service }}
+
+    steps:
+      - name: Checkout
+        if: matrix.affected == 'true'
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        if: matrix.affected == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Determine environment
+        if: matrix.affected == 'true'
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            ENV="development"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="production"
+          else
+            ENV="development"
+          fi
+          echo "environment=$ENV" >> $GITHUB_OUTPUT
+
+          case $ENV in
+            development)
+              echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
+              echo "overlay=development" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "overlay=staging" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "overlay=production" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Update kubeconfig for EKS
+        if: matrix.affected == 'true'
+        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        if: matrix.affected == 'true'
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Deploy ${{ matrix.name }}
+        if: matrix.affected == 'true'
+        run: |
+          NAMESPACE="${{ steps.env.outputs.namespace }}"
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.sha }}"
+
+          # Update image in kustomization
+          cd k8s/overlays/${{ steps.env.outputs.overlay }}
+
+          # Set the new image
+          kubectl set image deployment/${{ matrix.name }} ${{ matrix.name }}=$IMAGE -n $NAMESPACE || \
+            kubectl patch deployment ${{ matrix.name }} -n $NAMESPACE -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ matrix.name }}","image":"'$IMAGE'"}]}}}}'
+
+          # Wait for rollout
+          kubectl rollout status deployment/${{ matrix.name }} -n $NAMESPACE --timeout=300s
+
+  run-migrations:
+    needs: [detect-affected, deploy-services]
+    runs-on: ubuntu-latest
+    if: needs.detect-affected.outputs.affected != ''
 
     steps:
       - name: Checkout
@@ -229,54 +322,44 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
+      - name: Determine environment
+        id: env
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
+            ENV="development"
+          else
+            ENV="production"
+          fi
+
+          case $ENV in
+            development)
+              echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
       - name: Update kubeconfig for EKS
-        run: aws eks update-kubeconfig --name ${{ vars.EKS_CLUSTER_PROD }} --region ${{ env.AWS_REGION }}
+        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
 
-      - name: Deploy users-service
-        if: needs.detect-affected.outputs.users-service == 'true'
+      - name: Run database migrations
         run: |
-          kubectl apply -k apps/users-service/k8s/overlays/production
-          kubectl set image deployment/users-service users-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/users-service:${{ github.sha }} -n users-service
-          kubectl rollout status deployment/users-service -n users-service --timeout=300s
+          NAMESPACE="${{ steps.env.outputs.namespace }}"
 
-      - name: Deploy chat-service
-        if: needs.detect-affected.outputs.chat-service == 'true'
-        run: |
-          kubectl apply -k apps/chat-service/k8s/overlays/production
-          kubectl set image deployment/chat-service chat-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/chat-service:${{ github.sha }} -n chat-service
-          kubectl rollout status deployment/chat-service -n chat-service --timeout=300s
-
-      - name: Deploy file-service
-        if: needs.detect-affected.outputs.file-service == 'true'
-        run: |
-          kubectl apply -k apps/file-service/k8s/overlays/production
-          kubectl set image deployment/file-service file-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/file-service:${{ github.sha }} -n file-service
-          kubectl rollout status deployment/file-service -n file-service --timeout=300s
-
-      - name: Deploy main-service
-        if: needs.detect-affected.outputs.main-service == 'true'
-        run: |
-          kubectl apply -k apps/main-service/k8s/overlays/production
-          kubectl set image deployment/main-service main-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/main-service:${{ github.sha }} -n main-service
-          kubectl rollout status deployment/main-service -n main-service --timeout=300s
-
-      - name: Deploy billing-service
-        if: needs.detect-affected.outputs.billing-service == 'true'
-        run: |
-          kubectl apply -k apps/billing-service/k8s/overlays/production
-          kubectl set image deployment/billing-service billing-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/billing-service:${{ github.sha }} -n billing-service
-          kubectl rollout status deployment/billing-service -n billing-service --timeout=300s
-
-      - name: Deploy notification-service
-        if: needs.detect-affected.outputs.notification-service == 'true'
-        run: |
-          kubectl apply -k apps/notification-service/k8s/overlays/production
-          kubectl set image deployment/notification-service notification-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/notification-service:${{ github.sha }} -n notification-service
-          kubectl rollout status deployment/notification-service -n notification-service --timeout=300s
-
-      - name: Deploy telegram-service
-        if: needs.detect-affected.outputs.telegram-service == 'true'
-        run: |
-          kubectl apply -k apps/telegram-service/k8s/overlays/production
-          kubectl set image deployment/telegram-service telegram-service=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/flexobo/telegram-service:${{ github.sha }} -n telegram-service
-          kubectl rollout status deployment/telegram-service -n telegram-service --timeout=300s
+          # Run migrations for affected services that have Prisma
+          for service in users-service chat-service file-service main-service billing-service notification-service telegram-service; do
+            if [ -f "apps/$service/prisma/schema.prisma" ]; then
+              echo "Running migrations for $service..."
+              # Execute prisma migrate deploy in the running pod
+              kubectl exec -n $NAMESPACE deployment/$service -- npx prisma migrate deploy || echo "Migration for $service skipped or failed"
+            fi
+          done

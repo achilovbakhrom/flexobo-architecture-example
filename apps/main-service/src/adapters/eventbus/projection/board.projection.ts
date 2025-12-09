@@ -2,12 +2,15 @@ import { Injectable, Inject, Optional } from '@nestjs/common';
 import {
   RabbitMQConsumer,
   MESSAGE_CONSUMER,
+  MESSAGE_PUBLISHER,
+  IMessagePublisher,
   IncomingMessage,
   BaseProjection,
   ProjectionConfig,
   EventPayload,
   IEventBuffer,
   EVENT_BUFFER,
+  INotificationResolver,
 } from '@flexobo/core';
 import {
   IBoardReadRepository,
@@ -21,6 +24,7 @@ import {
   BoardMemberAddedEventData,
   BoardMemberRemovedEventData,
 } from '../../../domain/events/board.events';
+import { BOARD_NOTIFICATION_RESOLVER } from '../notification-resolvers';
 
 type BoardEventPayload = EventPayload<
   | BoardCreatedEventData
@@ -42,9 +46,15 @@ export class BoardProjection extends BaseProjection<
     rabbitMQConsumer: RabbitMQConsumer,
     @Optional()
     @Inject(EVENT_BUFFER)
-    eventBuffer: IEventBuffer | null
+    eventBuffer: IEventBuffer | null,
+    @Optional()
+    @Inject(MESSAGE_PUBLISHER)
+    messagePublisher: IMessagePublisher | null,
+    @Optional()
+    @Inject(BOARD_NOTIFICATION_RESOLVER)
+    notificationResolver: INotificationResolver<BoardEventPayload> | null
   ) {
-    super(rabbitMQConsumer, BoardProjection.name, eventBuffer);
+    super(rabbitMQConsumer, BoardProjection.name, eventBuffer, messagePublisher, notificationResolver);
   }
 
   protected getConfig(): ProjectionConfig {

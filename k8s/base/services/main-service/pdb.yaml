@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: main-service-pdb
+  namespace: flexobo
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: main-service

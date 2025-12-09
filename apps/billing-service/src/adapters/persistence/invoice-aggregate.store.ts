@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma.module';
 import { DomainEvent, IAggregateStore } from '@flexobo/core';
 import { InvoiceAggregate } from '../../domain/aggregates/invoice.aggregate';
@@ -8,7 +8,7 @@ import { AggregateType } from '../../domain/constants/enums';
 export class InvoiceAggregateStore implements IAggregateStore<InvoiceAggregate> {
   private readonly logger = new Logger(InvoiceAggregateStore.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(@Inject('PrismaService') private readonly prisma: PrismaService) {}
 
   async load(id: string): Promise<InvoiceAggregate | null> {
     const events = await this.prisma.event.findMany({

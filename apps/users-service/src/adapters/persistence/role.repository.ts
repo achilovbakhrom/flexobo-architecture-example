@@ -7,15 +7,15 @@ import {
 
 interface RolePrismaClient {
   role: {
-    findUnique: (args: { where: { id?: string; name?: string }; include?: { userRoles?: boolean } }) => Promise<RoleRecord | null>;
-    findMany: (args?: { where?: { isActive?: boolean }; include?: { userRoles?: boolean } }) => Promise<RoleRecord[]>;
+    findUnique: (args: { where: { id?: string; name?: string } }) => Promise<RoleRecord | null>;
+    findMany: (args?: { where?: { isActive?: boolean; id?: { in: string[] } } }) => Promise<RoleRecord[]>;
     create: (args: { data: CreateRoleData }) => Promise<RoleRecord>;
     update: (args: { where: { id: string }; data: UpdateRoleData }) => Promise<RoleRecord>;
     delete: (args: { where: { id: string } }) => Promise<RoleRecord>;
   };
   userRoleMapping: {
-    findMany: (args: { where: { userId: string; companyId?: string | null }; include?: { role: boolean } }) => Promise<UserRoleMappingRecord[]>;
-    findFirst: (args: { where: { userId: string; role?: { name: string }; companyId?: string | null }; include?: { role: boolean } }) => Promise<UserRoleMappingRecord | null>;
+    findMany: (args: { where: { userId: string; companyId?: string | null } }) => Promise<UserRoleMappingRecord[]>;
+    findFirst: (args: { where: { userId: string; roleId?: string; companyId?: string | null } }) => Promise<UserRoleMappingRecord | null>;
     create: (args: { data: CreateUserRoleMappingData }) => Promise<UserRoleMappingRecord>;
     deleteMany: (args: { where: { userId: string; roleId: string; companyId?: string | null } }) => Promise<{ count: number }>;
   };
@@ -39,7 +39,6 @@ interface UserRoleMappingRecord {
   companyId: string | null;
   assignedBy: string | null;
   assignedAt: Date;
-  role?: RoleRecord;
 }
 
 interface CreateRoleData {
@@ -84,7 +83,7 @@ export class PrismaRoleRepository implements IRoleRepository {
     };
   }
 
-  private mapUserRoleToDto(record: UserRoleMappingRecord): UserRoleMappingReadDto {
+  private mapUserRoleToDto(record: UserRoleMappingRecord, role?: RoleRecord): UserRoleMappingReadDto {
     return {
       id: record.id,
       userId: record.userId,
@@ -92,7 +91,7 @@ export class PrismaRoleRepository implements IRoleRepository {
       companyId: record.companyId,
       assignedBy: record.assignedBy,
       assignedAt: record.assignedAt,
-      role: record.role ? this.mapToDto(record.role) : undefined,
+      role: role ? this.mapToDto(role) : undefined,
     };
   }
 
@@ -156,29 +155,55 @@ export class PrismaRoleRepository implements IRoleRepository {
   }
 
   async findUserRoles(userId: string, companyId?: string): Promise<UserRoleMappingReadDto[]> {
+    // Get user role mappings
     const mappings = await this.prisma.userRoleMapping.findMany({
       where: {
         userId,
         companyId: companyId ?? null,
       },
-      include: { role: true },
     });
-    return mappings.map((m) => this.mapUserRoleToDto(m));
+
+    if (mappings.length === 0) {
+      return [];
+    }
+
+    // Get all roles for these mappings
+    const roleIds = mappings.map(m => m.roleId);
+    const roles = await this.prisma.role.findMany({
+      where: { id: { in: roleIds } },
+    });
+
+    // Create a map for quick role lookup
+    const roleMap = new Map(roles.map(r => [r.id, r]));
+
+    // Map with roles
+    return mappings.map((m) => this.mapUserRoleToDto(m, roleMap.get(m.roleId)));
   }
 
   async findUserPermissions(userId: string, companyId?: string): Promise<string[]> {
+    // Get user role mappings
     const mappings = await this.prisma.userRoleMapping.findMany({
       where: {
         userId,
         companyId: companyId ?? null,
       },
-      include: { role: true },
     });
 
+    if (mappings.length === 0) {
+      return [];
+    }
+
+    // Get all roles for these mappings
+    const roleIds = mappings.map(m => m.roleId);
+    const roles = await this.prisma.role.findMany({
+      where: { id: { in: roleIds } },
+    });
+
+    // Collect all permissions
     const permissions = new Set<string>();
-    for (const mapping of mappings) {
-      if (mapping.role && Array.isArray(mapping.role.permissions)) {
-        for (const perm of mapping.role.permissions as string[]) {
+    for (const role of roles) {
+      if (Array.isArray(role.permissions)) {
+        for (const perm of role.permissions as string[]) {
           permissions.add(perm);
         }
       }
@@ -216,10 +241,17 @@ export class PrismaRoleRepository implements IRoleRepository {
   }
 
   async hasRole(userId: string, roleName: string, companyId?: string): Promise<boolean> {
+    // First find the role by name
+    const role = await this.prisma.role.findUnique({ where: { name: roleName } });
+    if (!role) {
+      return false;
+    }
+
+    // Then check if user has this role
     const mapping = await this.prisma.userRoleMapping.findFirst({
       where: {
         userId,
-        role: { name: roleName },
+        roleId: role.id,
         companyId: companyId ?? null,
       },
     });

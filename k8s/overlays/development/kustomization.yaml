@@ -3,33 +3,159 @@ kind: Kustomization
 
 namespace: flexobo-dev
 
-bases:
+resources:
   - ../../base
 
-nameSuffix: -dev
+namePrefix: dev-
 
 commonLabels:
   environment: development
 
+# Reduce replicas for dev
 patches:
-  - patch: |-
+  # Users Service - reduce replicas
+  - target:
+      kind: Deployment
+      name: users-service
+    patch: |-
       - op: replace
         path: /spec/replicas
         value: 1
-    target:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: users-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Chat Service
+  - target:
       kind: Deployment
-      name: order-service
-  - patch: |-
+      name: chat-service
+    patch: |-
       - op: replace
         path: /spec/replicas
         value: 1
-    target:
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: chat-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # File Service
+  - target:
       kind: Deployment
-      name: admin-panel
+      name: file-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: file-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Main Service
+  - target:
+      kind: Deployment
+      name: main-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: main-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Billing Service
+  - target:
+      kind: Deployment
+      name: billing-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: billing-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Notification Service
+  - target:
+      kind: Deployment
+      name: notification-service
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: notification-service-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # RabbitMQ - single replica for dev
+  - target:
+      kind: StatefulSet
+      name: rabbitmq
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+
+  # Reduce resources for dev
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "128Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "50m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "250m"
 
 configMapGenerator:
   - name: flexobo-config
     behavior: merge
     literals:
-      - LOG_LEVEL=debug
       - NODE_ENV=development
+      - LOG_LEVEL=debug

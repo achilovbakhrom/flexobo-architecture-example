@@ -1,6 +1,7 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
 
 import { TelegramModule } from './telegram.module';
 
@@ -30,6 +31,9 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
+
+  // Global interceptors - snake_case response transformation
+  app.useGlobalInterceptors(new SnakeCaseInterceptor());
 
   // Swagger setup
   const config = new DocumentBuilder()

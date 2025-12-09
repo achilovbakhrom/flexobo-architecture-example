@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: telegram-service
+  namespace: flexobo
+  labels:
+    app: telegram-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3012
+      targetPort: 3012
+      name: http
+  selector:
+    app: telegram-service

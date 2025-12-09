@@ -10,3 +10,4 @@ export * from './lib/versioning';
 export * from './lib/health';
 export * from './lib/decorators';
 export * from './lib/interceptors';
+export * from './lib/http';
