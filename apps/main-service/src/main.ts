@@ -2,7 +2,7 @@ import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MainModule } from './main.module';
-import { TransformResponseInterceptor } from '@flexobo/shared-kernel';
+import { TransformResponseInterceptor, LanguageFilterInterceptor } from '@flexobo/shared-kernel';
 
 async function bootstrap() {
   const app = await NestFactory.create(MainModule);
@@ -19,7 +19,10 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
     })
   );
-  app.useGlobalInterceptors(new TransformResponseInterceptor());
+  app.useGlobalInterceptors(
+    new TransformResponseInterceptor(),
+    new LanguageFilterInterceptor()
+  );
 
   // CORS
   app.enableCors({
