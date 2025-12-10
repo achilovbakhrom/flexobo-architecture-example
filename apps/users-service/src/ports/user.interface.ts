@@ -10,6 +10,8 @@ export interface IUser {
   passwordHash: string;
   fio: string;
   avatar?: string | null;
+  countryId?: string;
+  city?: string;
   role: UserRole;
   userType?: UserType | null;
   status: UserStatus;

@@ -44,7 +44,7 @@ export class ResponseTranslationDto {
 export class ResponseCountryDto {
   @Expose({ name: '_id' })
   @Transform(({ obj }) => obj.id ?? obj._id)
-  id!: string;
+  _id!: string;
 
   @Expose()
   code!: string;

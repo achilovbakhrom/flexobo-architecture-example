@@ -22,7 +22,6 @@ import { CompanyController } from './adapters/http/v1/company.controller';
 import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
 import { LocationController } from './adapters/http/v1/location.controller';
 import { StatisticsController } from './adapters/http/v1/statistics.controller';
-import { ReferenceDataManagementController } from './adapters/http/v1/reference-data-admin.controller';
 
 // Auth (from shared-kernel)
 import {
@@ -297,6 +296,7 @@ import {
   ListSavedSearchesHandler,
 } from './application/queries/saved-search';
 import { ReferenceDataController } from './adapters/http/v1/reference-data.controller';
+import { ReferenceDataAdminController } from './adapters/http/v1/reference-data-admin.controller';
 
 const CommandHandlers = [
   // Transport
@@ -477,7 +477,8 @@ const QueryHandlers = [
     SavedSearchController,
     LocationController,
     StatisticsController,
-    ReferenceDataManagementController,
+    ReferenceDataController,
+    ReferenceDataAdminController,
   ],
   providers: [
     // Auth Guard (from shared-kernel)

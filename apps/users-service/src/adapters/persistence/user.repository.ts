@@ -13,7 +13,9 @@ import { UserRecord, UserPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaUserRepository implements IUserRepository {
-  constructor(@Inject('PrismaClient') private readonly prisma: UserPrismaClient) {}
+  constructor(
+    @Inject('PrismaClient') private readonly prisma: UserPrismaClient
+  ) {}
 
   async findById(id: string): Promise<IUser | null> {
     const user = await this.prisma.user.findUnique({
@@ -71,6 +73,8 @@ export class PrismaUserRepository implements IUserRepository {
         passwordHash: data.passwordHash,
         phoneNumber: data.phoneNumber,
         telegramId: data.telegramId,
+        countryId: data.countryId,
+        city: data.city,
         googleId: data.googleId,
         email: data.email,
         isPrivacyPolicyAccepted: data.isPrivacyPolicyAccepted ?? false,
@@ -91,6 +95,8 @@ export class PrismaUserRepository implements IUserRepository {
         phoneNumber: data.phoneNumber,
         language: data.language,
         avatar: data.avatar,
+        countryId: data.countryId,
+        city: data.city,
       },
     });
 
@@ -221,6 +227,8 @@ export class PrismaUserRepository implements IUserRepository {
       passwordHash: user.passwordHash,
       fio: user.fio,
       avatar: user.avatar,
+      countryId: user.countryId,
+      city: user.city,
       role: user.role as UserRole,
       userType: user.userType as UserType | null,
       status: user.status as UserStatus,

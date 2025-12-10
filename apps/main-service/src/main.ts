@@ -5,6 +5,7 @@ import { MainModule } from './main.module';
 import {
   TransformResponseInterceptor,
   LanguageFilterInterceptor,
+  SnakeCaseInterceptor,
 } from '@flexobo/shared-kernel';
 
 async function bootstrap() {
@@ -46,7 +47,8 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(
     new TransformResponseInterceptor(),
-    new LanguageFilterInterceptor()
+    new LanguageFilterInterceptor(),
+    new SnakeCaseInterceptor()
   );
 
   // CORS

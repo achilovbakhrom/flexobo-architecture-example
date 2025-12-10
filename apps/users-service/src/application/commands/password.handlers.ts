@@ -45,16 +45,29 @@ export class ChangePasswordHandler
         );
       }
 
-      const isOldPasswordValid = await this.passwordService.compare(
-        command.oldPassword,
-        user.passwordHash
-      );
+      // Check if user has existing password (not a Google/OAuth user)
+      const hasExistingPassword = user.passwordHash && user.passwordHash.trim().length > 0;
 
-      if (!isOldPasswordValid) {
-        return new Failure(
-          new BadRequestException(ErrorMessages[ErrorCodes.INVALID_OLD_PASSWORD])
+      if (hasExistingPassword) {
+        // User already has password, validate old password
+        if (!command.oldPassword) {
+          return new Failure(
+            new BadRequestException('Old password is required when changing existing password')
+          );
+        }
+
+        const isOldPasswordValid = await this.passwordService.compare(
+          command.oldPassword,
+          user.passwordHash
         );
+
+        if (!isOldPasswordValid) {
+          return new Failure(
+            new BadRequestException(ErrorMessages[ErrorCodes.INVALID_OLD_PASSWORD])
+          );
+        }
       }
+      // For Google/OAuth users (no existing password), old_password is not required
 
       const passwordHash = await this.passwordService.hash(command.newPassword);
 

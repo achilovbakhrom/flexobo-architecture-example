@@ -9,6 +9,8 @@ export interface CreateUserData {
   telegramId?: string;
   googleId?: string;
   email?: string;
+  countryId?: string;
+  city?: string;
   isPrivacyPolicyAccepted?: boolean;
   isSubscribedNewsletter?: boolean;
   platform?: AuthPlatform;
@@ -21,6 +23,8 @@ export interface UpdateUserData {
   telegramId?: string;
   language?: string;
   avatar?: string;
+  countryId?: string;
+  city?: string;
   passwordHash?: string;
 }
 
