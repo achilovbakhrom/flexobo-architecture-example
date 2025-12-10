@@ -63,6 +63,8 @@ export interface UserSnapshotData {
   avatar?: string;
   role?: UserRole;
   userType?: UserType;
+  countryId?: string;
+  city?: string;
   status?: UserStatus;
   language?: string;
   isPrivacyPolicyAccepted?: boolean;
@@ -85,6 +87,8 @@ export class User extends AggregateRoot {
   private _passwordHash?: string;
   private _fio?: string;
   private _avatar?: string;
+  private _countryId?: string;
+  private _city?: string;
   private _role?: UserRole;
   private _userType?: UserType;
   private _status?: UserStatus = UserStatus.Active;
@@ -132,6 +136,14 @@ export class User extends AggregateRoot {
 
   get avatar(): string | undefined {
     return this._avatar;
+  }
+
+  get countryId(): string | undefined {
+    return this._countryId;
+  }
+
+  get city(): string | undefined {
+    return this._city;
   }
 
   get role(): UserRole {
@@ -391,6 +403,8 @@ export class User extends AggregateRoot {
         this._status = UserStatus.Active;
         this._isVerified = false;
         this._role = UserRole.User;
+        this._countryId = event.data.countryId;
+        this._city = event.data.city;
         break;
 
       case UserEventType.LoggedIn:
@@ -409,6 +423,9 @@ export class User extends AggregateRoot {
         if (event.data.language !== undefined)
           this._language = event.data.language;
         if (event.data.avatar !== undefined) this._avatar = event.data.avatar;
+        if (event.data.countryId !== undefined)
+          this._countryId = event.data.countryId;
+        if (event.data.city !== undefined) this._city = event.data.city;
         break;
 
       case UserEventType.PasswordChanged:
@@ -496,6 +513,8 @@ export class User extends AggregateRoot {
       fio: this._fio,
       avatar: this._avatar,
       role: this._role,
+      countryId: this._countryId,
+      city: this._city,
       userType: this._userType,
       status: this._status,
       language: this._language,
@@ -527,6 +546,8 @@ export class User extends AggregateRoot {
     user._fio = snapshotData.fio;
     user._avatar = snapshotData.avatar;
     user._role = snapshotData.role;
+    user._countryId = snapshotData.countryId;
+    user._city = snapshotData.city;
     user._userType = snapshotData.userType;
     user._status = snapshotData.status;
     user._language = snapshotData.language;

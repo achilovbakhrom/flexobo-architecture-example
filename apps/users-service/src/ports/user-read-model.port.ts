@@ -10,6 +10,8 @@ export interface UserReadModelDto {
   passwordHash: string;
   fio: string;
   avatar?: string | null;
+  countryId?: string;
+  city?: string;
   role: UserRole;
   userType?: UserType | null;
   status: UserStatus;
@@ -43,21 +45,43 @@ export interface IUserReadModelRepository {
       phoneNumber?: string;
       language?: string;
       avatar?: string;
+      countryId?: string;
+      city?: string;
     },
     version?: number
   ): Promise<void>;
 
-  updatePassword(userId: string, passwordHash: string, version?: number): Promise<void>;
+  updatePassword(
+    userId: string,
+    passwordHash: string,
+    version?: number
+  ): Promise<void>;
 
-  updateTelegramId(userId: string, telegramId: string, version?: number): Promise<void>;
+  updateTelegramId(
+    userId: string,
+    telegramId: string,
+    version?: number
+  ): Promise<void>;
 
-  updateGoogleId(userId: string, googleId: string, version?: number): Promise<void>;
+  updateGoogleId(
+    userId: string,
+    googleId: string,
+    version?: number
+  ): Promise<void>;
 
   updateLastLogin(userId: string, version?: number): Promise<void>;
 
-  updateStatus(userId: string, status: UserStatus, version?: number): Promise<void>;
+  updateStatus(
+    userId: string,
+    status: UserStatus,
+    version?: number
+  ): Promise<void>;
 
-  updateIsVerified(userId: string, isVerified: boolean, version?: number): Promise<void>;
+  updateIsVerified(
+    userId: string,
+    isVerified: boolean,
+    version?: number
+  ): Promise<void>;
 
   updateVersion(userId: string, version: number): Promise<void>;
 }

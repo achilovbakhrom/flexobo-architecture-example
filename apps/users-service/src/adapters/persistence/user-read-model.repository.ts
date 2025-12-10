@@ -9,7 +9,9 @@ import { UserPrismaClient } from './prisma-types';
 
 @Injectable()
 export class PrismaUserReadModelRepository implements IUserReadModelRepository {
-  constructor(@Inject('PrismaClient') private readonly prisma: UserPrismaClient) {}
+  constructor(
+    @Inject('PrismaClient') private readonly prisma: UserPrismaClient
+  ) {}
 
   async findById(id: string): Promise<UserReadModelDto | null> {
     const user = await this.prisma.user.findUnique({
@@ -30,6 +32,8 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       passwordHash: user.passwordHash,
       fio: user.fio,
       avatar: user.avatar,
+      countryId: user.countryId,
+      city: user.city,
       role: user.role as any,
       userType: user.userType as any,
       status: user.status as any,
@@ -62,6 +66,8 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         fio: user.fio,
         avatar: user.avatar,
         role: user.role,
+        countryId: user.countryId,
+        city: user.city,
         userType: user.userType,
         status: user.status,
         language: user.language,
@@ -83,6 +89,8 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
         fio: user.fio,
         avatar: user.avatar,
         role: user.role,
+        countryId: user.countryId,
+        city: user.city,
         userType: user.userType,
         status: user.status,
         language: user.language,
@@ -106,6 +114,8 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       phoneNumber?: string;
       language?: string;
       avatar?: string;
+      countryId?: string;
+      city?: string;
     },
     version?: number
   ): Promise<void> {
@@ -113,7 +123,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
       where: { id: userId },
       data: {
         ...(data.fio !== undefined && { fio: data.fio }),
-        ...(data.phoneNumber !== undefined && { phoneNumber: data.phoneNumber }),
+        ...(data.phoneNumber !== undefined && {
+          phoneNumber: data.phoneNumber,
+        }),
+        ...(data.countryId !== undefined && { countryId: data.countryId }),
+        ...(data.city !== undefined && { city: data.city }),
         ...(data.language !== undefined && { language: data.language }),
         ...(data.avatar !== undefined && { avatar: data.avatar }),
         ...(version !== undefined && { version }),
@@ -122,7 +136,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
-  async updatePassword(userId: string, passwordHash: string, version?: number): Promise<void> {
+  async updatePassword(
+    userId: string,
+    passwordHash: string,
+    version?: number
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -133,7 +151,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
-  async updateTelegramId(userId: string, telegramId: string, version?: number): Promise<void> {
+  async updateTelegramId(
+    userId: string,
+    telegramId: string,
+    version?: number
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -144,7 +166,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
-  async updateGoogleId(userId: string, googleId: string, version?: number): Promise<void> {
+  async updateGoogleId(
+    userId: string,
+    googleId: string,
+    version?: number
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -166,7 +192,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
-  async updateStatus(userId: string, status: UserStatus, version?: number): Promise<void> {
+  async updateStatus(
+    userId: string,
+    status: UserStatus,
+    version?: number
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {
@@ -177,7 +207,11 @@ export class PrismaUserReadModelRepository implements IUserReadModelRepository {
     });
   }
 
-  async updateIsVerified(userId: string, isVerified: boolean, version?: number): Promise<void> {
+  async updateIsVerified(
+    userId: string,
+    isVerified: boolean,
+    version?: number
+  ): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
       data: {

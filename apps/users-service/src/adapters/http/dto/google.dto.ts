@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsBoolean, IsOptional, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsBoolean,
+  IsOptional,
+  IsEnum,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   UserType,
@@ -6,10 +12,12 @@ import {
   UserTypeWithoutCompanyDriver,
 } from './shared.dto';
 import { UserResponseDto } from './user-response.dto';
+import { Expose, Type } from 'class-transformer';
 
 export class AuthWithGoogleDto {
   @ApiProperty({
-    example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhY2NvdW50cy5nb29nbGUuY29tIiwiYXpwIjoiMTIzNDU2Nzg5MC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjEyMzQ1Njc4OTAuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTc1NTI2NzYyMjgxNDQ4MDc5MjQiLCJlbWFpbCI6ImpvaG4uZG9lQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiSm9obiBEb2UiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUFBQUFBQUFBQUE9czk2LWMiLCJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwibG9jYWxlIjoiZW4iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMzYwMH0.signature',
+    example:
+      'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJhY2NvdW50cy5nb29nbGUuY29tIiwiYXpwIjoiMTIzNDU2Nzg5MC5hcHBzLmdvb2dsZXVzZXJjb250ZW50LmNvbSIsImF1ZCI6IjEyMzQ1Njc4OTAuYXBwcy5nb29nbGV1c2VyY29udGVudC5jb20iLCJzdWIiOiIxMTc1NTI2NzYyMjgxNDQ4MDc5MjQiLCJlbWFpbCI6ImpvaG4uZG9lQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJuYW1lIjoiSm9obiBEb2UiLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUFBQUFBQUFBQUE9czk2LWMiLCJnaXZlbl9uYW1lIjoiSm9obiIsImZhbWlseV9uYW1lIjoiRG9lIiwibG9jYWxlIjoiZW4iLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6MTcwMDAwMzYwMH0.signature',
     description: 'Google ID token obtained from Google Sign-In SDK',
   })
   @IsString()
@@ -26,7 +34,8 @@ export class AuthWithGoogleDto {
 
   @ApiPropertyOptional({
     example: false,
-    description: 'Whether user subscribed to newsletter (for new registrations)',
+    description:
+      'Whether user subscribed to newsletter (for new registrations)',
   })
   @IsBoolean()
   @IsOptional()
@@ -35,7 +44,8 @@ export class AuthWithGoogleDto {
   @ApiPropertyOptional({
     enum: UserTypeEnumWithoutCompanyDriver,
     example: UserType.Carrier,
-    description: 'Type of user for new registrations (broker, load_owner, carrier, owner_operator)',
+    description:
+      'Type of user for new registrations (broker, load_owner, carrier, owner_operator)',
   })
   @IsEnum(UserTypeEnumWithoutCompanyDriver)
   @IsOptional()
@@ -44,13 +54,15 @@ export class AuthWithGoogleDto {
 
 export class GoogleAuthTokensDto {
   @ApiProperty({
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoiYWNjZXNzIn0.xyz789',
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoiYWNjZXNzIn0.xyz789',
     description: 'JWT access token for API authentication',
   })
   accessToken!: string;
 
   @ApiProperty({
-    example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoicmVmcmVzaCJ9.abc123',
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ0eXBlIjoicmVmcmVzaCJ9.abc123',
     description: 'Refresh token for obtaining new access tokens',
   })
   refreshToken!: string;
@@ -67,17 +79,23 @@ export class GoogleAuthResponseDto {
     type: UserResponseDto,
     description: 'User profile information',
   })
+  @Expose()
+  @Type(() => UserResponseDto)
   user!: UserResponseDto;
 
   @ApiProperty({
     type: GoogleAuthTokensDto,
     description: 'Authentication tokens',
   })
+  @Expose()
+  @Type(() => GoogleAuthTokensDto)
   tokens!: GoogleAuthTokensDto;
 
   @ApiProperty({
     example: true,
-    description: 'True if a new user was created, false if existing user logged in',
+    description:
+      'True if a new user was created, false if existing user logged in',
   })
-  isNewUser!: boolean;
+  @Expose()
+  is_new_user!: boolean;
 }

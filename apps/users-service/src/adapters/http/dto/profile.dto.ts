@@ -36,7 +36,7 @@ export class UpdateUserDto {
   @Transform(({ value }) =>
     typeof value === 'string' ? value.replace(/^\+/, '') : value
   )
-  phoneNumber?: string;
+  phonr_number?: string;
 
   @ApiPropertyOptional({
     example: 'en',
@@ -53,4 +53,20 @@ export class UpdateUserDto {
   @IsOptional()
   @IsString()
   avatar?: string;
+
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Country ID to update',
+  })
+  @IsOptional()
+  @IsString()
+  country_id?: string;
+
+  @ApiPropertyOptional({
+    example: 'Tashkent',
+    description: 'City name to update',
+  })
+  @IsOptional()
+  @IsString()
+  city?: string;
 }
