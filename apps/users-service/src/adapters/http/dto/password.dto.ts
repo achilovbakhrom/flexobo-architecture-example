@@ -79,13 +79,13 @@ export class ResetPasswordDto {
 }
 
 export class ChangePasswordDto {
-  @ApiProperty({
+  @ApiPropertyOptional({
     example: 'OldSecurePass123!',
-    description: 'Current password for verification',
+    description: 'Current password (required only if password already set)',
   })
   @IsString()
-  @IsNotEmpty()
-  oldPassword!: string;
+  @IsOptional()
+  old_password?: string;
 
   @ApiProperty({
     example: 'NewSecurePass456!',
@@ -95,5 +95,5 @@ export class ChangePasswordDto {
   @IsString()
   @MinLength(6)
   @IsNotEmpty()
-  newPassword!: string;
+  new_password!: string;
 }

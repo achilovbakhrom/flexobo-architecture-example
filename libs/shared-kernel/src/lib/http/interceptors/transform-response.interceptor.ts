@@ -12,7 +12,7 @@ const RESPONSE_DTO_KEY = 'api_response_dto';
 
 @Injectable()
 export class TransformResponseInterceptor implements NestInterceptor {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const metadata =
       Reflect.getMetadata(RESPONSE_DTO_KEY, context.getHandler()) ??
       Reflect.getMetadata(RESPONSE_DTO_KEY, context.getClass());

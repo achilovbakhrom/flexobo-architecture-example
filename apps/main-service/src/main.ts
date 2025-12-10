@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { MainModule } from './main.module';
 import {
   TransformResponseInterceptor,
+  LanguageFilterInterceptor,
   SnakeCaseInterceptor,
 } from '@flexobo/shared-kernel';
 
@@ -46,8 +47,15 @@ async function bootstrap() {
   );
   app.useGlobalInterceptors(
     new TransformResponseInterceptor(),
+    new LanguageFilterInterceptor(),
     new SnakeCaseInterceptor()
   );
+
+  // CORS
+  app.enableCors({
+    origin: process.env.CORS_ORIGIN || '*',
+    credentials: true,
+  });
 
   // Swagger
   const config = new DocumentBuilder()

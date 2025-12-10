@@ -85,6 +85,22 @@ export class RegisterDto {
   @IsOptional()
   email?: string;
 
+  @ApiPropertyOptional({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Country ID (UUID)',
+  })
+  @IsString()
+  @IsOptional()
+  country_id?: string;
+
+  @ApiPropertyOptional({
+    example: 'Tashkent',
+    description: 'City name',
+  })
+  @IsString()
+  @IsOptional()
+  city?: string;
+
   @ApiProperty({
     example: 'SecurePass123!',
     description: 'Password (minimum 6 characters)',

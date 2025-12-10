@@ -22,7 +22,6 @@ import { CompanyController } from './adapters/http/v1/company.controller';
 import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
 import { LocationController } from './adapters/http/v1/location.controller';
 import { StatisticsController } from './adapters/http/v1/statistics.controller';
-import { ReferenceDataManagementController } from './adapters/http/v1/reference-data-admin.controller';
 
 // Auth (from shared-kernel)
 import {
@@ -74,6 +73,7 @@ import {
   SAVED_SEARCH_READ_REPOSITORY,
 } from './ports/saved-search.repository';
 import { LOCATION_SERVICE } from './ports/location.service';
+import { REFERENCE_DATA_REPOSITORY } from './ports/reference-data.repository';
 
 // External Services
 import { OsmLocationService } from './adapters/external/osm-location.service';
@@ -295,6 +295,8 @@ import {
   GetSavedSearchHandler,
   ListSavedSearchesHandler,
 } from './application/queries/saved-search';
+import { ReferenceDataController } from './adapters/http/v1/reference-data.controller';
+import { ReferenceDataAdminController } from './adapters/http/v1/reference-data-admin.controller';
 
 const CommandHandlers = [
   // Transport
@@ -475,7 +477,8 @@ const QueryHandlers = [
     SavedSearchController,
     LocationController,
     StatisticsController,
-    ReferenceDataManagementController,
+    ReferenceDataController,
+    ReferenceDataAdminController,
   ],
   providers: [
     // Auth Guard (from shared-kernel)
@@ -564,6 +567,10 @@ const QueryHandlers = [
     {
       provide: SAVED_SEARCH_READ_REPOSITORY,
       useClass: PrismaSavedSearchReadRepository,
+    },
+    {
+      provide: REFERENCE_DATA_REPOSITORY,
+      useClass: PrismaReferenceDataRepository,
     },
 
     // External Services

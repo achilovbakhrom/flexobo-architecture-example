@@ -3,7 +3,11 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { join } from 'path';
-import { SnakeCaseInterceptor } from '@flexobo/shared-kernel';
+import {
+  LanguageFilterInterceptor,
+  SnakeCaseInterceptor,
+  TransformResponseInterceptor,
+} from '@flexobo/shared-kernel';
 
 import { UsersModule } from './users.module';
 
@@ -41,8 +45,11 @@ async function bootstrap() {
   );
 
   // Global interceptors - snake_case response transformation
-  app.useGlobalInterceptors(new SnakeCaseInterceptor());
-
+  app.useGlobalInterceptors(
+    new TransformResponseInterceptor(),
+    new SnakeCaseInterceptor(),
+    new LanguageFilterInterceptor()
+  );
   // Swagger setup
   const config = new DocumentBuilder()
     .setTitle('Users Service API')

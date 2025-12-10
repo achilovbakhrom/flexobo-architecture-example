@@ -15,6 +15,8 @@ export interface UserRecord {
   passwordHash: string;
   fio: string;
   avatar: string | null;
+  countryId?: string;
+  city?: string;
   role: string;
   userType: string | null;
   status: string;
@@ -62,10 +64,17 @@ export interface UserWhereUniqueInput {
 
 export interface UserPrismaClient {
   user: {
-    findUnique: (args: { where: UserWhereUniqueInput }) => Promise<UserRecord | null>;
-    findMany: (args: { where: { id: { in: string[] } } }) => Promise<UserRecord[]>;
+    findUnique: (args: {
+      where: UserWhereUniqueInput;
+    }) => Promise<UserRecord | null>;
+    findMany: (args: {
+      where: { id: { in: string[] } };
+    }) => Promise<UserRecord[]>;
     create: (args: { data: Partial<UserRecord> }) => Promise<UserRecord>;
-    update: (args: { where: { id: string }; data: Partial<UserRecord> }) => Promise<UserRecord>;
+    update: (args: {
+      where: { id: string };
+      data: Partial<UserRecord>;
+    }) => Promise<UserRecord>;
     upsert: (args: {
       where: { id: string };
       create: Partial<UserRecord>;
