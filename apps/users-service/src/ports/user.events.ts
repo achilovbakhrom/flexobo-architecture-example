@@ -34,6 +34,8 @@ export interface UserRegisteredEvent {
     fio: string;
     phoneNumber?: string;
     telegramId?: string;
+    countryId?: string;
+    city?: string;
     googleId?: string;
     email?: string;
     isPrivacyPolicyAccepted?: boolean;
@@ -66,6 +68,8 @@ export interface UserProfileUpdatedEvent {
     phoneNumber?: string;
     language?: string;
     avatar?: string;
+    countryId?: string;
+    city?: string;
     updatedAt: Date;
   };
 }

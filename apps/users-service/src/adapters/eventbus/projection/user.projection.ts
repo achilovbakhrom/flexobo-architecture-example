@@ -35,6 +35,8 @@ interface UserRegisteredData {
   passwordHash: string;
   fio: string;
   userType?: string | null;
+  countryId?: string;
+  city?: string;
   isPrivacyPolicyAccepted?: boolean;
   isSubscribedNewsletter?: boolean;
   platform?: string | null;
@@ -49,6 +51,8 @@ interface UserProfileUpdatedData {
   phoneNumber?: string;
   language?: string;
   avatar?: string;
+  countryId?: string;
+  city?: string;
 }
 
 interface UserPasswordChangedData {
@@ -116,7 +120,13 @@ export class UserProjection extends BaseProjection<
     @Inject(USER_NOTIFICATION_RESOLVER)
     notificationResolver: INotificationResolver<UserEventPayload> | null
   ) {
-    super(rabbitMQConsumer, UserProjection.name, eventBuffer, messagePublisher, notificationResolver);
+    super(
+      rabbitMQConsumer,
+      UserProjection.name,
+      eventBuffer,
+      messagePublisher,
+      notificationResolver
+    );
   }
 
   protected getConfig(): ProjectionConfig {
@@ -146,9 +156,7 @@ export class UserProjection extends BaseProjection<
   protected override async applyEvent(event: UserEventPayload): Promise<void> {
     switch (event.type) {
       case EVENT_TYPES.USER.REGISTERED:
-        await this.onUserRegistered(
-          event as EventPayload<UserRegisteredData>
-        );
+        await this.onUserRegistered(event as EventPayload<UserRegisteredData>);
         break;
 
       case EVENT_TYPES.USER.LOGGED_IN:
@@ -238,6 +246,8 @@ export class UserProjection extends BaseProjection<
         fio: data.fio,
         avatar: null,
         role: UserRole.User,
+        countryId: data.countryId,
+        city: data.city,
         userType: data.userType as any,
         status: UserStatus.Active,
         language: 'en',
@@ -282,6 +292,8 @@ export class UserProjection extends BaseProjection<
         phoneNumber: data.phoneNumber,
         language: data.language,
         avatar: data.avatar,
+        countryId: data.countryId,
+        city: data.city,
       },
       event.version
     );

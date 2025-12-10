@@ -98,7 +98,7 @@ export class ResetPasswordCommand implements ICommand {
 export class ChangePasswordCommand implements ICommand {
   constructor(
     public readonly userId: string,
-    public readonly oldPassword: string,
+    public readonly oldPassword: string | undefined,
     public readonly newPassword: string
   ) {}
 }
