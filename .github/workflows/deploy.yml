@@ -3,7 +3,8 @@ name: Deploy
 on:
   push:
     branches:
-      - dev   # Auto-deploy to development only
+      - dev   # Auto-deploy to development
+      - main  # Auto-deploy to production
   workflow_dispatch:
     inputs:
       environment:
@@ -13,37 +14,25 @@ on:
         default: 'development'
         options:
           - development
-          - staging
           - production
       service:
-        description: 'Service to deploy (leave empty for all affected)'
+        description: 'Service to deploy (leave empty for affected only)'
         required: false
-        type: choice
-        options:
-          - ''
-          - users-service
-          - chat-service
-          - file-service
-          - main-service
-          - billing-service
-          - notification-service
-          - telegram-service
+        type: string
+        default: ''
 
 env:
   AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
 
 jobs:
-  detect-affected:
+  # Detect which services have changed using Nx
+  detect-changes:
+    name: Detect Changed Services
     runs-on: ubuntu-latest
     outputs:
-      affected: ${{ steps.affected.outputs.affected }}
-      users-service: ${{ steps.check.outputs.users-service }}
-      chat-service: ${{ steps.check.outputs.chat-service }}
-      file-service: ${{ steps.check.outputs.file-service }}
-      main-service: ${{ steps.check.outputs.main-service }}
-      billing-service: ${{ steps.check.outputs.billing-service }}
-      notification-service: ${{ steps.check.outputs.notification-service }}
-      telegram-service: ${{ steps.check.outputs.telegram-service }}
+      affected_services: ${{ steps.affected.outputs.services }}
+      has_changes: ${{ steps.affected.outputs.has_changes }}
+      matrix: ${{ steps.matrix.outputs.matrix }}
 
     steps:
       - name: Checkout
@@ -60,67 +49,111 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Derive SHAs for NX affected
+      - name: Get last successful deployment SHA
+        id: last-sha
         run: |
-          echo "NX_BASE=HEAD~1" >> $GITHUB_ENV
-          echo "NX_HEAD=HEAD" >> $GITHUB_ENV
+          # Try to get the last successful deployment SHA from git tags or use default
+          BRANCH="${{ github.ref_name }}"
 
-      - name: Get affected projects
+          # Look for deployment tag
+          LAST_SHA=$(git tag -l "deployed-${BRANCH}-*" --sort=-creatordate | head -1 | sed "s/deployed-${BRANCH}-//" || echo "")
+
+          if [ -z "$LAST_SHA" ]; then
+            # Fallback: compare against previous commit or main branch
+            if [ "$BRANCH" = "main" ]; then
+              LAST_SHA=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)
+            else
+              LAST_SHA=$(git merge-base origin/main HEAD 2>/dev/null || git rev-parse HEAD~1)
+            fi
+          fi
+
+          echo "last_sha=$LAST_SHA" >> $GITHUB_OUTPUT
+          echo "Last deployment SHA: $LAST_SHA"
+
+      - name: Determine affected services
         id: affected
         run: |
-          # If specific service is selected, use that
+          # If specific service is provided via workflow_dispatch, use that
           if [ -n "${{ github.event.inputs.service }}" ]; then
-            AFFECTED="${{ github.event.inputs.service }}"
+            SERVICES="${{ github.event.inputs.service }}"
+            echo "Manual deployment of: $SERVICES"
           else
-            AFFECTED=$(npx nx show projects --affected --type=app 2>/dev/null || echo "")
+            # Use Nx to detect affected apps
+            export NX_BASE="${{ steps.last-sha.outputs.last_sha }}"
+            export NX_HEAD="HEAD"
+
+            echo "Comparing $NX_BASE to $NX_HEAD"
+
+            # Get affected apps (services)
+            AFFECTED_RAW=$(npx nx show projects --affected --type=app 2>/dev/null || echo "")
+
+            # Filter to only our microservices
+            SERVICES=""
+            for svc in auth-service main-service users-service billing-service chat-service notification-service file-service telegram-service; do
+              if echo "$AFFECTED_RAW" | grep -qw "$svc"; then
+                if [ -n "$SERVICES" ]; then
+                  SERVICES="$SERVICES,$svc"
+                else
+                  SERVICES="$svc"
+                fi
+              fi
+            done
+
+            echo "Affected services: $SERVICES"
           fi
-          echo "affected=$AFFECTED" >> $GITHUB_OUTPUT
-          echo "Affected projects: $AFFECTED"
 
-      - name: Check which services are affected
-        id: check
+          # Output results
+          if [ -n "$SERVICES" ]; then
+            echo "services=$SERVICES" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "services=" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create matrix
+        id: matrix
         run: |
-          AFFECTED="${{ steps.affected.outputs.affected }}"
+          SERVICES="${{ steps.affected.outputs.services }}"
 
-          for service in users-service chat-service file-service main-service billing-service notification-service telegram-service; do
-            if echo "$AFFECTED" | grep -q "$service"; then
-              echo "$service=true" >> $GITHUB_OUTPUT
-            else
-              echo "$service=false" >> $GITHUB_OUTPUT
-            fi
-          done
+          if [ -z "$SERVICES" ]; then
+            echo "matrix={\"service\":[]}" >> $GITHUB_OUTPUT
+          else
+            # Convert comma-separated to JSON array
+            JSON_ARRAY=$(echo "$SERVICES" | tr ',' '\n' | jq -R . | jq -s -c .)
+            echo "matrix={\"service\":$JSON_ARRAY}" >> $GITHUB_OUTPUT
+          fi
 
-  build-and-push:
-    needs: detect-affected
+          echo "Matrix: $(cat $GITHUB_OUTPUT | grep matrix)"
+
+      - name: Summary
+        run: |
+          echo "## Deployment Detection Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Property | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | ${{ github.ref_name }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Base SHA | ${{ steps.last-sha.outputs.last_sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Head SHA | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Affected Services | ${{ steps.affected.outputs.services }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Has Changes | ${{ steps.affected.outputs.has_changes }} |" >> $GITHUB_STEP_SUMMARY
+
+  # Build and push Docker images for affected services only
+  build:
+    name: Build ${{ matrix.service }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    if: needs.detect-affected.outputs.affected != ''
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: users-service
-            affected: ${{ needs.detect-affected.outputs.users-service }}
-          - name: chat-service
-            affected: ${{ needs.detect-affected.outputs.chat-service }}
-          - name: file-service
-            affected: ${{ needs.detect-affected.outputs.file-service }}
-          - name: main-service
-            affected: ${{ needs.detect-affected.outputs.main-service }}
-          - name: billing-service
-            affected: ${{ needs.detect-affected.outputs.billing-service }}
-          - name: notification-service
-            affected: ${{ needs.detect-affected.outputs.notification-service }}
-          - name: telegram-service
-            affected: ${{ needs.detect-affected.outputs.telegram-service }}
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
-        if: matrix.affected == 'true'
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        if: matrix.affected == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -128,120 +161,62 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: matrix.affected == 'true'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set up Docker Buildx
-        if: matrix.affected == 'true'
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push to ECR
-        if: matrix.affected == 'true'
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.service }}
+          tags: |
+            type=sha,prefix=
+            type=ref,event=branch
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build and push
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./apps/${{ matrix.name }}/Dockerfile
+          file: ./apps/${{ matrix.service }}/Dockerfile
           push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.sha }}
-            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.ref_name }}
-            ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          build-args: |
+            SERVICE_NAME=${{ matrix.service }}
 
-  deploy-infrastructure:
-    needs: [detect-affected, build-and-push]
-    runs-on: ubuntu-latest
-    if: needs.detect-affected.outputs.affected != ''
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.service }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '0'
+          ignore-unfixed: true
+          severity: 'CRITICAL,HIGH'
 
-      - name: Determine environment
-        id: env
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            ENV="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            ENV="development"
-          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            ENV="production"
-          else
-            ENV="development"
-          fi
-          echo "environment=$ENV" >> $GITHUB_OUTPUT
-
-          case $ENV in
-            development)
-              echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
-              echo "overlay=development" >> $GITHUB_OUTPUT
-              ;;
-            staging)
-              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
-              echo "overlay=staging" >> $GITHUB_OUTPUT
-              ;;
-            production)
-              echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
-              echo "overlay=production" >> $GITHUB_OUTPUT
-              ;;
-          esac
-
-      - name: Update kubeconfig for EKS
-        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
-
-      - name: Apply base infrastructure (RabbitMQ, Redis, Vault)
-        run: |
-          kubectl apply -k k8s/overlays/${{ steps.env.outputs.overlay }}
-
-      - name: Wait for infrastructure to be ready
-        run: |
-          kubectl wait --for=condition=ready pod -l app=rabbitmq -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
-          kubectl wait --for=condition=ready pod -l app=redis -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
-          kubectl wait --for=condition=ready pod -l app=vault -n ${{ steps.env.outputs.namespace }} --timeout=300s || true
-
-  deploy-services:
-    needs: [detect-affected, build-and-push, deploy-infrastructure]
+  # Deploy to Kubernetes
+  deploy:
+    name: Deploy ${{ matrix.service }}
+    needs: [detect-changes, build]
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    if: needs.detect-affected.outputs.affected != ''
+    environment: ${{ github.ref == 'refs/heads/main' && 'production' || 'development' }}
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: users-service
-            affected: ${{ needs.detect-affected.outputs.users-service }}
-          - name: chat-service
-            affected: ${{ needs.detect-affected.outputs.chat-service }}
-          - name: file-service
-            affected: ${{ needs.detect-affected.outputs.file-service }}
-          - name: main-service
-            affected: ${{ needs.detect-affected.outputs.main-service }}
-          - name: billing-service
-            affected: ${{ needs.detect-affected.outputs.billing-service }}
-          - name: notification-service
-            affected: ${{ needs.detect-affected.outputs.notification-service }}
-          - name: telegram-service
-            affected: ${{ needs.detect-affected.outputs.telegram-service }}
+      max-parallel: 2  # Deploy 2 services at a time to avoid overwhelming the cluster
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
-        if: matrix.affected == 'true'
         uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        if: matrix.affected == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -249,13 +224,10 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Determine environment
-        if: matrix.affected == 'true'
         id: env
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            ENV="development"
           elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             ENV="production"
           else
@@ -266,56 +238,98 @@ jobs:
           case $ENV in
             development)
               echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
-              echo "overlay=development" >> $GITHUB_OUTPUT
-              ;;
-            staging)
-              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
-              echo "overlay=staging" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo" >> $GITHUB_OUTPUT
               ;;
             production)
               echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
-              echo "overlay=production" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo" >> $GITHUB_OUTPUT
               ;;
           esac
 
-      - name: Update kubeconfig for EKS
-        if: matrix.affected == 'true'
-        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ steps.env.outputs.cluster_name }} \
+            --region ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
-        if: matrix.affected == 'true'
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Deploy ${{ matrix.name }}
-        if: matrix.affected == 'true'
+      - name: Deploy ${{ matrix.service }}
         run: |
           NAMESPACE="${{ steps.env.outputs.namespace }}"
-          IMAGE="${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.name }}:${{ github.sha }}"
+          IMAGE="${{ steps.login-ecr.outputs.registry }}/flexobo/${{ matrix.service }}:${{ github.sha }}"
 
-          # Update image in kustomization
-          cd k8s/overlays/${{ steps.env.outputs.overlay }}
+          echo "Deploying ${{ matrix.service }} to $NAMESPACE"
+          echo "Image: $IMAGE"
 
-          # Set the new image
-          kubectl set image deployment/${{ matrix.name }} ${{ matrix.name }}=$IMAGE -n $NAMESPACE || \
-            kubectl patch deployment ${{ matrix.name }} -n $NAMESPACE -p '{"spec":{"template":{"spec":{"containers":[{"name":"${{ matrix.name }}","image":"'$IMAGE'"}]}}}}'
+          # Update deployment image
+          kubectl set image deployment/${{ matrix.service }} \
+            ${{ matrix.service }}=$IMAGE \
+            -n $NAMESPACE
 
           # Wait for rollout
-          kubectl rollout status deployment/${{ matrix.name }} -n $NAMESPACE --timeout=300s
+          kubectl rollout status deployment/${{ matrix.service }} \
+            -n $NAMESPACE \
+            --timeout=300s
 
-  run-migrations:
-    needs: [detect-affected, deploy-services]
+      - name: Verify Istio sidecar
+        run: |
+          NAMESPACE="${{ steps.env.outputs.namespace }}"
+
+          # Check if pod has Istio sidecar
+          POD=$(kubectl get pod -n $NAMESPACE -l app=${{ matrix.service }} -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+
+          if [ -n "$POD" ]; then
+            CONTAINERS=$(kubectl get pod $POD -n $NAMESPACE -o jsonpath='{.spec.containers[*].name}')
+            if echo "$CONTAINERS" | grep -q "istio-proxy"; then
+              echo "✅ Istio sidecar is running"
+            else
+              echo "⚠️ Istio sidecar not detected"
+            fi
+          fi
+
+      - name: Run health check
+        run: |
+          NAMESPACE="${{ steps.env.outputs.namespace }}"
+
+          # Wait for pod to be ready
+          kubectl wait --for=condition=ready pod \
+            -l app=${{ matrix.service }} \
+            -n $NAMESPACE \
+            --timeout=120s
+
+          echo "✅ ${{ matrix.service }} is healthy"
+
+  # Run migrations only for affected services
+  migrate:
+    name: Migrate ${{ matrix.service }}
+    needs: [detect-changes, deploy]
+    if: needs.detect-changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
-    if: needs.detect-affected.outputs.affected != ''
+
+    strategy:
+      fail-fast: false
+      max-parallel: 1  # Run migrations sequentially
+      matrix: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Check if service has Prisma
+        id: check-prisma
+        run: |
+          if [ -f "apps/${{ matrix.service }}/prisma/schema.prisma" ]; then
+            echo "has_prisma=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_prisma=false" >> $GITHUB_OUTPUT
+            echo "No Prisma schema found for ${{ matrix.service }}, skipping migration"
+          fi
+
       - name: Configure AWS credentials
+        if: steps.check-prisma.outputs.has_prisma == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -323,43 +337,116 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Determine environment
+        if: steps.check-prisma.outputs.has_prisma == 'true'
         id: env
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             ENV="${{ github.event.inputs.environment }}"
-          elif [ "${{ github.ref }}" = "refs/heads/dev" ]; then
-            ENV="development"
-          else
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
             ENV="production"
+          else
+            ENV="development"
           fi
 
           case $ENV in
             development)
               echo "cluster_name=flexobo-dev" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-dev" >> $GITHUB_OUTPUT
-              ;;
-            staging)
-              echo "cluster_name=flexobo-staging" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-staging" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo" >> $GITHUB_OUTPUT
               ;;
             production)
               echo "cluster_name=flexobo-prod" >> $GITHUB_OUTPUT
-              echo "namespace=flexobo-prod" >> $GITHUB_OUTPUT
+              echo "namespace=flexobo" >> $GITHUB_OUTPUT
               ;;
           esac
 
-      - name: Update kubeconfig for EKS
-        run: aws eks update-kubeconfig --name ${{ steps.env.outputs.cluster_name }} --region ${{ env.AWS_REGION }}
+      - name: Update kubeconfig
+        if: steps.check-prisma.outputs.has_prisma == 'true'
+        run: |
+          aws eks update-kubeconfig \
+            --name ${{ steps.env.outputs.cluster_name }} \
+            --region ${{ env.AWS_REGION }}
 
-      - name: Run database migrations
+      - name: Run migrations for ${{ matrix.service }}
+        if: steps.check-prisma.outputs.has_prisma == 'true'
         run: |
           NAMESPACE="${{ steps.env.outputs.namespace }}"
 
-          # Run migrations for affected services that have Prisma
-          for service in users-service chat-service file-service main-service billing-service notification-service telegram-service; do
-            if [ -f "apps/$service/prisma/schema.prisma" ]; then
-              echo "Running migrations for $service..."
-              # Execute prisma migrate deploy in the running pod
-              kubectl exec -n $NAMESPACE deployment/$service -- npx prisma migrate deploy || echo "Migration for $service skipped or failed"
-            fi
+          echo "Running Prisma migrations for ${{ matrix.service }}..."
+
+          # Get the pod name
+          POD=$(kubectl get pod -n $NAMESPACE -l app=${{ matrix.service }} -o jsonpath='{.items[0].metadata.name}')
+
+          # Run migration
+          kubectl exec -n $NAMESPACE $POD -- npx prisma migrate deploy || {
+            echo "⚠️ Migration failed for ${{ matrix.service }}"
+            exit 1
+          }
+
+          echo "✅ Migrations completed for ${{ matrix.service }}"
+
+  # Tag successful deployment
+  tag-deployment:
+    name: Tag Deployment
+    needs: [detect-changes, deploy, migrate]
+    if: always() && needs.deploy.result == 'success'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Tag successful deployment
+        run: |
+          BRANCH="${{ github.ref_name }}"
+          TAG="deployed-${BRANCH}-${{ github.sha }}"
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # Create lightweight tag
+          git tag "$TAG"
+          git push origin "$TAG" || echo "Tag already exists"
+
+          echo "Tagged deployment: $TAG"
+
+      - name: Cleanup old deployment tags
+        run: |
+          BRANCH="${{ github.ref_name }}"
+
+          # Keep only last 10 deployment tags per branch
+          TAGS=$(git tag -l "deployed-${BRANCH}-*" --sort=-creatordate | tail -n +11)
+
+          for tag in $TAGS; do
+            git push origin --delete "$tag" 2>/dev/null || true
+            git tag -d "$tag" 2>/dev/null || true
           done
+
+  # Deployment summary
+  summary:
+    name: Deployment Summary
+    needs: [detect-changes, build, deploy, migrate]
+    if: always()
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Detection | ${{ needs.detect-changes.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ${{ needs.build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Deploy | ${{ needs.deploy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Migrate | ${{ needs.migrate.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed Services" >> $GITHUB_STEP_SUMMARY
+          echo "${{ needs.detect-changes.outputs.affected_services }}" >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "⚠️ Deployment failed! Check the workflow logs for details."
+          # Add Slack/email notification here if needed
