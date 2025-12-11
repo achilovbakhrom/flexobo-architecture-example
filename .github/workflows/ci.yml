@@ -7,8 +7,14 @@ on:
     branches: [main, dev]
 
 jobs:
-  main:
+  # Detect affected projects first
+  detect-affected:
+    name: Detect Affected Projects
     runs-on: ubuntu-latest
+    outputs:
+      affected: ${{ steps.affected.outputs.projects }}
+      has_changes: ${{ steps.affected.outputs.has_changes }}
+      affected_apps: ${{ steps.affected.outputs.apps }}
 
     steps:
       - name: Checkout
@@ -25,8 +31,77 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build libraries
-        run: yarn build
+      - name: Derive SHAs for NX affected
+        id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "base=origin/${{ github.base_ref }}" >> $GITHUB_OUTPUT
+          else
+            # For push events, compare against the previous commit
+            echo "base=HEAD~1" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get affected projects
+        id: affected
+        run: |
+          export NX_BASE="${{ steps.sha.outputs.base }}"
+          export NX_HEAD="HEAD"
+
+          echo "Comparing $NX_BASE to $NX_HEAD"
+
+          # Get all affected projects
+          AFFECTED=$(npx nx show projects --affected 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+          # Get affected apps only
+          APPS=$(npx nx show projects --affected --type=app 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+
+          if [ -n "$AFFECTED" ]; then
+            echo "projects=$AFFECTED" >> $GITHUB_OUTPUT
+            echo "apps=$APPS" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "projects=" >> $GITHUB_OUTPUT
+            echo "apps=" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "Affected projects: $AFFECTED"
+          echo "Affected apps: $APPS"
+
+      - name: Summary
+        run: |
+          echo "## Affected Projects" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Base: ${{ steps.sha.outputs.base }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**All affected:** ${{ steps.affected.outputs.projects }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Affected apps:** ${{ steps.affected.outputs.apps }}" >> $GITHUB_STEP_SUMMARY
+
+  # Main CI job - only runs if there are changes
+  main:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    needs: detect-affected
+    if: needs.detect-affected.outputs.has_changes == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build libraries first
+        run: npx nx run-many -t build --projects=tag:type:lib --parallel=3
 
       - name: Derive SHAs for NX affected
         run: |
@@ -37,14 +112,11 @@ jobs:
           fi
           echo "NX_HEAD=HEAD" >> $GITHUB_ENV
 
-      - name: Show affected projects
-        run: npx nx show projects --affected
-
-      - name: Lint affected
+      - name: Lint affected projects
         run: npx nx affected -t lint --parallel=3
 
-      - name: Test with coverage
-        run: npx nx run-many -t test --all --parallel=3 --coverage --coverageReporters=lcov
+      - name: Test affected projects
+        run: npx nx affected -t test --parallel=3 --coverage --coverageReporters=lcov
 
       - name: List coverage files
         run: find coverage -name "lcov.info" -type f 2>/dev/null || echo "No coverage files found"
@@ -57,12 +129,37 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
-      - name: Build affected
+      - name: Build affected projects
         run: npx nx affected -t build --parallel=3
 
-  security:
+      - name: Summary
+        run: |
+          echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Lint, test, and build completed for affected projects" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Affected: ${{ needs.detect-affected.outputs.affected }}" >> $GITHUB_STEP_SUMMARY
+
+  # Skip job - runs when no changes detected
+  skip:
+    name: No Changes Detected
     runs-on: ubuntu-latest
-    needs: main
+    needs: detect-affected
+    if: needs.detect-affected.outputs.has_changes == 'false'
+
+    steps:
+      - name: Skip message
+        run: |
+          echo "No affected projects detected. Skipping CI."
+          echo "## No Changes" >> $GITHUB_STEP_SUMMARY
+          echo "No projects were affected by this change." >> $GITHUB_STEP_SUMMARY
+
+  # Security job
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    needs: [detect-affected, main]
+    if: always() && needs.detect-affected.outputs.has_changes == 'true'
 
     steps:
       - name: Checkout
