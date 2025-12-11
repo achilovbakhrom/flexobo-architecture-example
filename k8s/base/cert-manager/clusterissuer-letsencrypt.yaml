@@ -1,0 +1,53 @@
+# Let's Encrypt ClusterIssuers for cert-manager
+# Version: 1.19.2 (December 2025)
+# Documentation: https://cert-manager.io/docs/configuration/acme/
+---
+# Staging issuer for testing (higher rate limits)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Staging server URL
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: admin@flexobo.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      # HTTP-01 solver using Kong ingress
+      - http01:
+          ingress:
+            class: kong
+      # DNS-01 solver for wildcard certificates (requires Route53 access)
+      - dns01:
+          route53:
+            region: us-east-1
+        selector:
+          dnsZones:
+            - "flexobo.com"
+---
+# Production issuer for real certificates
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Production server URL
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: admin@flexobo.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      # HTTP-01 solver using Kong ingress
+      - http01:
+          ingress:
+            class: kong
+      # DNS-01 solver for wildcard certificates
+      - dns01:
+          route53:
+            region: us-east-1
+        selector:
+          dnsZones:
+            - "flexobo.com"

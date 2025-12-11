@@ -1,0 +1,169 @@
+# Jaeger Helm Values
+# Version: 2.13.0 (December 2025)
+# Chart: jaegertracing/jaeger
+# Install: helm install jaeger jaegertracing/jaeger -n monitoring -f helm-values.yaml
+
+# Provider type
+providerType: elasticsearch  # Using OpenSearch which is ES-compatible
+
+# Collector configuration
+collector:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    grpc:
+      port: 14250
+    http:
+      port: 14268
+    otlp:
+      grpc:
+        port: 4317
+      http:
+        port: 4318
+    zipkin:
+      port: 9411
+
+# Query configuration
+query:
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 16686
+
+  # Ingress for Jaeger UI
+  ingress:
+    enabled: true
+    ingressClassName: kong
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      konghq.com/plugins: ip-restriction-admin
+    hosts:
+      - jaeger.flexobo.internal
+    tls:
+      - secretName: jaeger-tls
+        hosts:
+          - jaeger.flexobo.internal
+
+# Agent configuration (DaemonSet)
+agent:
+  enabled: true
+  daemonset:
+    useHostPort: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Storage configuration (OpenSearch)
+storage:
+  type: elasticsearch
+  elasticsearch:
+    # OpenSearch endpoint (ES-compatible)
+    host: ""  # Set via External Secret from Terraform output
+    port: 443
+    scheme: https
+    usePassword: true
+    user: admin
+    password: ""  # Set via External Secret
+    # TLS configuration
+    tls:
+      enabled: true
+      skipHostVerify: true
+    # Index settings
+    indexPrefix: jaeger
+    createIndexTemplates: true
+    numShards: 1
+    numReplicas: 0
+
+# Spark dependencies (for DAG generation)
+spark:
+  enabled: false  # Enable for production if needed
+
+# Cassandra (disabled - using OpenSearch)
+cassandra:
+  enabled: false
+
+# All-in-one mode (disabled for production)
+allInOne:
+  enabled: false
+
+# Hotrod demo (disabled)
+hotrod:
+  enabled: false
+
+# Service account
+serviceAccounts:
+  collector:
+    create: true
+    name: jaeger-collector
+    annotations:
+      eks.amazonaws.com/role-arn: ""  # IRSA for OpenSearch access
+  query:
+    create: true
+    name: jaeger-query
+    annotations:
+      eks.amazonaws.com/role-arn: ""
+  agent:
+    create: true
+    name: jaeger-agent
+
+# External secrets for OpenSearch credentials
+extraSecretMounts:
+  - name: opensearch-credentials
+    mountPath: /etc/jaeger/secrets
+    secretName: opensearch-credentials
+    readOnly: true
+
+# Environment variables
+extraEnv:
+  - name: ES_SERVER_URLS
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-credentials
+        key: OPENSEARCH_URL
+  - name: ES_USERNAME
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-credentials
+        key: OPENSEARCH_USERNAME
+  - name: ES_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: opensearch-credentials
+        key: OPENSEARCH_PASSWORD
+
+# Metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

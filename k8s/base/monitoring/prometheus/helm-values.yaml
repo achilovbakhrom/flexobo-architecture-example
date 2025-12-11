@@ -1,0 +1,214 @@
+# Prometheus Helm Values (kube-prometheus-stack)
+# Chart: prometheus-community/kube-prometheus-stack
+# Install: helm install prometheus prometheus-community/kube-prometheus-stack -n monitoring --create-namespace -f helm-values.yaml
+
+# Global settings
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+# Prometheus configuration
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # Retention settings (7 days for dev)
+    retention: 7d
+    retentionSize: "10GB"
+
+    # Storage configuration
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 20Gi
+
+    # Resources
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+
+    # Remote write to S3 via Thanos (optional)
+    # remoteWrite:
+    #   - url: "http://thanos-receive.monitoring.svc.cluster.local:19291/api/v1/receive"
+
+    # Service monitors for flexobo services
+    additionalServiceMonitors:
+      - name: flexobo-services
+        selector:
+          matchLabels:
+            app.kubernetes.io/part-of: flexobo
+        namespaceSelector:
+          matchNames:
+            - flexobo
+        endpoints:
+          - port: http
+            path: /metrics
+            interval: 30s
+      - name: kong-metrics
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: kong
+        namespaceSelector:
+          matchNames:
+            - kong
+        endpoints:
+          - port: metrics
+            interval: 30s
+      - name: istio-metrics
+        selector:
+          matchLabels:
+            app: istiod
+        namespaceSelector:
+          matchNames:
+            - istio-system
+        endpoints:
+          - port: http-monitoring
+            interval: 30s
+
+    # Pod monitor for Istio sidecars
+    additionalPodMonitors:
+      - name: envoy-stats
+        podMetricsEndpoints:
+          - path: /stats/prometheus
+            port: "15090"
+        selector:
+          matchExpressions:
+            - key: security.istio.io/tlsMode
+              operator: Exists
+        namespaceSelector:
+          matchNames:
+            - flexobo
+
+  # Ingress for Prometheus (internal only)
+  ingress:
+    enabled: true
+    ingressClassName: kong
+    annotations:
+      konghq.com/plugins: ip-restriction-admin
+    hosts:
+      - prometheus.flexobo.internal
+    tls:
+      - secretName: prometheus-tls
+        hosts:
+          - prometheus.flexobo.internal
+
+# Alertmanager configuration
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: gp3
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+  # Alert configuration
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: 'default'
+      group_by: ['alertname', 'namespace', 'service']
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 12h
+      routes:
+        - match:
+            severity: critical
+          receiver: 'critical'
+        - match:
+            severity: warning
+          receiver: 'warning'
+    receivers:
+      - name: 'default'
+        # Add webhook/email configuration as needed
+      - name: 'critical'
+        # Configure critical alert receiver
+      - name: 'warning'
+        # Configure warning alert receiver
+
+# Grafana is handled separately
+grafana:
+  enabled: false  # Using separate Grafana deployment
+
+# Node exporter
+nodeExporter:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# Kube state metrics
+kubeStateMetrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# PrometheusOperator
+prometheusOperator:
+  enabled: true
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# Default rules
+defaultRules:
+  create: true
+  rules:
+    alertmanager: true
+    etcd: false  # EKS managed
+    configReloaders: true
+    general: true
+    k8s: true
+    kubeApiserverAvailability: true
+    kubeApiserverBurnrate: true
+    kubeApiserverHistogram: true
+    kubeApiserverSlos: true
+    kubelet: true
+    kubeProxy: false  # EKS managed
+    kubePrometheusGeneral: true
+    kubePrometheusNodeRecording: true
+    kubernetesApps: true
+    kubernetesResources: true
+    kubernetesStorage: true
+    kubernetesSystem: true
+    kubeSchedulerAlerting: false  # EKS managed
+    kubeSchedulerRecording: false  # EKS managed
+    kubeStateMetrics: true
+    network: true
+    node: true
+    nodeExporterAlerting: true
+    nodeExporterRecording: true
+    prometheus: true
+    prometheusOperator: true
