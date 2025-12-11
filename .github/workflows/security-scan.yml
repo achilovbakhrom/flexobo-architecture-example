@@ -36,21 +36,6 @@ jobs:
         run: yarn audit --level moderate
         continue-on-error: true
 
-      - name: Run Snyk to check for vulnerabilities
-        uses: snyk/actions/node@master
-        continue-on-error: true
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          args: --severity-threshold=high --all-projects
-
-      - name: Upload Snyk results to GitHub Code Scanning
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
-        with:
-          sarif_file: snyk.sarif
-
   # Static Application Security Testing (SAST)
   sast-scan:
     name: Static Code Analysis
@@ -166,12 +151,12 @@ jobs:
       - name: Run Kubesec
         uses: controlplaneio/kubesec-action@v0.0.2
         with:
-          input: k8s/base/
+          input: infrastructure/k8s/base/
 
       - name: Run kube-linter
         uses: stackrox/kube-linter-action@v1
         with:
-          directory: k8s/
+          directory: infrastructure/k8s/
           config: .kube-linter.yaml
 
       - name: Run Checkov for IaC

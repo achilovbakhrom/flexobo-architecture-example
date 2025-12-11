@@ -37,13 +37,13 @@ resources:
   - monitoring
 
 # Note: The following are installed via Helm and managed separately:
-# - cert-manager (k8s/base/cert-manager/helm-values.yaml)
-# - kong (k8s/base/kong/helm-values.yaml)
-# - prometheus-stack (k8s/base/monitoring/prometheus/helm-values.yaml)
-# - grafana (k8s/base/monitoring/grafana/helm-values.yaml)
-# - loki (k8s/base/monitoring/loki/helm-values.yaml)
-# - jaeger (k8s/base/monitoring/jaeger/helm-values.yaml)
-# - rancher (k8s/rancher/helm-values.yaml)
+# - cert-manager (infrastructure/k8s/base/cert-manager/helm-values.yaml)
+# - kong (infrastructure/k8s/base/kong/helm-values.yaml)
+# - prometheus-stack (infrastructure/k8s/base/monitoring/prometheus/helm-values.yaml)
+# - grafana (infrastructure/k8s/base/monitoring/grafana/helm-values.yaml)
+# - loki (infrastructure/k8s/base/monitoring/loki/helm-values.yaml)
+# - jaeger (infrastructure/k8s/base/monitoring/jaeger/helm-values.yaml)
+# - rancher (infrastructure/k8s/rancher/helm-values.yaml)
 
 commonLabels:
   app.kubernetes.io/name: flexobo
