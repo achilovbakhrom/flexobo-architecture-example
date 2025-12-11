@@ -1,0 +1,12 @@
+# RBAC Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - service-accounts.yaml
+  - roles.yaml
+  - role-bindings.yaml
+
+commonLabels:
+  app.kubernetes.io/part-of: flexobo
+  app.kubernetes.io/managed-by: kustomize

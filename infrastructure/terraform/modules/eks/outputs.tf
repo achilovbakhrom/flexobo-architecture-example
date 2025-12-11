@@ -42,3 +42,13 @@ output "node_group_status" {
   description = "EKS node group status"
   value       = aws_eks_node_group.main.status
 }
+
+output "oidc_provider_arn" {
+  description = "ARN of the OIDC provider for IRSA"
+  value       = aws_iam_openid_connect_provider.eks.arn
+}
+
+output "oidc_provider_url" {
+  description = "URL of the OIDC provider (without https://)"
+  value       = replace(aws_eks_cluster.main.identity[0].oidc[0].issuer, "https://", "")
+}
