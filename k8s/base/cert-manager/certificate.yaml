@@ -1,0 +1,39 @@
+# Certificates for flexobo services
+# These will be automatically managed by cert-manager
+---
+# Wildcard certificate for all services
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: flexobo-wildcard-cert
+  namespace: flexobo
+spec:
+  secretName: flexobo-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.flexobo.com"
+  dnsNames:
+    - "*.flexobo.com"
+    - "flexobo.com"
+  # Certificate will be renewed 30 days before expiration
+  renewBefore: 720h  # 30 days
+  duration: 2160h    # 90 days (Let's Encrypt standard)
+---
+# Development subdomain certificate
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: flexobo-dev-cert
+  namespace: flexobo
+spec:
+  secretName: flexobo-dev-tls-secret
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  commonName: "*.dev.flexobo.com"
+  dnsNames:
+    - "*.dev.flexobo.com"
+    - "dev.flexobo.com"
+  renewBefore: 720h
+  duration: 2160h

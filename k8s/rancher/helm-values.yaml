@@ -1,0 +1,109 @@
+# Rancher Helm Values
+# Version: 2.13.0 (December 2025)
+# Chart: rancher-stable/rancher
+# Prerequisites: cert-manager must be installed first
+# Install:
+#   helm repo add rancher-stable https://releases.rancher.com/server-charts/stable
+#   helm install rancher rancher-stable/rancher -n cattle-system --create-namespace -f helm-values.yaml
+
+# Hostname for Rancher UI
+hostname: rancher.flexobo.com
+
+# Number of replicas
+replicas: 1  # Can increase for HA in production
+
+# Use Let's Encrypt certificates via cert-manager
+ingress:
+  tls:
+    source: letsEncrypt
+
+# Let's Encrypt configuration
+letsEncrypt:
+  email: admin@flexobo.com
+  environment: production  # Use 'staging' for testing
+  ingress:
+    class: kong  # Use Kong as ingress controller
+
+# Bootstrap password (change after first login!)
+# In production, use: --set bootstrapPassword=$(openssl rand -base64 32)
+bootstrapPassword: ""  # Will be auto-generated if empty
+
+# Private CA (disabled - using Let's Encrypt)
+privateCA: false
+
+# Additional trusted CAs (optional)
+additionalTrustedCAs: false
+
+# Rancher image
+rancherImage: rancher/rancher
+rancherImageTag: v2.13.0
+
+# System default registry (optional)
+# systemDefaultRegistry: ""
+
+# Resources
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Audit logging
+auditLog:
+  level: 1  # 0=off, 1=metadata, 2=request, 3=request+response
+  maxAge: 30
+  maxBackup: 10
+  maxSize: 100
+
+# Busy box image for init containers
+busyboxImage: busybox
+
+# Extra environment variables
+extraEnv:
+  - name: CATTLE_PROMETHEUS_METRICS
+    value: "true"
+
+# Pod priority class
+priorityClassName: ""
+
+# Antiaffinity (for HA)
+antiAffinity: preferred
+
+# Tolerations
+tolerations: []
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Pod annotations
+podAnnotations: {}
+
+# Service annotations (for AWS NLB if not using ingress)
+service:
+  type: ClusterIP
+  annotations: {}
+
+# Post-delete hook (cleanup)
+postDelete:
+  enabled: true
+  image:
+    repository: rancher/shell
+    tag: v0.2.1
+
+# Embedded cluster agent
+# Note: For managing external clusters, install fleet separately
+clusterAgent:
+  # Tolerations for the cluster agent
+  tolerations: []
+
+# Feature flags
+features: ""
+
+# Global settings
+global:
+  cattle:
+    psp:
+      enabled: false  # PSP deprecated in K8s 1.25+

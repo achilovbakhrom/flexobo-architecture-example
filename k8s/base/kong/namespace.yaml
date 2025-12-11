@@ -1,0 +1,10 @@
+# Kong namespace
+# Version: 3.5.3 (December 2025)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kong
+  labels:
+    istio-injection: enabled  # Enable Istio sidecar for mTLS to services
+    app.kubernetes.io/name: kong
+    app.kubernetes.io/component: ingress-controller

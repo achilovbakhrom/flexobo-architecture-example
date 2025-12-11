@@ -1,0 +1,34 @@
+# kube-linter configuration
+# Documentation: https://github.com/stackrox/kube-linter
+checks:
+  # Enable all default checks
+  addAllBuiltIn: true
+
+  # Exclude checks that may not apply
+  exclude:
+    - "unset-cpu-requirements"     # Some sidecars don't need CPU limits
+    - "unset-memory-requirements"  # Some sidecars don't need memory limits
+
+customChecks:
+  # Custom check for required labels
+  - name: required-labels
+    description: "Ensures required labels are present"
+    remediation: "Add the missing labels to the resource"
+    scope:
+      objectKinds:
+        - DeploymentLike
+        - Service
+    template: required-label
+    params:
+      key: app.kubernetes.io/part-of
+
+  # Custom check for security annotations
+  - name: security-annotations
+    description: "Ensures security-related annotations"
+    remediation: "Add required security annotations"
+    scope:
+      objectKinds:
+        - DeploymentLike
+    template: required-annotation
+    params:
+      key: security.flexobo.com/reviewed

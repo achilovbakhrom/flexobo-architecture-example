@@ -1,0 +1,9 @@
+# cert-manager namespace
+# Version: 1.19.2 (December 2025)
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    app.kubernetes.io/name: cert-manager
+    app.kubernetes.io/component: controller

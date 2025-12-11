@@ -1,0 +1,185 @@
+# Kong Plugins Configuration
+# Documentation: https://docs.konghq.com/kubernetes-ingress-controller/latest/plugins/
+---
+# Global Rate Limiting Plugin
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-rate-limit
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+spec:
+  plugin: rate-limiting
+  config:
+    minute: 100
+    policy: local
+    fault_tolerant: true
+    hide_client_headers: false
+    limit_by: ip
+---
+# Global CORS Plugin
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-cors
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+spec:
+  plugin: cors
+  config:
+    origins:
+      - "https://flexobo.com"
+      - "https://*.flexobo.com"
+      - "https://dev.flexobo.com"
+      - "http://localhost:3000"  # Local development
+    methods:
+      - GET
+      - POST
+      - PUT
+      - PATCH
+      - DELETE
+      - OPTIONS
+    headers:
+      - Accept
+      - Accept-Version
+      - Content-Length
+      - Content-Type
+      - Authorization
+      - X-Requested-With
+      - X-Request-ID
+    exposed_headers:
+      - X-Request-ID
+      - X-RateLimit-Limit
+      - X-RateLimit-Remaining
+    credentials: true
+    max_age: 3600
+---
+# Global Request Transformer (add request ID)
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-request-id
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+spec:
+  plugin: correlation-id
+  config:
+    header_name: X-Request-ID
+    generator: uuid
+    echo_downstream: true
+---
+# Global Prometheus Plugin
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: global-prometheus
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+spec:
+  plugin: prometheus
+  config:
+    per_consumer: false
+    status_code_metrics: true
+    latency_metrics: true
+    bandwidth_metrics: true
+    upstream_health_metrics: true
+---
+# JWT Authentication Plugin (for services requiring auth)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: jwt-auth
+  namespace: flexobo
+spec:
+  plugin: jwt
+  config:
+    uri_param_names:
+      - jwt
+    cookie_names: []
+    key_claim_name: iss
+    secret_is_base64: false
+    claims_to_verify:
+      - exp
+    run_on_preflight: true
+---
+# Response Rate Limiting (for specific endpoints)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: strict-rate-limit
+  namespace: flexobo
+spec:
+  plugin: rate-limiting
+  config:
+    minute: 30
+    policy: local
+    fault_tolerant: true
+    limit_by: consumer
+---
+# Request Size Limiting
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: request-size-limit
+  namespace: flexobo
+spec:
+  plugin: request-size-limiting
+  config:
+    allowed_payload_size: 10  # MB
+    size_unit: megabytes
+---
+# Bot Detection Plugin
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: bot-detection
+  namespace: flexobo
+spec:
+  plugin: bot-detection
+  config:
+    allow: []
+    deny:
+      - "curl"
+      - "wget"
+---
+# IP Restriction Plugin (for admin endpoints)
+apiVersion: configuration.konghq.com/v1
+kind: KongPlugin
+metadata:
+  name: ip-restriction-admin
+  namespace: flexobo
+spec:
+  plugin: ip-restriction
+  config:
+    allow:
+      - 10.0.0.0/8  # VPC CIDR
+    status: 403
+    message: "Access denied"
+---
+# Response Transformer (security headers)
+apiVersion: configuration.konghq.com/v1
+kind: KongClusterPlugin
+metadata:
+  name: security-headers
+  annotations:
+    kubernetes.io/ingress.class: kong
+  labels:
+    global: "true"
+spec:
+  plugin: response-transformer
+  config:
+    add:
+      headers:
+        - "X-Content-Type-Options:nosniff"
+        - "X-Frame-Options:DENY"
+        - "X-XSS-Protection:1; mode=block"
+        - "Strict-Transport-Security:max-age=31536000; includeSubDomains"
+        - "Referrer-Policy:strict-origin-when-cross-origin"

@@ -1,0 +1,105 @@
+# Destination Rules for traffic management
+# Documentation: https://istio.io/latest/docs/reference/config/networking/destination-rule/
+---
+# Default destination rule for all services in flexobo
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: flexobo-default
+  namespace: flexobo
+spec:
+  host: "*.flexobo.svc.cluster.local"
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 5s
+      http:
+        h2UpgradePolicy: UPGRADE
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+        maxRequestsPerConnection: 10
+        maxRetries: 3
+    outlierDetection:
+      consecutive5xxErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+---
+# Auth Service destination rule
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: auth-service
+  namespace: flexobo
+spec:
+  host: auth-service.flexobo.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 50
+      http:
+        http1MaxPendingRequests: 50
+        http2MaxRequests: 500
+    loadBalancer:
+      simple: ROUND_ROBIN
+---
+# Main Service destination rule
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: main-service
+  namespace: flexobo
+spec:
+  host: main-service.flexobo.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 1000
+    loadBalancer:
+      simple: ROUND_ROBIN
+    outlierDetection:
+      consecutive5xxErrors: 3
+      interval: 10s
+      baseEjectionTime: 30s
+---
+# RabbitMQ destination rule (TCP traffic)
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: rabbitmq
+  namespace: flexobo
+spec:
+  host: rabbitmq.flexobo.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 200
+        connectTimeout: 10s
+---
+# Redis destination rule (TCP traffic)
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: redis
+  namespace: flexobo
+spec:
+  host: redis.flexobo.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+    connectionPool:
+      tcp:
+        maxConnections: 100
+        connectTimeout: 5s

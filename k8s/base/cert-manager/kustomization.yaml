@@ -1,0 +1,14 @@
+# cert-manager Kustomization
+# This assumes cert-manager is installed via Helm first
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - namespace.yaml
+  - clusterissuer-letsencrypt.yaml
+  - certificate.yaml
+
+# Labels to apply to all resources
+commonLabels:
+  app.kubernetes.io/part-of: flexobo
+  app.kubernetes.io/managed-by: kustomize
