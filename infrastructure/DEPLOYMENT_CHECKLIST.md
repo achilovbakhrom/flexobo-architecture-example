@@ -78,25 +78,57 @@ echo "JWT_SECRET: $JWT_SECRET"
 ```bash
 cd infrastructure/terraform/environments/dev
 
-# Create tfvars file
+# Create tfvars file (only required variables - others have defaults)
 cat > terraform.tfvars <<EOF
-db_password         = "YOUR_DB_PASSWORD"
-opensearch_password = "YOUR_OPENSEARCH_PASSWORD"
+db_password         = "$DB_PASSWORD"
+opensearch_password = "$OPENSEARCH_PASSWORD"
 EOF
 
 # Initialize
 terraform init
 
-# Plan
-terraform plan -out=tfplan
+# STAGE 1: Plan core infrastructure (required due to OIDC dependency)
+terraform plan -out=tfplan \
+  -target=module.vpc \
+  -target=module.route53 \
+  -target=module.acm \
+  -target=module.s3 \
+  -target=module.security_groups \
+  -target=module.iam \
+  -target=module.eks \
+  -target=module.rds \
+  -target=module.ecr
 
-# Review the plan output, then apply
+# Review the plan output, then apply Stage 1
+terraform apply tfplan
+
+# STAGE 2: After EKS is created, run full plan for remaining resources
+terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
+**Notes:**
+
+- Stage 1 takes 15-20 minutes (EKS cluster ~10min, ACM validation depends on DNS)
+- ACM certificate validation requires NS records at registrar (Step 5) - may timeout on first run
+- If ACM times out, continue to Step 5 to configure DNS, then re-run `terraform apply`
+
+**Default values** (override in terraform.tfvars if needed):
+
+| Variable | Default |
+|----------|---------|
+| `project_name` | flexobo |
+| `environment` | dev |
+| `aws_region` | us-east-1 |
+| `domain_name` | flexobo.com |
+| `vpc_cidr` | 10.0.0.0/16 |
+| `kubernetes_version` | 1.29 |
+
 - [ ] terraform init successful
-- [ ] terraform plan reviewed
-- [ ] terraform apply completed (takes 15-20 min)
+- [ ] Stage 1 terraform plan reviewed
+- [ ] Stage 1 terraform apply completed (takes 15-20 min)
+- [ ] Stage 2 terraform plan reviewed
+- [ ] Stage 2 terraform apply completed
 
 ### Step 4: Configure kubectl
 
@@ -240,6 +272,7 @@ kubectl get svc kong-kong-proxy -n kong
 ### Step 11: Configure Kong DNS
 
 Create Route53 A record or CNAME:
+
 - `api.flexobo.com` -> Kong LoadBalancer
 - `dev.api.flexobo.com` -> Kong LoadBalancer (for dev)
 
@@ -334,6 +367,7 @@ aws ecr describe-repositories --region us-east-1 --query 'repositories[].reposit
 ```
 
 Expected repositories:
+
 - [ ] flexobo/auth-service
 - [ ] flexobo/main-service
 - [ ] flexobo/users-service
@@ -473,14 +507,39 @@ Repeat the above steps for production:
 cd infrastructure/terraform/environments/prod
 
 # Create terraform.tfvars with prod passwords
+cat > terraform.tfvars <<EOF
+db_password           = "$DB_PASSWORD_PROD"
+opensearch_password   = "$OPENSEARCH_PASSWORD_PROD"
+stripe_secret_key     = "sk_live_xxx"
+stripe_webhook_secret = "whsec_xxx"
+telegram_bot_token    = "xxx"
+click_secret_key      = "xxx"
+EOF
+
 terraform init
+
+# STAGE 1: Core infrastructure
+terraform plan -out=tfplan \
+  -target=module.vpc \
+  -target=module.route53 \
+  -target=module.acm \
+  -target=module.s3 \
+  -target=module.security_groups \
+  -target=module.iam \
+  -target=module.eks \
+  -target=module.rds \
+  -target=module.ecr
+
+terraform apply tfplan
+
+# STAGE 2: OIDC-dependent resources
 terraform plan -out=tfplan
 terraform apply tfplan
 
 # Configure kubectl for prod cluster
 aws eks update-kubeconfig --region us-east-1 --name flexobo-prod
 
-# Install all Helm charts (same commands, different cluster)
+# Install all Helm charts (same commands as dev, different cluster)
 # Apply prod overlay
 kubectl apply -k infrastructure/k8s/overlays/production
 ```

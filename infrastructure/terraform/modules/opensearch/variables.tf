@@ -123,9 +123,9 @@ variable "master_user_password" {
 }
 
 variable "auto_tune_enabled" {
-  description = "Whether auto-tune is enabled"
+  description = "Whether auto-tune is enabled (not supported on t2/t3 instance types)"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "create_service_linked_role" {
