@@ -136,7 +136,7 @@ jobs:
         run: |
           echo "## CI Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "✅ Lint, test, and build completed for affected projects" >> $GITHUB_STEP_SUMMARY
+          echo "Lint, test, and build completed for affected projects" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Affected: ${{ needs.detect-affected.outputs.affected }}" >> $GITHUB_STEP_SUMMARY
 

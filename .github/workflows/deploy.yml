@@ -3,8 +3,8 @@ name: Deploy
 on:
   push:
     branches:
-      - dev   # Auto-deploy to development
-      - main  # Auto-deploy to production
+      - dev
+      - main
   workflow_dispatch:
     inputs:
       environment:
@@ -284,9 +284,9 @@ jobs:
           if [ -n "$POD" ]; then
             CONTAINERS=$(kubectl get pod $POD -n $NAMESPACE -o jsonpath='{.spec.containers[*].name}')
             if echo "$CONTAINERS" | grep -q "istio-proxy"; then
-              echo "✅ Istio sidecar is running"
+              echo "Istio sidecar is running"
             else
-              echo "⚠️ Istio sidecar not detected"
+              echo "Istio sidecar not detected"
             fi
           fi
 
@@ -300,7 +300,7 @@ jobs:
             -n $NAMESPACE \
             --timeout=120s
 
-          echo "✅ ${{ matrix.service }} is healthy"
+          echo "${{ matrix.service }} is healthy"
 
   # Run migrations only for affected services
   migrate:
@@ -378,11 +378,11 @@ jobs:
 
           # Run migration
           kubectl exec -n $NAMESPACE $POD -- npx prisma migrate deploy || {
-            echo "⚠️ Migration failed for ${{ matrix.service }}"
+            echo "Migration failed for ${{ matrix.service }}"
             exit 1
           }
 
-          echo "✅ Migrations completed for ${{ matrix.service }}"
+          echo "Migrations completed for ${{ matrix.service }}"
 
   # Tag successful deployment
   tag-deployment:
@@ -448,5 +448,5 @@ jobs:
       - name: Notify on failure
         if: failure()
         run: |
-          echo "⚠️ Deployment failed! Check the workflow logs for details."
+          echo "Deployment failed! Check the workflow logs for details."
           # Add Slack/email notification here if needed
