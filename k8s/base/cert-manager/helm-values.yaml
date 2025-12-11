@@ -1,0 +1,98 @@
+# cert-manager Helm Values
+# Version: 1.19.2 (December 2025)
+# Chart: https://charts.jetstack.io
+# Install: helm install cert-manager jetstack/cert-manager -n cert-manager --create-namespace -f helm-values.yaml
+
+# Install CRDs with Helm (recommended)
+crds:
+  enabled: true
+  keep: true
+
+# Global settings
+global:
+  # Use AWS for DNS challenges
+  leaderElection:
+    namespace: cert-manager
+
+# Controller configuration
+replicaCount: 2
+
+# Resources for controller
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Webhook configuration
+webhook:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+# CA Injector configuration
+cainjector:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# Enable Prometheus metrics
+prometheus:
+  enabled: true
+  servicemonitor:
+    enabled: true
+    namespace: monitoring
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Service Account for IRSA (AWS IAM Roles for Service Accounts)
+serviceAccount:
+  create: true
+  name: cert-manager
+  annotations:
+    # This will be set during deployment with actual OIDC provider
+    eks.amazonaws.com/role-arn: ""
+
+# Enable feature gates
+featureGates: ""
+
+# DNS01 recursive nameservers (for Route53)
+extraArgs:
+  - --dns01-recursive-nameservers-only
+  - --dns01-recursive-nameservers=8.8.8.8:53,1.1.1.1:53
+
+# Node selector for predictable scheduling
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - cert-manager
+          topologyKey: kubernetes.io/hostname

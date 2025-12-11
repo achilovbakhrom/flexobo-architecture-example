@@ -1,0 +1,214 @@
+# Grafana Helm Values
+# Chart: grafana/grafana
+# Install: helm install grafana grafana/grafana -n monitoring -f helm-values.yaml
+
+# Replicas
+replicas: 1
+
+# Image
+image:
+  repository: grafana/grafana
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Resources
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Persistence
+persistence:
+  enabled: true
+  type: pvc
+  storageClassName: gp3
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+# Admin credentials (use External Secrets in production)
+adminUser: admin
+# adminPassword is set via secret
+
+# Grafana configuration
+grafana.ini:
+  server:
+    domain: grafana.flexobo.com
+    root_url: "https://grafana.flexobo.com"
+    serve_from_sub_path: false
+  security:
+    admin_user: admin
+    disable_gravatar: true
+    cookie_secure: true
+    strict_transport_security: true
+  users:
+    allow_sign_up: false
+    auto_assign_org: true
+    auto_assign_org_role: Viewer
+  auth:
+    disable_login_form: false
+  auth.anonymous:
+    enabled: false
+  analytics:
+    reporting_enabled: false
+    check_for_updates: false
+  log:
+    mode: console
+    level: info
+  alerting:
+    enabled: true
+
+# Datasources
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      # Prometheus
+      - name: Prometheus
+        type: prometheus
+        url: http://prometheus-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090
+        access: proxy
+        isDefault: true
+        editable: false
+
+      # Loki for logs
+      - name: Loki
+        type: loki
+        url: http://loki-gateway.monitoring.svc.cluster.local
+        access: proxy
+        editable: false
+
+      # Jaeger for traces
+      - name: Jaeger
+        type: jaeger
+        url: http://jaeger-query.monitoring.svc.cluster.local:16686
+        access: proxy
+        editable: false
+
+      # Tempo (alternative to Jaeger)
+      # - name: Tempo
+      #   type: tempo
+      #   url: http://tempo.monitoring.svc.cluster.local:3100
+      #   access: proxy
+      #   editable: false
+
+# Dashboard providers
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/default
+      - name: 'kubernetes'
+        orgId: 1
+        folder: 'Kubernetes'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/kubernetes
+      - name: 'istio'
+        orgId: 1
+        folder: 'Istio'
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/istio
+
+# Pre-configured dashboards from Grafana.com
+dashboards:
+  default:
+    node-exporter:
+      gnetId: 1860
+      revision: 37
+      datasource: Prometheus
+    kong:
+      gnetId: 7424
+      revision: 7
+      datasource: Prometheus
+  kubernetes:
+    k8s-cluster:
+      gnetId: 7249
+      revision: 1
+      datasource: Prometheus
+    k8s-pods:
+      gnetId: 6336
+      revision: 1
+      datasource: Prometheus
+    k8s-namespaces:
+      gnetId: 15758
+      revision: 32
+      datasource: Prometheus
+  istio:
+    istio-mesh:
+      gnetId: 7639
+      revision: 212
+      datasource: Prometheus
+    istio-service:
+      gnetId: 7636
+      revision: 212
+      datasource: Prometheus
+    istio-workload:
+      gnetId: 7630
+      revision: 212
+      datasource: Prometheus
+
+# Ingress
+ingress:
+  enabled: true
+  ingressClassName: kong
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    konghq.com/plugins: global-cors
+  hosts:
+    - grafana.flexobo.com
+  tls:
+    - secretName: grafana-tls
+      hosts:
+        - grafana.flexobo.com
+
+# Service account
+serviceAccount:
+  create: true
+  name: grafana
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # Set for AWS CloudWatch access
+
+# Pod security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 472
+  fsGroup: 472
+
+# Sidecar for dashboard/datasource reload
+sidecar:
+  dashboards:
+    enabled: true
+    label: grafana_dashboard
+    labelValue: "1"
+    searchNamespace: ALL
+  datasources:
+    enabled: true
+    label: grafana_datasource
+    labelValue: "1"
+    searchNamespace: ALL
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

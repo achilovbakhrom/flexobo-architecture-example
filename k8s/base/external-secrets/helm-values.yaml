@@ -1,0 +1,98 @@
+# External Secrets Operator Helm Values
+# Documentation: https://external-secrets.io/latest/
+# Install: helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace -f helm-values.yaml
+
+# Number of replicas
+replicaCount: 2
+
+# Image configuration
+image:
+  repository: ghcr.io/external-secrets/external-secrets
+  pullPolicy: IfNotPresent
+
+# Service Account for IRSA
+serviceAccount:
+  create: true
+  name: external-secrets
+  annotations:
+    # IRSA annotation - set by Terraform output
+    eks.amazonaws.com/role-arn: ""
+
+# Controller resources
+resources:
+  requests:
+    cpu: 10m
+    memory: 64Mi
+  limits:
+    cpu: 100m
+    memory: 128Mi
+
+# Webhook configuration
+webhook:
+  replicaCount: 2
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Cert Controller configuration
+certController:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 50m
+      memory: 64Mi
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Prometheus metrics
+metrics:
+  enabled: true
+  service:
+    port: 8080
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+
+# Security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Affinity for HA
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - external-secrets
+          topologyKey: kubernetes.io/hostname
+
+# Install CRDs
+crds:
+  createClusterExternalSecret: true
+  createClusterSecretStore: true
+  createPushSecret: true

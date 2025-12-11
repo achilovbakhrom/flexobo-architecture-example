@@ -4,13 +4,24 @@ kind: Kustomization
 namespace: flexobo
 
 resources:
+  # Core infrastructure
   - namespace.yaml
   - storage-class.yaml
   - configmap.yaml
-  - secrets.yaml
+
+  # Security & RBAC (apply first)
+  - rbac
+  - network-policies
+
+  # External Secrets (replaces static secrets.yaml)
+  - external-secrets
+
+  # Message queue and cache
   - rabbitmq
   - redis
-  - vault
+
+  # Microservices
+  - services/auth-service
   - services/users-service
   - services/chat-service
   - services/file-service
@@ -18,8 +29,26 @@ resources:
   - services/billing-service
   - services/notification-service
   - services/telegram-service
-  - ingress
+
+  # Istio policies (after services)
+  - istio
+
+  # Monitoring namespace
+  - monitoring
+
+# Note: The following are installed via Helm and managed separately:
+# - cert-manager (k8s/base/cert-manager/helm-values.yaml)
+# - kong (k8s/base/kong/helm-values.yaml)
+# - prometheus-stack (k8s/base/monitoring/prometheus/helm-values.yaml)
+# - grafana (k8s/base/monitoring/grafana/helm-values.yaml)
+# - loki (k8s/base/monitoring/loki/helm-values.yaml)
+# - jaeger (k8s/base/monitoring/jaeger/helm-values.yaml)
+# - rancher (k8s/rancher/helm-values.yaml)
 
 commonLabels:
   app.kubernetes.io/name: flexobo
+  app.kubernetes.io/part-of: flexobo
   app.kubernetes.io/managed-by: kustomize
+
+commonAnnotations:
+  security.flexobo.com/reviewed: "true"

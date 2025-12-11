@@ -1,0 +1,41 @@
+# PeerAuthentication - mTLS Configuration
+# Documentation: https://istio.io/latest/docs/reference/config/security/peer_authentication/
+---
+# Strict mTLS for the entire mesh (production mode)
+# Start with PERMISSIVE during migration, then switch to STRICT
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT  # Require mTLS for all traffic
+---
+# Namespace-specific PeerAuthentication for flexobo
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: flexobo-mtls
+  namespace: flexobo
+spec:
+  mtls:
+    mode: STRICT
+  # Per-port exceptions if needed
+  # portLevelMtls:
+  #   8080:
+  #     mode: PERMISSIVE
+---
+# Allow plaintext for Prometheus scraping
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: allow-prometheus-scrape
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: flexobo
+  portLevelMtls:
+    9090:  # Prometheus metrics port
+      mode: PERMISSIVE

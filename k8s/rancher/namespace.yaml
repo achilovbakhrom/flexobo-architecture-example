@@ -1,0 +1,24 @@
+# Rancher namespaces
+# Version: 2.13.0 (December 2025)
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-system
+  labels:
+    app.kubernetes.io/name: rancher
+    istio-injection: disabled  # Rancher manages its own networking
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-fleet-system
+  labels:
+    app.kubernetes.io/name: fleet
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cattle-fleet-local-system
+  labels:
+    app.kubernetes.io/name: fleet-local

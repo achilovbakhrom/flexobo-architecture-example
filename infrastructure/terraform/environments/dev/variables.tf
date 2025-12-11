@@ -33,3 +33,44 @@ variable "db_password" {
   type        = string
   sensitive   = true
 }
+
+variable "domain_name" {
+  description = "Root domain name for the application"
+  type        = string
+  default     = "flexobo.com"
+}
+
+variable "opensearch_password" {
+  description = "Master password for OpenSearch"
+  type        = string
+  sensitive   = true
+  default     = ""  # Set via terraform.tfvars or environment variable
+}
+
+variable "stripe_secret_key" {
+  description = "Stripe API secret key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "stripe_webhook_secret" {
+  description = "Stripe webhook signing secret"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "telegram_bot_token" {
+  description = "Telegram bot token"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "click_secret_key" {
+  description = "Click payment provider secret key"
+  type        = string
+  sensitive   = true
+  default     = ""
+}

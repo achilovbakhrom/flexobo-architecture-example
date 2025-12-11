@@ -1,0 +1,162 @@
+# Kong Ingress Controller Helm Values
+# Version: 3.5.3 (December 2025)
+# Chart: kong/kong
+# Documentation: https://docs.konghq.com/kubernetes-ingress-controller/
+# Install: helm install kong kong/kong -n kong --create-namespace -f helm-values.yaml
+
+# Deployment configuration
+replicaCount: 2
+
+# Image configuration
+image:
+  repository: kong
+  tag: "3.9"  # Kong Gateway version
+  pullPolicy: IfNotPresent
+
+# Ingress Controller
+ingressController:
+  enabled: true
+  image:
+    repository: kong/kubernetes-ingress-controller
+    tag: "3.5.3"
+  installCRDs: true
+  env:
+    kong_admin_token:
+      valueFrom:
+        secretKeyRef:
+          name: kong-admin-token
+          key: token
+
+# Admin API configuration
+admin:
+  enabled: true
+  type: ClusterIP
+  http:
+    enabled: false
+  tls:
+    enabled: true
+    servicePort: 8444
+
+# Proxy configuration (public-facing)
+proxy:
+  enabled: true
+  type: LoadBalancer
+  annotations:
+    # AWS ALB annotations
+    service.beta.kubernetes.io/aws-load-balancer-type: "external"
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: "ip"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: ""  # ACM cert ARN - set via overlay
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "http"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: "HTTP"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: "/health"
+  http:
+    enabled: true
+    servicePort: 80
+    containerPort: 8000
+  tls:
+    enabled: true
+    servicePort: 443
+    containerPort: 8443
+
+# Environment variables
+env:
+  # Database-less mode (declarative configuration)
+  database: "off"
+  # Enable request/response buffering
+  nginx_proxy_proxy_buffer_size: "64k"
+  nginx_proxy_proxy_buffers: "8 64k"
+  # Security headers
+  headers: "off"
+  # Trusted IPs for X-Forwarded-For
+  trusted_ips: "0.0.0.0/0,::/0"
+  real_ip_header: "X-Forwarded-For"
+  real_ip_recursive: "on"
+  # Logging
+  log_level: "info"
+  # Enable Prometheus plugin globally
+  plugins: "bundled"
+  # Proxy settings
+  proxy_access_log: "/dev/stdout"
+  proxy_error_log: "/dev/stderr"
+
+# Resource limits
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Service account
+serviceAccount:
+  create: true
+  name: kong
+  annotations:
+    # IRSA for AWS access
+    eks.amazonaws.com/role-arn: ""
+
+# Security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+# Affinity for HA
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - kong
+          topologyKey: kubernetes.io/hostname
+
+# Node selector
+nodeSelector:
+  kubernetes.io/os: linux
+
+# Tolerations
+tolerations: []
+
+# Status endpoint for health checks
+status:
+  enabled: true
+  http:
+    enabled: true
+    containerPort: 8100
+
+# Prometheus metrics
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring

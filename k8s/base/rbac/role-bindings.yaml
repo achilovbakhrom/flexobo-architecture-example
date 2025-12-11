@@ -1,0 +1,79 @@
+# Role Bindings for Flexobo services
+---
+# Bind app role to all service accounts
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flexobo-app-binding
+  namespace: flexobo
+subjects:
+  - kind: ServiceAccount
+    name: auth-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: main-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: users-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: billing-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: chat-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: notification-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: file-service
+    namespace: flexobo
+  - kind: ServiceAccount
+    name: telegram-service
+    namespace: flexobo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flexobo-app-role
+---
+# Bind deploy role to GitHub Actions service account (for CI/CD)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: flexobo-deploy-binding
+  namespace: flexobo
+subjects:
+  - kind: ServiceAccount
+    name: github-actions
+    namespace: flexobo
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: flexobo-deploy-role
+---
+# GitHub Actions service account for CI/CD
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: github-actions
+  namespace: flexobo
+  annotations:
+    # IRSA for GitHub Actions OIDC
+    eks.amazonaws.com/role-arn: ""
+  labels:
+    app.kubernetes.io/part-of: flexobo
+---
+# Bind external-secrets role to external-secrets operator
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: external-secrets-binding
+  namespace: flexobo
+subjects:
+  - kind: ServiceAccount
+    name: external-secrets
+    namespace: external-secrets
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: external-secrets-role

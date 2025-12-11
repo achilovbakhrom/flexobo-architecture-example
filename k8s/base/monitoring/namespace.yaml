@@ -1,0 +1,9 @@
+# Monitoring namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    istio-injection: enabled
+    app.kubernetes.io/name: monitoring
+    kubernetes.io/metadata.name: monitoring
