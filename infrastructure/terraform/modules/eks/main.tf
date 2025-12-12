@@ -56,13 +56,18 @@ resource "aws_eks_addon" "kube_proxy" {
 resource "aws_eks_addon" "ebs_csi_driver" {
   cluster_name             = aws_eks_cluster.main.name
   addon_name               = "aws-ebs-csi-driver"
+<<<<<<< HEAD
   service_account_role_arn = aws_iam_role.ebs_csi_driver.arn
+=======
+  service_account_role_arn = var.ebs_csi_driver_role_arn
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   resolve_conflicts_on_create = "OVERWRITE"
   resolve_conflicts_on_update = "OVERWRITE"
 
   tags = var.tags
 
+<<<<<<< HEAD
   depends_on = [aws_eks_node_group.main, aws_iam_role.ebs_csi_driver]
 }
 
@@ -93,6 +98,9 @@ resource "aws_iam_role" "ebs_csi_driver" {
 resource "aws_iam_role_policy_attachment" "ebs_csi_driver" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
   role       = aws_iam_role.ebs_csi_driver.name
+=======
+  depends_on = [aws_eks_node_group.main]
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 }
 
 # Managed Node Group
@@ -104,7 +112,10 @@ resource "aws_eks_node_group" "main" {
 
   instance_types = var.node_instance_types
   capacity_type  = var.capacity_type
+<<<<<<< HEAD
   disk_size      = var.node_disk_size
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   scaling_config {
     desired_size = var.node_desired_size

@@ -1,24 +1,46 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+<<<<<<< HEAD
 # Note: No global namespace set - each resource defines its own namespace
 
 resources:
   # Core infrastructure - flexobo namespace
+=======
+namespace: flexobo
+
+resources:
+  # Core infrastructure
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   - namespace.yaml
   - storage-class.yaml
   - configmap.yaml
 
+<<<<<<< HEAD
   # Security & RBAC
   - rbac
   - network-policies
 
+=======
+  # Security & RBAC (apply first)
+  - rbac
+  - network-policies
+
+  # External Secrets (replaces static secrets.yaml)
+  - external-secrets
+
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   # Message queue and cache
   - rabbitmq
   - redis
 
+<<<<<<< HEAD
   # Microservices (all in flexobo namespace)
   # Note: auth-service removed - no source code exists
+=======
+  # Microservices
+  - services/auth-service
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   - services/users-service
   - services/chat-service
   - services/file-service
@@ -27,6 +49,7 @@ resources:
   - services/notification-service
   - services/telegram-service
 
+<<<<<<< HEAD
 # Note: The following have their own namespaces and should be applied separately:
 # - external-secrets: kubectl apply -k infrastructure/k8s/base/external-secrets
 # - istio: istioctl install -f infrastructure/k8s/base/istio/istio-operator.yaml
@@ -38,6 +61,22 @@ resources:
 # - prometheus-stack (infrastructure/k8s/base/monitoring/prometheus/helm-values.yaml)
 # - loki (infrastructure/k8s/base/monitoring/loki/helm-values.yaml)
 # - jaeger (infrastructure/k8s/base/monitoring/jaeger/helm-values.yaml)
+=======
+  # Istio policies (after services)
+  - istio
+
+  # Monitoring namespace
+  - monitoring
+
+# Note: The following are installed via Helm and managed separately:
+# - cert-manager (infrastructure/k8s/base/cert-manager/helm-values.yaml)
+# - kong (infrastructure/k8s/base/kong/helm-values.yaml)
+# - prometheus-stack (infrastructure/k8s/base/monitoring/prometheus/helm-values.yaml)
+# - grafana (infrastructure/k8s/base/monitoring/grafana/helm-values.yaml)
+# - loki (infrastructure/k8s/base/monitoring/loki/helm-values.yaml)
+# - jaeger (infrastructure/k8s/base/monitoring/jaeger/helm-values.yaml)
+# - rancher (infrastructure/k8s/rancher/helm-values.yaml)
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 commonLabels:
   app.kubernetes.io/name: flexobo

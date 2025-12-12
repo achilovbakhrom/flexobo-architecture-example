@@ -40,6 +40,49 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: istio-system
 ---
+<<<<<<< HEAD
+=======
+# Auth Service: Allow from all services (authentication)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: auth-service-policy
+  namespace: flexobo
+spec:
+  podSelector:
+    matchLabels:
+      app: auth-service
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: flexobo
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 50051
+  egress:
+    # Allow to RDS (PostgreSQL)
+    - to:
+        - ipBlock:
+            cidr: 10.0.0.0/8  # VPC CIDR
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Main Service: Allow from Kong and other services
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -100,7 +143,11 @@ spec:
         - protocol: TCP
           port: 50051
 ---
+<<<<<<< HEAD
 # Users Service: Allow from main-service
+=======
+# Users Service: Allow from main-service and auth-service
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -116,8 +163,17 @@ spec:
   ingress:
     - from:
         - podSelector:
+<<<<<<< HEAD
             matchLabels:
               app: main-service
+=======
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - main-service
+                  - auth-service
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
       ports:
         - protocol: TCP
           port: 3000

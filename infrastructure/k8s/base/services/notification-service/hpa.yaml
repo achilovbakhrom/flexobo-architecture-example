@@ -8,7 +8,11 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: notification-service
+<<<<<<< HEAD
   minReplicas: 1
+=======
+  minReplicas: 2
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   maxReplicas: 10
   metrics:
     - type: Resource

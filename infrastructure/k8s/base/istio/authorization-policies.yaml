@@ -1,0 +1,245 @@
+# Authorization Policies for service-to-service communication
+# Documentation: https://istio.io/latest/docs/reference/config/security/authorization-policy/
+---
+# Default deny all in flexobo namespace
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: flexobo
+spec:
+  {}  # Empty spec = deny all
+---
+# Allow Kong ingress to all services
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-kong-ingress
+  namespace: flexobo
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["kong"]
+      to:
+        - operation:
+            ports: ["3000", "50051"]
+---
+# Auth Service: Allow from all flexobo services
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: auth-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: auth-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["flexobo", "kong"]
+      to:
+        - operation:
+            methods: ["GET", "POST"]
+            ports: ["3000", "50051"]
+---
+# Main Service: Allow from Kong and other services
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: main-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: main-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["flexobo", "kong"]
+      to:
+        - operation:
+            methods: ["GET", "POST", "PUT", "PATCH", "DELETE"]
+            ports: ["3000", "50051"]
+---
+# Users Service: Allow from main-service and auth-service
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: users-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: users-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/main-service"
+              - "cluster.local/ns/flexobo/sa/auth-service"
+      to:
+        - operation:
+            ports: ["3000", "50051"]
+---
+# Billing Service: Allow from main-service only
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: billing-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: billing-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/main-service"
+      to:
+        - operation:
+            ports: ["3000", "50051"]
+---
+# Chat Service: Allow from main-service only
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: chat-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: chat-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/main-service"
+      to:
+        - operation:
+            ports: ["3000", "50051"]
+---
+# Notification Service: Allow from main-service and billing-service
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: notification-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: notification-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/main-service"
+              - "cluster.local/ns/flexobo/sa/billing-service"
+      to:
+        - operation:
+            ports: ["3000"]
+---
+# File Service: Allow from main-service only
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: file-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: file-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/main-service"
+      to:
+        - operation:
+            ports: ["3000", "50051"]
+---
+# Telegram Service: Allow from notification-service only
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: telegram-service-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: telegram-service
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - "cluster.local/ns/flexobo/sa/notification-service"
+      to:
+        - operation:
+            ports: ["3000"]
+---
+# Allow Prometheus to scrape metrics
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: flexobo
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["monitoring"]
+      to:
+        - operation:
+            methods: ["GET"]
+            ports: ["9090", "3000"]
+            paths: ["/metrics", "/health", "/ready"]
+---
+# RabbitMQ: Allow from all flexobo services
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: rabbitmq-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: rabbitmq
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["flexobo"]
+      to:
+        - operation:
+            ports: ["5672", "15672"]
+---
+# Redis: Allow from all flexobo services
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: redis-policy
+  namespace: flexobo
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["flexobo"]
+      to:
+        - operation:
+            ports: ["6379"]

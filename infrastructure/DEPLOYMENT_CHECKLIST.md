@@ -78,15 +78,23 @@ echo "JWT_SECRET: $JWT_SECRET"
 ```bash
 cd infrastructure/terraform/environments/dev
 
+<<<<<<< HEAD
 # Create tfvars file (only required variables - others have defaults)
 cat > terraform.tfvars <<EOF
 db_password         = "$DB_PASSWORD"
 opensearch_password = "$OPENSEARCH_PASSWORD"
+=======
+# Create tfvars file
+cat > terraform.tfvars <<EOF
+db_password         = "YOUR_DB_PASSWORD"
+opensearch_password = "YOUR_OPENSEARCH_PASSWORD"
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 EOF
 
 # Initialize
 terraform init
 
+<<<<<<< HEAD
 # STAGE 1: Plan core infrastructure (required due to OIDC dependency)
 terraform plan -out=tfplan \
   -target=module.vpc \
@@ -129,6 +137,18 @@ terraform apply tfplan
 - [ ] Stage 1 terraform apply completed (takes 15-20 min)
 - [ ] Stage 2 terraform plan reviewed
 - [ ] Stage 2 terraform apply completed
+=======
+# Plan
+terraform plan -out=tfplan
+
+# Review the plan output, then apply
+terraform apply tfplan
+```
+
+- [ ] terraform init successful
+- [ ] terraform plan reviewed
+- [ ] terraform apply completed (takes 15-20 min)
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 ### Step 4: Configure kubectl
 
@@ -272,7 +292,10 @@ kubectl get svc kong-kong-proxy -n kong
 ### Step 11: Configure Kong DNS
 
 Create Route53 A record or CNAME:
+<<<<<<< HEAD
 
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 - `api.flexobo.com` -> Kong LoadBalancer
 - `dev.api.flexobo.com` -> Kong LoadBalancer (for dev)
 
@@ -367,7 +390,10 @@ aws ecr describe-repositories --region us-east-1 --query 'repositories[].reposit
 ```
 
 Expected repositories:
+<<<<<<< HEAD
 
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 - [ ] flexobo/auth-service
 - [ ] flexobo/main-service
 - [ ] flexobo/users-service
@@ -507,6 +533,7 @@ Repeat the above steps for production:
 cd infrastructure/terraform/environments/prod
 
 # Create terraform.tfvars with prod passwords
+<<<<<<< HEAD
 cat > terraform.tfvars <<EOF
 db_password           = "$DB_PASSWORD_PROD"
 opensearch_password   = "$OPENSEARCH_PASSWORD_PROD"
@@ -533,13 +560,20 @@ terraform plan -out=tfplan \
 terraform apply tfplan
 
 # STAGE 2: OIDC-dependent resources
+=======
+terraform init
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 terraform plan -out=tfplan
 terraform apply tfplan
 
 # Configure kubectl for prod cluster
 aws eks update-kubeconfig --region us-east-1 --name flexobo-prod
 
+<<<<<<< HEAD
 # Install all Helm charts (same commands as dev, different cluster)
+=======
+# Install all Helm charts (same commands, different cluster)
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Apply prod overlay
 kubectl apply -k infrastructure/k8s/overlays/production
 ```

@@ -5,4 +5,7 @@ metadata:
   labels:
     app.kubernetes.io/name: flexobo
     app.kubernetes.io/managed-by: kustomize
+<<<<<<< HEAD
     istio-injection: enabled
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a

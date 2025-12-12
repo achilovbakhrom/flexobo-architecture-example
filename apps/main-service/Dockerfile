@@ -17,7 +17,11 @@ COPY . .
 # Generate Prisma client for main-service
 RUN npx prisma generate --schema=apps/main-service/prisma/schema.prisma
 
+<<<<<<< HEAD
 # Build the application with NX (dependencies are built automatically)
+=======
+# Build the application with NX
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 RUN npx nx build main-service --configuration=production
 
 # Production stage
@@ -33,6 +37,7 @@ COPY --from=build --chown=nodejs:nodejs /app/dist/apps/main-service ./
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/package.json ./
 
+<<<<<<< HEAD
 # Copy Prisma client to expected path and link node_modules for Prisma runtime dependencies
 RUN mkdir -p /apps/main-service/node_modules/.prisma
 COPY --from=build --chown=nodejs:nodejs /app/apps/main-service/node_modules/.prisma /apps/main-service/node_modules/.prisma
@@ -44,9 +49,17 @@ COPY --from=build --chown=nodejs:nodejs /app/dist/libs/core ./node_modules/@flex
 
 # Copy proto files (required for gRPC)
 COPY --from=build --chown=nodejs:nodejs /app/libs/shared-kernel/src/lib/grpc/proto /app/libs/shared-kernel/src/lib/grpc/proto
+=======
+# Copy Prisma client (custom output path)
+COPY --from=build --chown=nodejs:nodejs /app/apps/main-service/node_modules/.prisma ./node_modules/.prisma
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 USER nodejs
 
 EXPOSE 3008
 
+<<<<<<< HEAD
 CMD ["node", "src/main.js"]
+=======
+CMD ["node", "main.js"]
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a

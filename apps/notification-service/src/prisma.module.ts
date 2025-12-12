@@ -19,6 +19,7 @@ export const PRISMA_CLIENT = Symbol('PRISMA_CLIENT');
       useFactory: () => {
         return new Pool({
           connectionString: process.env['DATABASE_URL'],
+<<<<<<< HEAD
           // Connection pool settings for RDS
           max: 10,
           idleTimeoutMillis: 30000,
@@ -26,6 +27,8 @@ export const PRISMA_CLIENT = Symbol('PRISMA_CLIENT');
           // Keep connections alive through NAT gateway/load balancer timeouts
           keepAlive: true,
           keepAliveInitialDelayMillis: 10000,
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
         });
       },
     },

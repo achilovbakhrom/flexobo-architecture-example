@@ -17,11 +17,18 @@ spec:
         app: users-service
         tier: backend
     spec:
+<<<<<<< HEAD
       enableServiceLinks: false
       serviceAccountName: default
       containers:
         - name: users-service
           image: 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/users-service:latest
+=======
+      serviceAccountName: default
+      containers:
+        - name: users-service
+          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/users-service:latest
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           imagePullPolicy: Always
           ports:
             - containerPort: 3005
@@ -34,14 +41,21 @@ spec:
             - secretRef:
                 name: flexobo-secrets
           env:
+<<<<<<< HEAD
             - name: HOST
               value: "0.0.0.0"
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             - name: PORT
               value: "3005"
             - name: GRPC_PORT
               value: "50052"
             - name: DATABASE_URL
+<<<<<<< HEAD
               value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=users&sslmode=no-verify"
+=======
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=users"
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           resources:
             requests:
               memory: "256Mi"
@@ -50,6 +64,7 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           readinessProbe:
+<<<<<<< HEAD
             tcpSocket:
               port: 3005
             initialDelaySeconds: 10
@@ -59,6 +74,24 @@ spec:
               port: 3005
             initialDelaySeconds: 30
             periodSeconds: 30
+=======
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3005
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

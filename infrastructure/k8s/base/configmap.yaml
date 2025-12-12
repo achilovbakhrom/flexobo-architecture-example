@@ -7,9 +7,12 @@ data:
   NODE_ENV: "production"
   LOG_LEVEL: "info"
 
+<<<<<<< HEAD
   # Database
   DB_HOST: "flexobo-dev-postgres.cs5ggumgsldf.us-east-1.rds.amazonaws.com"
 
+=======
+>>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   # RabbitMQ
   RABBITMQ_HOST: "rabbitmq.flexobo.svc.cluster.local"
   RABBITMQ_PORT: "5672"
