@@ -57,3 +57,8 @@ apps/*/.env
 !apps/*/.env.example
 libs/*/.env
 !libs/*/.env.example
+
+infrastructure/terraform/.terraform/
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.backup
+infrastructure/terraform/crash.log
