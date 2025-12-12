@@ -17,9 +17,10 @@ spec:
         app: main-service
         tier: backend
     spec:
+      enableServiceLinks: false
       containers:
         - name: main-service
-          image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/main-service:latest
+          image: 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/main-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 3008
@@ -30,10 +31,12 @@ spec:
             - secretRef:
                 name: flexobo-secrets
           env:
+            - name: HOST
+              value: "0.0.0.0"
             - name: PORT
               value: "3008"
             - name: DATABASE_URL
-              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=main"
+              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=main&sslmode=no-verify"
           resources:
             requests:
               memory: "256Mi"
@@ -42,14 +45,12 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           readinessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: 3008
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: 3008
             initialDelaySeconds: 30
             periodSeconds: 30

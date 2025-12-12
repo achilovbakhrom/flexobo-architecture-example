@@ -104,6 +104,7 @@ resource "aws_eks_node_group" "main" {
 
   instance_types = var.node_instance_types
   capacity_type  = var.capacity_type
+  disk_size      = var.node_disk_size
 
   scaling_config {
     desired_size = var.node_desired_size

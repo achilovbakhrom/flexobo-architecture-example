@@ -237,11 +237,12 @@ module "eks" {
   subnet_ids                = module.vpc.private_subnet_ids
   cluster_security_group_id = module.security_groups.eks_cluster_sg_id
 
-  # Dev sizing (t3.small for cost optimization)
-  node_instance_types = ["t3.small"]
+  # Dev sizing (t3.large for sufficient resources)
+  node_instance_types = ["t3.large"]
   node_desired_size   = 2
   node_min_size       = 2
-  node_max_size       = 4
+  node_max_size       = 6
+  node_disk_size      = 50  # 50GB to avoid disk pressure
   enable_spot_nodes   = false
 
   tags = local.common_tags

@@ -16,14 +16,8 @@ metadata:
   namespace: flexobo
 data:
   rabbitmq.conf: |
-    ## Clustering
-    cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
-    cluster_formation.k8s.host = kubernetes.default.svc.cluster.local
-    cluster_formation.k8s.address_type = hostname
-    cluster_formation.k8s.service_name = rabbitmq-headless
-    cluster_formation.node_cleanup.interval = 30
-    cluster_formation.node_cleanup.only_log_warning = true
-    cluster_partition_handling = autoheal
+    ## Single node - no clustering for dev
+    cluster_formation.peer_discovery_backend = classic_config
 
     ## Memory
     vm_memory_high_watermark.relative = 0.7
@@ -39,7 +33,7 @@ data:
     default_user = flexobo
     default_pass = flexobo-rabbitmq-pass
   enabled_plugins: |
-    [rabbitmq_management,rabbitmq_peer_discovery_k8s].
+    [rabbitmq_management].
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -117,7 +111,7 @@ metadata:
     app: rabbitmq
 spec:
   serviceName: rabbitmq-headless
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: rabbitmq

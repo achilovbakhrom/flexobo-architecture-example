@@ -21,15 +21,20 @@ collector:
     type: ClusterIP
     grpc:
       port: 14250
+      name: grpc
     http:
       port: 14268
+      name: http
     otlp:
       grpc:
         port: 4317
+        name: otlp-grpc
       http:
         port: 4318
+        name: otlp-http
     zipkin:
       port: 9411
+      name: zipkin
 
 # Query configuration
 query:

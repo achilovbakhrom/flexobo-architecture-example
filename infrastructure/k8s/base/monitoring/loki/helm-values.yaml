@@ -1,4 +1,4 @@
-# Loki Helm Values (loki-stack or loki-distributed)
+# Loki Helm Values - Simplified for Dev
 # Chart: grafana/loki
 # Install: helm install loki grafana/loki -n monitoring -f helm-values.yaml
 
@@ -7,91 +7,37 @@ loki:
   # Authentication
   auth_enabled: false
 
-  # Server configuration
-  server:
-    http_listen_port: 3100
-    grpc_listen_port: 9096
-
   # Common configuration
   commonConfig:
     replication_factor: 1
     path_prefix: /var/loki
 
-  # Schema configuration
+  # Schema configuration - use filesystem for dev
   schemaConfig:
     configs:
       - from: 2024-01-01
         store: tsdb
-        object_store: s3
+        object_store: filesystem
         schema: v13
         index:
           prefix: index_
           period: 24h
 
-  # Storage configuration
+  # Storage configuration - filesystem for dev (simpler)
   storage:
-    type: s3
-    bucketNames:
-      chunks: flexobo-monitoring-dev  # S3 bucket name - update per environment
-      ruler: flexobo-monitoring-dev
-      admin: flexobo-monitoring-dev
-    s3:
-      region: us-east-1
-      # Using IRSA for authentication
-      endpoint: null
-      insecure: false
-      s3ForcePathStyle: false
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
 
-  # Ingester configuration
-  ingester:
-    chunk_encoding: snappy
-    chunk_idle_period: 30m
-    chunk_block_size: 262144
-    chunk_retain_period: 1m
-    max_transfer_retries: 0
-    wal:
-      enabled: true
-      dir: /var/loki/wal
-
-  # Compactor configuration
-  compactor:
-    working_directory: /var/loki/compactor
-    compaction_interval: 10m
-    retention_enabled: true
-    retention_delete_delay: 2h
-    retention_delete_worker_count: 150
-    delete_request_store: s3
-
-  # Limits configuration
+  # Limits configuration (removed deprecated fields)
   limits_config:
-    retention_period: 720h  # 30 days
-    enforce_metric_name: false
+    retention_period: 168h  # 7 days for dev
     reject_old_samples: true
-    reject_old_samples_max_age: 168h  # 7 days
-    max_cache_freshness_per_query: 10m
-    split_queries_by_interval: 15m
+    reject_old_samples_max_age: 168h
     ingestion_rate_mb: 10
     ingestion_burst_size_mb: 20
-    max_query_parallelism: 32
     max_query_series: 5000
-
-  # Query range configuration
-  query_range:
-    align_queries_with_step: true
-    max_retries: 5
-    cache_results: true
-    results_cache:
-      cache:
-        embedded_cache:
-          enabled: true
-          max_size_mb: 100
-
-  # Ruler configuration (for alerting)
-  rulerConfig:
-    storage:
-      type: s3
-      s3:
-        region: us-east-1
 
 # Deployment mode
 deploymentMode: SingleBinary
@@ -111,12 +57,26 @@ singleBinary:
     storageClass: gp3
     size: 10Gi
 
-# Service account for IRSA
+# Disable scalable mode components (must be 0 for SingleBinary)
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Disable chunksCache for dev (simplify)
+chunksCache:
+  enabled: false
+
+# Disable resultsCache for dev
+resultsCache:
+  enabled: false
+
+# Service account
 serviceAccount:
   create: true
   name: loki
-  annotations:
-    eks.amazonaws.com/role-arn: ""  # Set via Terraform output
 
 # Gateway configuration
 gateway:
@@ -129,103 +89,12 @@ gateway:
     limits:
       cpu: 100m
       memory: 64Mi
-  ingress:
-    enabled: false  # Access via Grafana datasource
-
-# Promtail configuration (log collector)
-promtail:
-  enabled: true
-  config:
-    clients:
-      - url: http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/push
-    positions:
-      filename: /run/promtail/positions.yaml
-    scrape_configs:
-      # Kubernetes pods
-      - job_name: kubernetes-pods
-        pipeline_stages:
-          - cri: {}
-        kubernetes_sd_configs:
-          - role: pod
-        relabel_configs:
-          - source_labels:
-              - __meta_kubernetes_pod_controller_name
-            regex: ([0-9a-z-.]+?)(-[0-9a-f]{8,10})?
-            action: replace
-            target_label: __tmp_controller_name
-          - source_labels:
-              - __meta_kubernetes_pod_label_app_kubernetes_io_name
-              - __meta_kubernetes_pod_label_app
-              - __tmp_controller_name
-              - __meta_kubernetes_pod_name
-            regex: ^;*([^;]+)(;.*)?$
-            action: replace
-            target_label: app
-          - source_labels:
-              - __meta_kubernetes_pod_label_app_kubernetes_io_instance
-              - __meta_kubernetes_pod_label_instance
-            regex: ^;*([^;]+)(;.*)?$
-            action: replace
-            target_label: instance
-          - source_labels:
-              - __meta_kubernetes_pod_label_app_kubernetes_io_component
-              - __meta_kubernetes_pod_label_component
-            regex: ^;*([^;]+)(;.*)?$
-            action: replace
-            target_label: component
-          - action: replace
-            source_labels:
-              - __meta_kubernetes_pod_node_name
-            target_label: node_name
-          - action: replace
-            source_labels:
-              - __meta_kubernetes_namespace
-            target_label: namespace
-          - action: replace
-            replacement: $1
-            separator: /
-            source_labels:
-              - namespace
-              - app
-            target_label: job
-          - action: replace
-            source_labels:
-              - __meta_kubernetes_pod_name
-            target_label: pod
-          - action: replace
-            source_labels:
-              - __meta_kubernetes_pod_container_name
-            target_label: container
-          - action: replace
-            replacement: /var/log/pods/*$1/*.log
-            separator: /
-            source_labels:
-              - __meta_kubernetes_pod_uid
-              - __meta_kubernetes_pod_container_name
-            target_label: __path__
-          - action: replace
-            regex: true/(.*)
-            replacement: /var/log/pods/*$1/*.log
-            separator: /
-            source_labels:
-              - __meta_kubernetes_pod_annotationpresent_kubernetes_io_config_hash
-              - __meta_kubernetes_pod_annotation_kubernetes_io_config_hash
-              - __meta_kubernetes_pod_container_name
-            target_label: __path__
-  resources:
-    requests:
-      cpu: 50m
-      memory: 64Mi
-    limits:
-      cpu: 200m
-      memory: 128Mi
 
 # Monitoring
 monitoring:
   dashboards:
-    enabled: true
+    enabled: false
   rules:
-    enabled: true
+    enabled: false
   serviceMonitor:
     enabled: true
-    namespace: monitoring

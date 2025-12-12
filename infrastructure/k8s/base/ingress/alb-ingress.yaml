@@ -1,92 +1,95 @@
 apiVersion: networking.k8s.io/v1
-kind: IngressClass
-metadata:
-  name: alb
-  annotations:
-    ingressclass.kubernetes.io/is-default-class: "true"
-spec:
-  controller: ingress.k8s.aws/alb
----
-apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: flexobo-ingress
   namespace: flexobo
   annotations:
-    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/healthcheck-path: /health
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
-    # TLS - uncomment when you have a certificate
-    # alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:ACCOUNT_ID:certificate/CERT_ID
-    # alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    # alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:677109604279:certificate/15aab3c5-edd4-4f08-a02e-95079265d06d
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/healthcheck-path: /
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/success-codes: 200-404
+    alb.ingress.kubernetes.io/group.name: flexobo-dev
 spec:
   ingressClassName: alb
   rules:
-    - http:
+    # Main Service (port 3008)
+    - host: dev-api.flexobo-mock.site
+      http:
         paths:
-          # Users Service - Authentication endpoints
-          - path: /api/v1/auth
-            pathType: Prefix
-            backend:
-              service:
-                name: users-service
-                port:
-                  number: 3005
-          - path: /api/v1/users
-            pathType: Prefix
-            backend:
-              service:
-                name: users-service
-                port:
-                  number: 3005
-
-          # Chat Service
-          - path: /api/v1/chat
-            pathType: Prefix
-            backend:
-              service:
-                name: chat-service
-                port:
-                  number: 3006
-
-          # File Service
-          - path: /api/v1/files
-            pathType: Prefix
-            backend:
-              service:
-                name: file-service
-                port:
-                  number: 3007
-
-          # Main Service (default)
-          - path: /api/v1
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: main-service
                 port:
                   number: 3008
-
-          # Billing Service
-          - path: /api/v1/billing
+    # Users Service (port 3005)
+    - host: dev-users-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: users-service
+                port:
+                  number: 3005
+    # Chat Service (port 3006)
+    - host: dev-chat-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: chat-service
+                port:
+                  number: 3006
+    # File Service (port 3007)
+    - host: dev-file-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: file-service
+                port:
+                  number: 3007
+    # Billing Service (port 3009)
+    - host: dev-billing-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: billing-service
                 port:
                   number: 3009
-
-          # Notification Service (SSE)
-          - path: /api/v1/notifications
+    # Notification Service (port 3010)
+    - host: dev-notification-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
             pathType: Prefix
             backend:
               service:
                 name: notification-service
                 port:
                   number: 3010
+    # Telegram Service (port 3012)
+    - host: dev-telegram-api.flexobo-mock.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: telegram-service
+                port:
+                  number: 3012

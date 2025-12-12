@@ -1,27 +1,24 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: flexobo
+# Note: No global namespace set - each resource defines its own namespace
 
 resources:
-  # Core infrastructure
+  # Core infrastructure - flexobo namespace
   - namespace.yaml
   - storage-class.yaml
   - configmap.yaml
 
-  # Security & RBAC (apply first)
+  # Security & RBAC
   - rbac
   - network-policies
-
-  # External Secrets (replaces static secrets.yaml)
-  - external-secrets
 
   # Message queue and cache
   - rabbitmq
   - redis
 
-  # Microservices
-  - services/auth-service
+  # Microservices (all in flexobo namespace)
+  # Note: auth-service removed - no source code exists
   - services/users-service
   - services/chat-service
   - services/file-service
@@ -30,20 +27,17 @@ resources:
   - services/notification-service
   - services/telegram-service
 
-  # Istio policies (after services)
-  - istio
-
-  # Monitoring namespace
-  - monitoring
-
-# Note: The following are installed via Helm and managed separately:
+# Note: The following have their own namespaces and should be applied separately:
+# - external-secrets: kubectl apply -k infrastructure/k8s/base/external-secrets
+# - istio: istioctl install -f infrastructure/k8s/base/istio/istio-operator.yaml
+# - monitoring: kubectl apply -k infrastructure/k8s/base/monitoring
+#
+# Helm charts (installed separately):
 # - cert-manager (infrastructure/k8s/base/cert-manager/helm-values.yaml)
 # - kong (infrastructure/k8s/base/kong/helm-values.yaml)
 # - prometheus-stack (infrastructure/k8s/base/monitoring/prometheus/helm-values.yaml)
-# - grafana (infrastructure/k8s/base/monitoring/grafana/helm-values.yaml)
 # - loki (infrastructure/k8s/base/monitoring/loki/helm-values.yaml)
 # - jaeger (infrastructure/k8s/base/monitoring/jaeger/helm-values.yaml)
-# - rancher (infrastructure/k8s/rancher/helm-values.yaml)
 
 commonLabels:
   app.kubernetes.io/name: flexobo

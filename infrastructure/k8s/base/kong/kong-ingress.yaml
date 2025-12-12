@@ -36,15 +36,7 @@ spec:
     - host: api.flexobo.com
       http:
         paths:
-          # Auth Service endpoints (no JWT required for login/register)
-          - path: /api/v1/auth
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 3000
-          # Main Service endpoints
+          # Main Service endpoints (handles all API routes including auth)
           - path: /api/v1
             pathType: Prefix
             backend:
@@ -56,60 +48,11 @@ spec:
     - host: dev.api.flexobo.com
       http:
         paths:
-          - path: /api/v1/auth
-            pathType: Prefix
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 3000
           - path: /api/v1
             pathType: Prefix
             backend:
               service:
                 name: main-service
-                port:
-                  number: 3000
----
-# Auth Service specific routes (no JWT for public endpoints)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: auth-public
-  namespace: flexobo
-  annotations:
-    kubernetes.io/ingress.class: kong
-    konghq.com/plugins: global-rate-limit,global-cors,global-request-id,security-headers,strict-rate-limit
-    konghq.com/strip-path: "false"
-spec:
-  ingressClassName: kong
-  tls:
-    - hosts:
-        - api.flexobo.com
-      secretName: flexobo-api-tls
-  rules:
-    - host: api.flexobo.com
-      http:
-        paths:
-          - path: /api/v1/auth/login
-            pathType: Exact
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 3000
-          - path: /api/v1/auth/register
-            pathType: Exact
-            backend:
-              service:
-                name: auth-service
-                port:
-                  number: 3000
-          - path: /api/v1/auth/refresh
-            pathType: Exact
-            backend:
-              service:
-                name: auth-service
                 port:
                   number: 3000
 ---

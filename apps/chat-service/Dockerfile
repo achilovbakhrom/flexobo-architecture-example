@@ -17,7 +17,7 @@ COPY . .
 # Generate Prisma client for chat-service
 RUN npx prisma generate --schema=apps/chat-service/prisma/schema.prisma
 
-# Build the application with NX
+# Build the application with NX (dependencies are built automatically)
 RUN npx nx build chat-service --configuration=production
 
 # Production stage
@@ -33,11 +33,20 @@ COPY --from=build --chown=nodejs:nodejs /app/dist/apps/chat-service ./
 COPY --from=build --chown=nodejs:nodejs /app/node_modules ./node_modules
 COPY --from=build --chown=nodejs:nodejs /app/package.json ./
 
-# Copy Prisma client (custom output path)
-COPY --from=build --chown=nodejs:nodejs /app/apps/chat-service/node_modules/.prisma ./node_modules/.prisma
+# Copy Prisma client to expected path and link node_modules for Prisma runtime dependencies
+RUN mkdir -p /apps/chat-service/node_modules/.prisma
+COPY --from=build --chown=nodejs:nodejs /app/apps/chat-service/node_modules/.prisma /apps/chat-service/node_modules/.prisma
+RUN ln -s /app/node_modules/@prisma /apps/chat-service/node_modules/@prisma
+
+# Copy internal libraries
+COPY --from=build --chown=nodejs:nodejs /app/dist/libs/shared-kernel ./node_modules/@flexobo/shared-kernel
+COPY --from=build --chown=nodejs:nodejs /app/dist/libs/core ./node_modules/@flexobo/core
+
+# Copy proto files (required for gRPC)
+COPY --from=build --chown=nodejs:nodejs /app/libs/shared-kernel/src/lib/grpc/proto /app/libs/shared-kernel/src/lib/grpc/proto
 
 USER nodejs
 
 EXPOSE 3006
 
-CMD ["node", "main.js"]
+CMD ["node", "src/main.js"]

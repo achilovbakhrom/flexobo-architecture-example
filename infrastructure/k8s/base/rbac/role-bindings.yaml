@@ -8,9 +8,6 @@ metadata:
   namespace: flexobo
 subjects:
   - kind: ServiceAccount
-    name: auth-service
-    namespace: flexobo
-  - kind: ServiceAccount
     name: main-service
     namespace: flexobo
   - kind: ServiceAccount
