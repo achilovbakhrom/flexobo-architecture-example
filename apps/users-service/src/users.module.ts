@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
+import { ClientsModule, Transport } from '@nestjs/microservices';
+import { join } from 'path';
 import {
   CqrsModule,
   MessagingModule,
@@ -17,6 +19,7 @@ import { UsersController } from './adapters/http/v1/users.controller';
 import { UsersGrpcController } from './adapters/grpc/users.grpc.controller';
 import { JwtAuthGuard } from './adapters/http/guards';
 import configuration from './config/configuration';
+import { ReferenceDataGrpcClient } from './adapters/grpc/reference-data-grpc.client';
 
 // Ports
 import {
@@ -32,6 +35,7 @@ import {
   ROLE_REPOSITORY,
   INVITATION_REPOSITORY,
   COMPANY_MEMBERSHIP_REPOSITORY,
+  REFERENCE_DATA_SERVICE,
 } from './ports';
 import { USER_AGGREGATE_STORE } from './ports/user-store.port';
 
@@ -194,6 +198,24 @@ const QueryHandlers = [
       }),
       inject: [ConfigService],
     }),
+    // gRPC Client for Main Service (Reference Data)
+    ClientsModule.registerAsync([
+      {
+        name: 'REFERENCE_DATA_GRPC_CLIENT',
+        useFactory: (configService: ConfigService) => ({
+          transport: Transport.GRPC,
+          options: {
+            package: 'reference_data',
+            protoPath: join(
+              process.cwd(),
+              'libs/shared-kernel/src/lib/grpc/proto/reference-data.proto'
+            ),
+            url: configService.get('mainService.grpcUrl', 'localhost:50051'),
+          },
+        }),
+        inject: [ConfigService],
+      },
+    ]),
   ],
   controllers: [AuthController, RoleController, UsersController, UsersGrpcController],
   providers: [
@@ -249,6 +271,11 @@ const QueryHandlers = [
     {
       provide: COMPANY_MEMBERSHIP_REPOSITORY,
       useClass: PrismaCompanyMembershipRepository,
+    },
+    // Reference Data Service (gRPC Client)
+    {
+      provide: REFERENCE_DATA_SERVICE,
+      useClass: ReferenceDataGrpcClient,
     },
     // Notification Resolvers
     {

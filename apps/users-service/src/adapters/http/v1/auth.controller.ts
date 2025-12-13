@@ -91,7 +91,9 @@ export class AuthController {
       dto.is_privacy_policy_accepted,
       dto.is_subscribed_newsletter,
       dto.platform,
-      dto.user_type
+      dto.user_type,
+      dto.country_id,
+      dto.city
     );
 
     const result = await this.commandBus.execute<TokenResponseDto>(command);
@@ -401,6 +403,8 @@ export class AuthController {
       throw new NotFoundException('User not found');
     }
 
+    console.log(user);
+
     return { data: user };
   }
 
@@ -417,7 +421,9 @@ export class AuthController {
       dto.fio,
       dto.phonr_number,
       dto.language,
-      dto.avatar
+      dto.avatar,
+      dto.country_id,
+      dto.city
     );
 
     const result = await this.commandBus.execute<void>(command);

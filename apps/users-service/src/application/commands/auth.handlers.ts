@@ -103,6 +103,8 @@ export class RegisterUserHandler
         isSubscribedNewsletter: command.isSubscribedNewsletter,
         platform: command.platform,
         userType: command.userType,
+        countryId: command.countryId,
+        city: command.city,
       });
 
       const tokens = await this.tokenService.generateTokens(

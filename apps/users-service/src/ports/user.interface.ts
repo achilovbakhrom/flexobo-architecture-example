@@ -1,4 +1,5 @@
 import { AuthPlatform, UserRole, UserStatus, UserType } from './user.enums';
+import { CountryData } from './reference-data';
 
 export interface IUser {
   id: string;
@@ -11,6 +12,7 @@ export interface IUser {
   fio: string;
   avatar?: string | null;
   countryId?: string;
+  country?: CountryData; // gRPC fetched data
   city?: string;
   role: UserRole;
   userType?: UserType | null;

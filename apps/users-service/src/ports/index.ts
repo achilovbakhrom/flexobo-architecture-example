@@ -10,6 +10,7 @@ export * from './google-auth-service.port';
 export * from './role.repository';
 export * from './invitation.repository';
 export * from './company-membership.repository';
+export * from './reference-data';
 
 // Re-export domain types for adapters to use
 export * from './user.enums';

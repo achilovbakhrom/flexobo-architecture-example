@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package reference_data;
+
+// Reference Data Service - handles countries, languages, currencies, etc.
+service ReferenceDataService {
+  // Get country by ID
+  rpc GetCountry(GetCountryRequest) returns (GetCountryResponse);
+
+  // Get multiple countries by IDs
+  rpc GetCountries(GetCountriesRequest) returns (GetCountriesResponse);
+
+  // Get language by ID
+  rpc GetLanguage(GetLanguageRequest) returns (GetLanguageResponse);
+
+  // Get currency by ID
+  rpc GetCurrency(GetCurrencyRequest) returns (GetCurrencyResponse);
+}
+
+// Country messages
+message GetCountryRequest {
+  string country_id = 1;
+  string language_code = 2; // For translation (en, uz, ru)
+}
+
+message GetCountryResponse {
+  bool found = 1;
+  CountryInfo country = 2;
+}
+
+message GetCountriesRequest {
+  repeated string country_ids = 1;
+  string language_code = 2;
+}
+
+message GetCountriesResponse {
+  repeated CountryInfo countries = 1;
+}
+
+message CountryInfo {
+  string id = 1;
+  string code = 2;
+  string name = 3; // Translated name based on language_code
+  string phone_code = 4;
+  string currency_code = 5;
+  bool is_active = 6;
+}
+
+// Language messages
+message GetLanguageRequest {
+  string language_id = 1;
+}
+
+message GetLanguageResponse {
+  bool found = 1;
+  LanguageInfo language = 2;
+}
+
+message LanguageInfo {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  bool is_active = 4;
+}
+
+// Currency messages
+message GetCurrencyRequest {
+  string currency_id = 1;
+  string language_code = 2;
+}
+
+message GetCurrencyResponse {
+  bool found = 1;
+  CurrencyInfo currency = 2;
+}
+
+message CurrencyInfo {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string symbol = 4;
+  double rate = 5;
+  bool is_active = 6;
+}

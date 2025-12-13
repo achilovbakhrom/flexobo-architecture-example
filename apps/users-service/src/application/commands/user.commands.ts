@@ -11,7 +11,9 @@ export class RegisterUserCommand implements ICommand {
     public readonly isPrivacyPolicyAccepted?: boolean,
     public readonly isSubscribedNewsletter?: boolean,
     public readonly platform?: AuthPlatform,
-    public readonly userType?: UserType
+    public readonly userType?: UserType,
+    public readonly countryId?: string,
+    public readonly city?: string
   ) {}
 }
 
@@ -42,10 +44,7 @@ export class RefreshTokenCommand implements ICommand {
 }
 
 export class LogoutUserCommand implements ICommand {
-  constructor(
-    public readonly userId: string,
-    public readonly jti: string
-  ) {}
+  constructor(public readonly userId: string, public readonly jti: string) {}
 }
 
 export class UpdateUserProfileCommand implements ICommand {
@@ -54,7 +53,9 @@ export class UpdateUserProfileCommand implements ICommand {
     public readonly fio?: string,
     public readonly phoneNumber?: string,
     public readonly language?: string,
-    public readonly avatar?: string
+    public readonly avatar?: string,
+    public readonly countryId?: string,
+    public readonly city?: string
   ) {}
 }
 
