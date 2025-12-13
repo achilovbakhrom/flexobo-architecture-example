@@ -1,964 +1,488 @@
-# Flexobo Developer Guide
+# Flexobo Infrastructure Setup Guide
 
-A comprehensive guide for developing, deploying, and maintaining Flexobo microservices.
+A step-by-step guide for deploying the Flexobo microservices infrastructure from scratch.
 
 ## Table of Contents
 
-1. [Getting Started](#getting-started)
-2. [Project Structure](#project-structure)
-3. [Local Development](#local-development)
-4. [Creating a New Microservice](#creating-a-new-microservice)
-5. [Database Management](#database-management)
-6. [Working with Message Queues](#working-with-message-queues)
-7. [Testing](#testing)
-8. [Deployment](#deployment)
-9. [Environment Configuration](#environment-configuration)
-10. [Common Patterns](#common-patterns)
-11. [Troubleshooting](#troubleshooting)
+1. [Prerequisites](#prerequisites)
+2. [Infrastructure Setup (Terraform)](#infrastructure-setup-terraform)
+3. [Kubernetes Deployment](#kubernetes-deployment)
+4. [Helm Charts Installation](#helm-charts-installation)
+5. [Service Deployment](#service-deployment)
+6. [DNS & SSL Configuration](#dns--ssl-configuration)
+7. [Verification](#verification)
+8. [Local Development](#local-development)
 
 ---
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+### Required Tools
 
-Ensure you have the following installed:
+| Tool | Version | Installation |
+|------|---------|--------------|
+| AWS CLI | 2.x | `brew install awscli` |
+| Terraform | 1.5.7+ | `brew install terraform` |
+| kubectl | 1.29+ | `brew install kubectl` |
+| Helm | 3.x | `brew install helm` |
+| Docker | 24+ | Docker Desktop |
 
-| Tool | Version | Purpose |
-|------|---------|---------|
-| Node.js | 22+ | Runtime |
-| Yarn | 1.22+ | Package manager |
-| Docker | 24+ | Containerization |
-| kubectl | 1.29+ | Kubernetes CLI |
-| AWS CLI | 2.x | AWS operations |
-| Terraform | 1.5.7+ | Infrastructure |
+### AWS Account Setup
 
-### Initial Setup
+1. Create an AWS account or use existing one
+2. Create an IAM user with programmatic access
+3. Attach these policies: `AdministratorAccess` (or specific policies for EKS, RDS, S3, etc.)
+4. Configure AWS CLI:
 
 ```bash
-# Clone the repository
+aws configure
+# Enter: AWS Access Key ID, Secret Access Key, Region (us-east-1)
+```
+
+### Domain Setup
+
+Register a domain (e.g., `flexobo-mock.site`) and note the hosted zone ID if using Route53.
+
+---
+
+## Infrastructure Setup (Terraform)
+
+### Step 1: Clone Repository
+
+```bash
 git clone https://github.com/achilovbakhrom/flexobo-microservice-example.git
 cd flexobo-microservice-example
-
-# Install dependencies
-yarn install
-
-# Start local infrastructure
-cd infrastructure && docker-compose up -d && cd ..
-
-# Start a service (e.g., users-service)
-yarn start:users
 ```
 
-### AWS Configuration
+### Step 2: Create Terraform Backend (First Time Only)
+
+Create S3 bucket and DynamoDB table for Terraform state:
 
 ```bash
-# Configure AWS credentials
-aws configure
+# Create S3 bucket for state
+aws s3 mb s3://flexobo-terraform-state --region us-east-1
 
-# Verify access
-aws sts get-caller-identity
+# Enable versioning
+aws s3api put-bucket-versioning \
+  --bucket flexobo-terraform-state \
+  --versioning-configuration Status=Enabled
 
-# Update kubeconfig for EKS
+# Create DynamoDB table for state locking
+aws dynamodb create-table \
+  --table-name flexobo-terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region us-east-1
+```
+
+### Step 3: Configure Variables
+
+Create `infrastructure/terraform/environments/dev/terraform.tfvars`:
+
+```hcl
+project_name       = "flexobo"
+environment        = "dev"
+aws_region         = "us-east-1"
+domain_name        = "flexobo-mock.site"
+vpc_cidr           = "10.0.0.0/16"
+kubernetes_version = "1.29"
+
+# Sensitive - use environment variables or secrets manager
+db_password         = "your-secure-db-password"
+opensearch_password = "your-opensearch-password"
+
+# Third-party (optional)
+stripe_secret_key      = ""
+stripe_webhook_secret  = ""
+telegram_bot_token     = ""
+click_secret_key       = ""
+```
+
+### Step 4: Initialize and Apply Terraform
+
+```bash
+cd infrastructure/terraform/environments/dev
+
+# Initialize Terraform
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply infrastructure (takes 15-20 minutes)
+terraform apply
+```
+
+This creates:
+
+- VPC with public/private subnets
+- EKS cluster with node groups
+- RDS PostgreSQL database
+- S3 buckets
+- ECR repositories
+- Route53 hosted zone
+- ACM SSL certificates
+- Security groups
+- IAM roles
+
+### Step 5: Connect to EKS Cluster
+
+```bash
 aws eks update-kubeconfig --region us-east-1 --name flexobo-dev
+
+# Verify connection
+kubectl get nodes
 ```
 
 ---
 
-## Project Structure
+## Kubernetes Deployment
 
+### Step 1: Install AWS Load Balancer Controller
+
+```bash
+# Add Helm repo
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+
+# Get OIDC provider
+OIDC_ID=$(aws eks describe-cluster --name flexobo-dev --query "cluster.identity.oidc.issuer" --output text | cut -d'/' -f5)
+
+# Create IAM service account (check if policy exists first)
+eksctl create iamserviceaccount \
+  --cluster=flexobo-dev \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --role-name AmazonEKSLoadBalancerControllerRole \
+  --attach-policy-arn=arn:aws:iam::aws:policy/AWSLoadBalancerControllerIAMPolicy \
+  --approve
+
+# Install controller
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=flexobo-dev \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller
 ```
-flexobo-microservice-example/
-├── apps/                          # Microservices
-│   ├── main-service/              # Main API gateway service
-│   ├── users-service/             # User management
-│   ├── chat-service/              # Chat functionality
-│   ├── file-service/              # File management
-│   ├── billing-service/           # Billing & payments
-│   ├── notification-service/      # Push notifications
-│   └── telegram-service/          # Telegram bot integration
-├── libs/                          # Shared libraries
-│   ├── core/                      # CQRS, event sourcing, messaging
-│   └── shared-kernel/             # Event contracts, value objects
-├── infrastructure/                # Infrastructure as Code
-│   ├── terraform/                 # AWS resources (Terraform)
-│   ├── k8s/                       # Kubernetes manifests
-│   └── docker-compose.yml         # Local development
-├── docs/                          # Documentation
-│   ├── INFRASTRUCTURE.md          # Infrastructure details
-│   └── GUIDE.md                   # This file
-├── scripts/                       # Utility scripts
-├── nx.json                        # NX monorepo configuration
-├── package.json                   # Root package.json
-└── tsconfig.base.json             # Base TypeScript config
+
+### Step 2: Apply Base Kubernetes Resources
+
+```bash
+cd infrastructure/k8s/base
+
+# Apply namespace and core resources
+kubectl apply -f namespace.yaml
+kubectl apply -f storage-class.yaml
+kubectl apply -f configmap.yaml
+
+# Apply RBAC
+kubectl apply -k rbac/
+
+# Apply network policies
+kubectl apply -k network-policies/
 ```
 
-### Service Structure
+### Step 3: Deploy RabbitMQ and Redis
 
-Each microservice follows the hexagonal architecture pattern:
+```bash
+kubectl apply -k rabbitmq/
+kubectl apply -k redis/
 
-```
-apps/{service-name}/
-├── prisma/
-│   ├── schema.prisma              # Database schema
-│   └── migrations/                # Database migrations
-├── src/
-│   ├── main.ts                    # Application entry point
-│   ├── {service}.module.ts        # Root NestJS module
-│   ├── prisma.module.ts           # Prisma client module
-│   ├── domain/                    # Domain layer
-│   │   ├── aggregates/            # Domain aggregates
-│   │   ├── entities/              # Domain entities
-│   │   ├── events/                # Domain events
-│   │   └── value-objects/         # Value objects
-│   ├── application/               # Application layer
-│   │   ├── commands/              # Command handlers
-│   │   ├── queries/               # Query handlers
-│   │   └── use-cases/             # Use case implementations
-│   ├── adapters/                  # Adapters layer
-│   │   ├── http/                  # REST controllers
-│   │   │   └── v1/                # API version 1
-│   │   ├── persistence/           # Repository implementations
-│   │   ├── eventbus/              # Event handlers
-│   │   └── messaging/             # Message consumers
-│   └── ports/                     # Port interfaces
-│       └── repositories/          # Repository interfaces
-├── Dockerfile                     # Container image
-├── docker-compose.yml             # Service-specific infrastructure
-├── .env                           # Environment variables
-├── .env.example                   # Environment template
-├── project.json                   # NX project configuration
-├── prisma.config.ts               # Prisma configuration
-└── tsconfig.*.json                # TypeScript configs
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app=rabbitmq -n flexobo --timeout=120s
+kubectl wait --for=condition=ready pod -l app=redis -n flexobo --timeout=120s
 ```
 
 ---
 
-## Local Development
+## Helm Charts Installation
 
-### Starting Services
-
-```bash
-# Start all services
-yarn start
-
-# Start specific service
-yarn start:main          # Main service (port 3008)
-yarn start:users         # Users service (port 3005)
-yarn start:chat          # Chat service (port 3006)
-yarn start:file          # File service (port 3007)
-yarn start:billing       # Billing service (port 3009)
-yarn start:notification  # Notification service (port 3010)
-yarn start:telegram      # Telegram service (port 3012)
-
-# Stop all services
-yarn stop
-```
-
-### Local Infrastructure
+### Rancher (Cluster Management UI)
 
 ```bash
-# Start shared infrastructure (RabbitMQ)
-cd infrastructure && docker-compose up -d && cd ..
+# Add Rancher repo
+helm repo add rancher-latest https://releases.rancher.com/server-charts/latest
+helm repo update
 
-# Start service-specific infrastructure
-cd apps/users-service && docker-compose up -d && cd ../..
+# Create namespace
+kubectl create namespace cattle-system
 
-# View logs
-docker-compose logs -f
+# Install Rancher
+helm install rancher rancher-latest/rancher \
+  --namespace cattle-system \
+  --set hostname=rancher.flexobo-mock.site \
+  --set bootstrapPassword=admin \
+  --set ingress.ingressClassName=alb \
+  --set ingress.tls.source=secret \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/scheme=internet-facing' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/target-type=ip' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/certificate-arn=<YOUR_ACM_CERT_ARN>' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/listen-ports=[{"HTTP": 80}, {"HTTPS": 443}]' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/ssl-redirect=443' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/group\.name=flexobo-rancher' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/success-codes=200-399' \
+  --set 'ingress.extraAnnotations.alb\.ingress\.kubernetes\.io/healthcheck-path=/healthz'
 
-# Stop and remove volumes
-docker-compose down -v
-```
-
-### Environment Variables
-
-Each service uses a `.env` file:
-
-```bash
-# apps/users-service/.env
-NODE_ENV=development
-USERS_SERVICE_PORT=3005
-
-# Database
-DATABASE_URL=postgresql://postgres:postgres@localhost:5437/users_service
-
-# Redis
-REDIS_URL=redis://localhost:6379
-
-# RabbitMQ
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
-
-# JWT
-JWT_SECRET=your-local-jwt-secret
-
-# OpenTelemetry (optional)
-OTEL_TRACE_ENDPOINT=http://localhost:4318/v1/traces
-OTEL_METRICS_ENDPOINT=http://localhost:4318/v1/metrics
-```
-
-### Port Assignments
-
-| Service | HTTP Port | Debug Port | Prisma Studio |
-|---------|-----------|------------|---------------|
-| main-service | 3008 | 9229 | 5555 |
-| users-service | 3005 | 9230 | 5556 |
-| chat-service | 3006 | 9231 | 5557 |
-| file-service | 3007 | 9232 | 5558 |
-| billing-service | 3009 | 9233 | 5559 |
-| notification-service | 3010 | 9234 | 5560 |
-| telegram-service | 3012 | 9235 | 5561 |
-
-### Hot Reloading
-
-Services automatically rebuild and restart on file changes:
-
-```bash
-# NX watch mode (automatic)
-yarn start:{service}
-
-# Manual rebuild
-npx nx build {service-name}
+# Fix path type for ALB
+kubectl patch ingress rancher -n cattle-system --type='json' \
+  -p='[{"op": "replace", "path": "/spec/rules/0/http/paths/0/pathType", "value": "Prefix"}]'
 ```
 
 ---
 
-## Creating a New Microservice
+## Service Deployment
 
-### Step 1: Generate Service
-
-```bash
-# Generate NestJS application
-npx nx g @nx/nest:application apps/inventory-service \
-  --name=inventory-service \
-  --e2eTestRunner=none
-```
-
-### Step 2: Configure project.json
-
-Replace `apps/inventory-service/project.json`:
-
-```json
-{
-  "name": "inventory-service",
-  "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "apps/inventory-service/src",
-  "projectType": "application",
-  "tags": [],
-  "targets": {
-    "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
-      "options": {
-        "outputPath": "dist/apps/inventory-service",
-        "main": "apps/inventory-service/src/main.ts",
-        "tsConfig": "apps/inventory-service/tsconfig.app.json",
-        "assets": ["apps/inventory-service/src/assets"]
-      }
-    },
-    "serve": {
-      "executor": "@nx/js:node",
-      "dependsOn": ["build"],
-      "options": {
-        "buildTarget": "inventory-service:build",
-        "watch": true,
-        "inspect": "inspect",
-        "port": 9236,
-        "debounce": 500,
-        "runtimeArgs": ["--enable-source-maps"]
-      }
-    },
-    "test": {
-      "options": {
-        "passWithNoTests": true
-      }
-    }
-  }
-}
-```
-
-### Step 3: Create Docker Compose
-
-Create `apps/inventory-service/docker-compose.yml`:
-
-```yaml
-services:
-  postgres-inventory:
-    image: postgres:15-alpine
-    container_name: inventory-service-postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: inventory_service
-    ports:
-      - "5440:5432"
-    volumes:
-      - postgres_inventory_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-volumes:
-  postgres_inventory_data:
-```
-
-### Step 4: Setup Prisma
-
-Create `apps/inventory-service/prisma/schema.prisma`:
-
-```prisma
-generator client {
-  provider = "prisma-client-js"
-  output   = "../../../node_modules/.prisma/inventory-client"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-model EventStore {
-  id            String   @id @default(uuid())
-  aggregateId   String   @map("aggregate_id")
-  aggregateType String   @map("aggregate_type")
-  eventType     String   @map("event_type")
-  eventData     Json     @map("event_data")
-  version       Int
-  occurredAt    DateTime @default(now()) @map("occurred_at")
-  metadata      Json?
-
-  @@index([aggregateId])
-  @@map("event_store")
-}
-
-model OutboxMessage {
-  id          String    @id @default(uuid())
-  eventType   String    @map("event_type")
-  payload     Json
-  occurredAt  DateTime  @default(now()) @map("occurred_at")
-  processedAt DateTime? @map("processed_at")
-
-  @@index([processedAt])
-  @@map("outbox_messages")
-}
-```
-
-Create `apps/inventory-service/prisma.config.ts`:
-
-```typescript
-import path from 'path';
-
-export default {
-  schema: path.join(__dirname, 'prisma/schema.prisma'),
-};
-```
-
-### Step 5: Create Environment File
-
-Create `apps/inventory-service/.env`:
-
-```bash
-NODE_ENV=development
-INVENTORY_SERVICE_PORT=3013
-DATABASE_URL=postgresql://postgres:postgres@localhost:5440/inventory_service
-REDIS_URL=redis://localhost:6379
-RABBITMQ_URL=amqp://guest:guest@localhost:5672
-```
-
-### Step 6: Add Package Scripts
-
-Update root `package.json`:
-
-```json
-{
-  "scripts": {
-    "start:inventory": "npx tsx scripts/dev.ts inventory",
-    "db:generate:inventory": "npx prisma generate --config apps/inventory-service/prisma.config.ts",
-    "db:push:inventory": "npx prisma db push --config apps/inventory-service/prisma.config.ts",
-    "db:migrate:inventory": "npx prisma migrate dev --config apps/inventory-service/prisma.config.ts",
-    "db:studio:inventory": "npx prisma studio --config apps/inventory-service/prisma.config.ts --port 5562"
-  }
-}
-```
-
-### Step 7: Create Dockerfile
-
-Create `apps/inventory-service/Dockerfile`:
-
-```dockerfile
-FROM node:22-alpine AS builder
-
-WORKDIR /app
-COPY package.json yarn.lock ./
-RUN yarn install --frozen-lockfile
-
-COPY . .
-RUN npx nx build inventory-service --prod
-
-FROM node:22-alpine
-
-WORKDIR /app
-COPY --from=builder /app/dist/apps/inventory-service ./
-COPY --from=builder /app/node_modules ./node_modules
-
-ENV NODE_ENV=production
-EXPOSE 3013
-
-CMD ["node", "main.js"]
-```
-
-### Step 8: Create Kubernetes Manifests
-
-Create `infrastructure/k8s/base/services/inventory-service/`:
-
-```yaml
-# deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: inventory-service
-  namespace: flexobo
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: inventory-service
-  template:
-    metadata:
-      labels:
-        app: inventory-service
-        tier: backend
-    spec:
-      containers:
-        - name: inventory-service
-          image: 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/inventory-service:latest
-          ports:
-            - containerPort: 3013
-          envFrom:
-            - configMapRef:
-                name: flexobo-config
-            - secretRef:
-                name: flexobo-secrets
-          env:
-            - name: HOST
-              value: "0.0.0.0"
-            - name: PORT
-              value: "3013"
-            - name: DATABASE_URL
-              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=inventory&sslmode=no-verify"
-          resources:
-            requests:
-              memory: "256Mi"
-              cpu: "100m"
-            limits:
-              memory: "512Mi"
-              cpu: "500m"
-          readinessProbe:
-            tcpSocket:
-              port: 3013
-            initialDelaySeconds: 10
-            periodSeconds: 10
-          livenessProbe:
-            tcpSocket:
-              port: 3013
-            initialDelaySeconds: 30
-            periodSeconds: 30
----
-# service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: inventory-service
-  namespace: flexobo
-spec:
-  selector:
-    app: inventory-service
-  ports:
-    - port: 3013
-      targetPort: 3013
-```
-
-### Step 9: Start the Service
-
-```bash
-# Start infrastructure
-cd apps/inventory-service && docker-compose up -d && cd ../..
-
-# Generate Prisma client
-yarn db:generate:inventory
-
-# Push schema
-yarn db:push:inventory
-
-# Start service
-yarn start:inventory
-```
-
----
-
-## Database Management
-
-### Prisma Commands
-
-```bash
-# Generate client
-yarn db:generate:{service}
-
-# Push schema (development)
-yarn db:push:{service}
-
-# Create migration
-yarn db:migrate:{service}
-
-# Open Prisma Studio
-yarn db:studio:{service}
-
-# Reset database (caution!)
-npx prisma migrate reset --config apps/{service}/prisma.config.ts
-```
-
-### Database URLs
-
-Local development:
-
-```bash
-# Each service has its own database
-DATABASE_URL=postgresql://postgres:postgres@localhost:{port}/{database}
-
-# Port mapping
-# users-service:    5437
-# chat-service:     5436
-# file-service:     5438
-# billing-service:  5440
-# notification-service: 5441
-# telegram-service: 5442
-```
-
-Production (EKS):
-
-```bash
-# All services share one RDS instance with different schemas
-DATABASE_URL=postgresql://postgres:{password}@{rds-host}:5432/flexobo?schema={schema}&sslmode=no-verify
-```
-
-### Creating Database Schema in Production
-
-```bash
-# Create schema using a temporary pod
-kubectl run db-migrate --rm -i --restart=Never \
-  --image=postgres:15-alpine \
-  -n flexobo \
-  --env="PGPASSWORD=${DB_PASSWORD}" \
-  -- psql -h ${DB_HOST} -U postgres -d flexobo \
-  -c "CREATE SCHEMA IF NOT EXISTS inventory;"
-```
-
----
-
-## Working with Message Queues
-
-### RabbitMQ Configuration
-
-```typescript
-// In service module
-MessagingModule.forRoot({
-  config: {
-    url: process.env['RABBITMQ_URL'],
-    exchanges: [
-      { name: 'flexobo.events', type: 'topic', durable: true },
-      { name: 'flexobo.dlx', type: 'topic', durable: true },
-    ],
-    deadLetter: {
-      exchange: 'flexobo.dlx',
-      queue: 'flexobo.dead-letter',
-      ttl: 86400000 * 7,
-    },
-  },
-  enablePublisher: true,
-  enableConsumer: true,
-}),
-```
-
-### Publishing Events
-
-```typescript
-// Using outbox pattern (recommended)
-@Injectable()
-export class OrderService {
-  constructor(private readonly outboxService: OutboxService) {}
-
-  async createOrder(data: CreateOrderDto) {
-    const order = await this.prisma.order.create({ data });
-    
-    await this.outboxService.publish({
-      eventType: 'OrderCreated',
-      payload: {
-        orderId: order.id,
-        userId: order.userId,
-      },
-    });
-    
-    return order;
-  }
-}
-```
-
-### Consuming Events
-
-```typescript
-// Event handler
-@MessageHandler({
-  exchange: 'flexobo.events',
-  queue: 'inventory-service.on-order-created',
-  routingKey: 'order.created',
-})
-export class OrderCreatedHandler {
-  async handle(event: OrderCreatedEvent) {
-    // Update inventory
-  }
-}
-```
-
-### Shared Event Contracts
-
-```typescript
-import { EVENT_TYPES, ROUTING_KEYS, EXCHANGES } from '@flexobo/shared-kernel';
-
-// Event types
-EVENT_TYPES.ORDER.CREATED    // 'OrderCreated'
-EVENT_TYPES.PAYMENT.COMPLETED // 'PaymentCompleted'
-
-// Routing keys
-ROUTING_KEYS.ORDER.CREATED   // 'order.created'
-ROUTING_KEYS.ORDER.ALL       // 'order.*'
-```
-
----
-
-## Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-yarn test
-
-# Run specific service tests
-npx nx test {service-name}
-
-# Run with coverage
-npx nx test {service-name} --coverage
-
-# Run e2e tests
-npx nx e2e {service-name}-e2e
-```
-
-### Test Structure
-
-```
-apps/{service}/src/
-├── domain/
-│   └── aggregates/
-│       └── order.aggregate.spec.ts
-├── application/
-│   └── commands/
-│       └── create-order.handler.spec.ts
-└── adapters/
-    └── http/
-        └── orders.controller.spec.ts
-```
-
-### Writing Tests
-
-```typescript
-// Unit test example
-describe('OrderAggregate', () => {
-  it('should create order with valid data', () => {
-    const order = new OrderAggregate();
-    order.create({
-      userId: 'user-123',
-      items: [{ productId: 'prod-1', quantity: 2 }],
-    });
-    
-    expect(order.status).toBe('PENDING');
-    expect(order.getUncommittedEvents()).toHaveLength(1);
-  });
-});
-
-// Integration test example
-describe('OrdersController', () => {
-  let app: INestApplication;
-
-  beforeAll(async () => {
-    const module = await Test.createTestingModule({
-      imports: [OrderModule],
-    }).compile();
-    
-    app = module.createNestApplication();
-    await app.init();
-  });
-
-  it('POST /orders should create order', async () => {
-    const response = await request(app.getHttpServer())
-      .post('/orders')
-      .send({ userId: 'user-123', items: [] })
-      .expect(201);
-    
-    expect(response.body.id).toBeDefined();
-  });
-});
-```
-
----
-
-## Deployment
-
-### Building Images
+### Step 1: Build and Push Docker Images
 
 ```bash
 # Login to ECR
 aws ecr get-login-password --region us-east-1 | \
   docker login --username AWS --password-stdin \
-  677109604279.dkr.ecr.us-east-1.amazonaws.com
+  <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
 
-# Build for production
-docker build --platform linux/amd64 \
-  -t 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/{service}:latest \
-  -f apps/{service}/Dockerfile .
-
-# Push to ECR
-docker push 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/{service}:latest
+# Build and push each service
+for svc in main-service users-service chat-service file-service billing-service notification-service telegram-service; do
+  docker build --platform linux/amd64 \
+    -t <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/flexobo/$svc:latest \
+    -f apps/$svc/Dockerfile .
+  docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/flexobo/$svc:latest
+done
 ```
 
-### Deploying to Kubernetes
+### Step 2: Create Database Schemas
+
+Each service uses a separate schema in the shared RDS instance:
 
 ```bash
-# Apply configuration
-kubectl apply -k infrastructure/k8s/base
+# Get RDS endpoint
+RDS_HOST=$(terraform output -raw db_instance_address)
 
-# Update specific service
-kubectl apply -f infrastructure/k8s/base/services/{service}/
-
-# Trigger rolling update
-kubectl rollout restart deployment/{service} -n flexobo
-
-# Check status
-kubectl rollout status deployment/{service} -n flexobo
-
-# View logs
-kubectl logs -f deployment/{service} -n flexobo
+# Create schemas (from a bastion or pod with psql)
+kubectl run db-setup --rm -i --restart=Never \
+  --image=postgres:15-alpine \
+  -n flexobo \
+  --env="PGPASSWORD=<DB_PASSWORD>" \
+  -- psql -h $RDS_HOST -U postgres -d flexobo -c "
+    CREATE SCHEMA IF NOT EXISTS main;
+    CREATE SCHEMA IF NOT EXISTS users;
+    CREATE SCHEMA IF NOT EXISTS chat;
+    CREATE SCHEMA IF NOT EXISTS files;
+    CREATE SCHEMA IF NOT EXISTS billing;
+    CREATE SCHEMA IF NOT EXISTS notifications;
+    CREATE SCHEMA IF NOT EXISTS telegram;
+  "
 ```
 
-### Rollback
+### Step 3: Update ConfigMap with Database Connection
 
 ```bash
-# View rollout history
-kubectl rollout history deployment/{service} -n flexobo
+kubectl edit configmap flexobo-config -n flexobo
+# Update DB_HOST with RDS endpoint
+```
 
-# Rollback to previous
-kubectl rollout undo deployment/{service} -n flexobo
+### Step 4: Create Secrets
 
-# Rollback to specific revision
-kubectl rollout undo deployment/{service} -n flexobo --to-revision=2
+```bash
+kubectl create secret generic flexobo-secrets -n flexobo \
+  --from-literal=DB_PASSWORD=<your-db-password> \
+  --from-literal=JWT_SECRET=<your-jwt-secret> \
+  --from-literal=STRIPE_SECRET_KEY=<stripe-key> \
+  --from-literal=STRIPE_WEBHOOK_SECRET=<stripe-webhook> \
+  --from-literal=TELEGRAM_BOT_TOKEN=<telegram-token>
+```
+
+### Step 5: Deploy Services
+
+```bash
+kubectl apply -k infrastructure/k8s/base/services/
+```
+
+### Step 6: Apply Ingress
+
+```bash
+kubectl apply -f infrastructure/k8s/base/ingress/alb-ingress.yaml
 ```
 
 ---
 
-## Environment Configuration
+## DNS & SSL Configuration
 
-### Local vs Production
+### Step 1: Get ALB DNS Name
 
-| Variable | Local | Production |
-|----------|-------|------------|
-| NODE_ENV | development | production |
-| DATABASE_URL | localhost:543x | RDS endpoint |
-| RABBITMQ_URL | localhost:5672 | RabbitMQ pod |
-| REDIS_URL | localhost:6379 | Redis pod |
+```bash
+# Wait for ALB to be created
+kubectl get ingress -n flexobo -w
 
-### ConfigMaps and Secrets
-
-```yaml
-# ConfigMap (non-sensitive)
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: flexobo-config
-  namespace: flexobo
-data:
-  NODE_ENV: "production"
-  DB_HOST: "flexobo-dev-postgres.xxx.us-east-1.rds.amazonaws.com"
-  RABBITMQ_URL: "amqp://rabbitmq.flexobo.svc.cluster.local:5672"
-  REDIS_URL: "redis://redis.flexobo.svc.cluster.local:6379"
-
----
-# Secret (sensitive)
-apiVersion: v1
-kind: Secret
-metadata:
-  name: flexobo-secrets
-  namespace: flexobo
-type: Opaque
-stringData:
-  DB_PASSWORD: "xxx"
-  JWT_SECRET: "xxx"
-  STRIPE_SECRET_KEY: "xxx"
+# Get ALB DNS
+ALB_DNS=$(kubectl get ingress flexobo-ingress -n flexobo -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "ALB DNS: $ALB_DNS"
 ```
 
----
+### Step 2: Create Route53 Records
 
-## Common Patterns
+```bash
+HOSTED_ZONE_ID=<your-hosted-zone-id>
+ALB_HOSTED_ZONE_ID=Z35SXDOTRQ7X7K  # us-east-1 ALB zone
 
-### API Versioning
-
-```typescript
-@Controller({ path: 'orders', version: '1' })
-export class OrdersControllerV1 {
-  @Get()
-  getOrders() { /* v1 implementation */ }
-}
-
-@Controller({ path: 'orders', version: '2' })
-export class OrdersControllerV2 {
-  @Get()
-  getOrders() { /* v2 implementation */ }
-}
-```
-
-### Error Handling
-
-```typescript
-// Domain exception
-export class OrderNotFoundException extends DomainException {
-  constructor(orderId: string) {
-    super(`Order ${orderId} not found`, 'ORDER_NOT_FOUND');
-  }
-}
-
-// Global filter
-@Catch()
-export class GlobalExceptionFilter implements ExceptionFilter {
-  catch(exception: unknown, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    
-    if (exception instanceof DomainException) {
-      return response.status(400).json({
-        code: exception.code,
-        message: exception.message,
-      });
+# Create alias record for API
+aws route53 change-resource-record-sets --hosted-zone-id $HOSTED_ZONE_ID --change-batch '{
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "dev-api.flexobo-mock.site",
+      "Type": "A",
+      "AliasTarget": {
+        "HostedZoneId": "'$ALB_HOSTED_ZONE_ID'",
+        "DNSName": "'$ALB_DNS'",
+        "EvaluateTargetHealth": true
+      }
     }
-    
-    // Handle other exceptions
-  }
-}
+  }]
+}'
 ```
 
-### Event Sourcing
+Repeat for other subdomains as needed.
 
-```typescript
-// Aggregate root
-export class OrderAggregate extends AggregateRoot {
-  private status: OrderStatus;
-  private items: OrderItem[];
+---
 
-  create(data: CreateOrderData) {
-    this.apply(new OrderCreatedEvent({
-      orderId: this.id,
-      userId: data.userId,
-      items: data.items,
-    }));
-  }
+## Verification
 
-  private onOrderCreated(event: OrderCreatedEvent) {
-    this.status = 'PENDING';
-    this.items = event.items;
-  }
-}
+### Check All Pods Running
 
-// Event store
-const events = await eventStore.getEvents(aggregateId);
-const aggregate = new OrderAggregate();
-aggregate.loadFromHistory(events);
+```bash
+kubectl get pods -n flexobo
+kubectl get pods -n cattle-system
+kubectl get pods -n kube-system | grep aws-load-balancer
 ```
+
+### Check Services
+
+```bash
+kubectl get svc -n flexobo
+```
+
+### Check Ingress and ALB
+
+```bash
+kubectl get ingress -A
+```
+
+### Test Endpoints
+
+```bash
+# Test API
+curl -I https://dev-api.flexobo-mock.site
+
+# Test Rancher
+curl -I https://rancher.flexobo-mock.site
+```
+
+### Access Rancher UI
+
+1. Open <https://rancher.flexobo-mock.site>
+2. Login with bootstrap password: `admin`
+3. Set new admin password
+
+---
+
+## Local Development
+
+### Quick Start
+
+```bash
+# Install dependencies
+yarn install
+
+# Start shared infrastructure (RabbitMQ)
+cd infrastructure && docker-compose up -d && cd ..
+
+# Start service-specific database
+cd apps/users-service && docker-compose up -d && cd ../..
+
+# Generate Prisma client
+yarn db:generate:users
+
+# Push schema
+yarn db:push:users
+
+# Start service
+yarn start:users
+```
+
+### Port Assignments
+
+| Service | Port |
+|---------|------|
+| main-service | 3008 |
+| users-service | 3005 |
+| chat-service | 3006 |
+| file-service | 3007 |
+| billing-service | 3009 |
+| notification-service | 3010 |
+| telegram-service | 3012 |
 
 ---
 
 ## Troubleshooting
 
-### Service Won't Start
+### Terraform Issues
 
 ```bash
-# Check port availability
-lsof -i :3008
+# Re-initialize if module changes
+terraform init -upgrade
 
-# Kill process on port
-kill -9 $(lsof -t -i:3008)
+# Import existing resource
+terraform import module.eks.aws_eks_cluster.this flexobo-dev
 
-# Check logs
-npx nx build {service} 2>&1 | tail -50
+# Force unlock state
+terraform force-unlock <LOCK_ID>
 ```
 
-### Database Issues
+### EKS Connection Issues
 
 ```bash
-# Reset database
-npx prisma migrate reset --config apps/{service}/prisma.config.ts
+# Update kubeconfig
+aws eks update-kubeconfig --region us-east-1 --name flexobo-dev
 
-# Regenerate client
-rm -rf node_modules/.prisma/{service}-client
-npx prisma generate --config apps/{service}/prisma.config.ts
+# Check current context
+kubectl config current-context
+
+# Check cluster info
+kubectl cluster-info
 ```
 
-### Docker Issues
-
-```bash
-# Restart containers
-docker-compose down && docker-compose up -d
-
-# Clean up
-docker system prune -af
-docker volume prune -f
-
-# View logs
-docker-compose logs -f {service}
-```
-
-### Kubernetes Issues
+### Pod Issues
 
 ```bash
 # Check pod status
-kubectl get pods -n flexobo
+kubectl describe pod <pod-name> -n flexobo
 
-# View pod logs
-kubectl logs -f deployment/{service} -n flexobo
+# Check logs
+kubectl logs -f <pod-name> -n flexobo
 
-# Describe pod for events
-kubectl describe pod {pod-name} -n flexobo
-
-# Get shell in pod
-kubectl exec -it {pod-name} -n flexobo -- /bin/sh
-
-# Check endpoints
-kubectl get endpoints -n flexobo
+# Shell into pod
+kubectl exec -it <pod-name> -n flexobo -- /bin/sh
 ```
 
-### Build Errors
+### ALB Issues
 
 ```bash
-# Clean NX cache
-npx nx reset
+# Check ALB controller logs
+kubectl logs -f deployment/aws-load-balancer-controller -n kube-system
 
-# Clean dist
-rm -rf dist/
+# Describe ingress
+kubectl describe ingress flexobo-ingress -n flexobo
+```
 
-# Reinstall dependencies
-rm -rf node_modules
-yarn install
+### Database Connection
 
-# Rebuild
-npx nx build {service}
+```bash
+# Port-forward to RDS (for debugging)
+kubectl run pg-client --rm -i --tty --restart=Never \
+  --image=postgres:15-alpine \
+  -n flexobo \
+  -- psql -h <RDS_HOST> -U postgres -d flexobo
 ```
 
 ---
@@ -968,55 +492,31 @@ npx nx build {service}
 ### Common Commands
 
 ```bash
-# Start service
-yarn start:{service}
-
-# Build service
-npx nx build {service}
-
-# Test service
-npx nx test {service}
-
-# Lint service
-npx nx lint {service}
-
-# Database commands
-yarn db:generate:{service}
-yarn db:push:{service}
-yarn db:migrate:{service}
-yarn db:studio:{service}
-
-# Docker commands
-docker-compose up -d
-docker-compose down -v
-docker-compose logs -f
-
-# Kubernetes commands
+# Kubernetes
 kubectl get pods -n flexobo
-kubectl logs -f deployment/{service} -n flexobo
-kubectl rollout restart deployment/{service} -n flexobo
-```
+kubectl logs -f deployment/<service> -n flexobo
+kubectl rollout restart deployment/<service> -n flexobo
 
-### Service URLs (Local)
+# Docker/ECR
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
+docker build -t <repo>:<tag> -f apps/<service>/Dockerfile .
+docker push <repo>:<tag>
 
-```
-http://localhost:3005  # users-service
-http://localhost:3006  # chat-service
-http://localhost:3007  # file-service
-http://localhost:3008  # main-service
-http://localhost:3009  # billing-service
-http://localhost:3010  # notification-service
-http://localhost:3012  # telegram-service
+# Terraform
+terraform plan
+terraform apply
+terraform destroy
 ```
 
 ### Service URLs (Production)
 
-```
-https://dev-api.flexobo-mock.site           # main-service
-https://dev-users-api.flexobo-mock.site     # users-service
-https://dev-chat-api.flexobo-mock.site      # chat-service
-https://dev-file-api.flexobo-mock.site      # file-service
-https://dev-billing-api.flexobo-mock.site   # billing-service
-https://dev-notification-api.flexobo-mock.site  # notification-service
-https://dev-telegram-api.flexobo-mock.site  # telegram-service
-```
+| Service | URL |
+|---------|-----|
+| Main API | <https://dev-api.flexobo-mock.site> |
+| Users API | <https://dev-users-api.flexobo-mock.site> |
+| Chat API | <https://dev-chat-api.flexobo-mock.site> |
+| File API | <https://dev-file-api.flexobo-mock.site> |
+| Billing API | <https://dev-billing-api.flexobo-mock.site> |
+| Notification API | <https://dev-notification-api.flexobo-mock.site> |
+| Telegram API | <https://dev-telegram-api.flexobo-mock.site> |
+| Rancher UI | <https://rancher.flexobo-mock.site> |

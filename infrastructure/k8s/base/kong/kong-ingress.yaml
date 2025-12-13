@@ -36,9 +36,6 @@ spec:
     - host: api.flexobo.com
       http:
         paths:
-<<<<<<< HEAD
-          # Main Service endpoints (handles all API routes including auth)
-=======
           # Auth Service endpoints (no JWT required for login/register)
           - path: /api/v1/auth
             pathType: Prefix
@@ -48,7 +45,6 @@ spec:
                 port:
                   number: 3000
           # Main Service endpoints
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           - path: /api/v1
             pathType: Prefix
             backend:
@@ -60,8 +56,6 @@ spec:
     - host: dev.api.flexobo.com
       http:
         paths:
-<<<<<<< HEAD
-=======
           - path: /api/v1/auth
             pathType: Prefix
             backend:
@@ -69,7 +63,6 @@ spec:
                 name: auth-service
                 port:
                   number: 3000
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           - path: /api/v1
             pathType: Prefix
             backend:
@@ -78,8 +71,6 @@ spec:
                 port:
                   number: 3000
 ---
-<<<<<<< HEAD
-=======
 # Auth Service specific routes (no JWT for public endpoints)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -122,7 +113,6 @@ spec:
                 port:
                   number: 3000
 ---
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Health check endpoints (no auth required)
 apiVersion: networking.k8s.io/v1
 kind: Ingress

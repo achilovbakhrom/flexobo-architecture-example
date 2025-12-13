@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 # Loki Helm Values - Simplified for Dev
-=======
-# Loki Helm Values (loki-stack or loki-distributed)
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Chart: grafana/loki
 # Install: helm install loki grafana/loki -n monitoring -f helm-values.yaml
 
@@ -11,56 +7,27 @@ loki:
   # Authentication
   auth_enabled: false
 
-<<<<<<< HEAD
-=======
   # Server configuration
   server:
     http_listen_port: 3100
     grpc_listen_port: 9096
 
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   # Common configuration
   commonConfig:
     replication_factor: 1
     path_prefix: /var/loki
 
-<<<<<<< HEAD
-  # Schema configuration - use filesystem for dev
-=======
   # Schema configuration
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   schemaConfig:
     configs:
       - from: 2024-01-01
         store: tsdb
-<<<<<<< HEAD
-        object_store: filesystem
-=======
         object_store: s3
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
         schema: v13
         index:
           prefix: index_
           period: 24h
 
-<<<<<<< HEAD
-  # Storage configuration - filesystem for dev (simpler)
-  storage:
-    type: filesystem
-    filesystem:
-      chunks_directory: /var/loki/chunks
-      rules_directory: /var/loki/rules
-
-  # Limits configuration (removed deprecated fields)
-  limits_config:
-    retention_period: 168h  # 7 days for dev
-    reject_old_samples: true
-    reject_old_samples_max_age: 168h
-    ingestion_rate_mb: 10
-    ingestion_burst_size_mb: 20
-    max_query_series: 5000
-
-=======
   # Storage configuration
   storage:
     type: s3
@@ -126,7 +93,6 @@ loki:
       s3:
         region: us-east-1
 
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Deployment mode
 deploymentMode: SingleBinary
 
@@ -145,35 +111,12 @@ singleBinary:
     storageClass: gp3
     size: 10Gi
 
-<<<<<<< HEAD
-# Disable scalable mode components (must be 0 for SingleBinary)
-read:
-  replicas: 0
-write:
-  replicas: 0
-backend:
-  replicas: 0
-
-# Disable chunksCache for dev (simplify)
-chunksCache:
-  enabled: false
-
-# Disable resultsCache for dev
-resultsCache:
-  enabled: false
-
-# Service account
-serviceAccount:
-  create: true
-  name: loki
-=======
 # Service account for IRSA
 serviceAccount:
   create: true
   name: loki
   annotations:
     eks.amazonaws.com/role-arn: ""  # Set via Terraform output
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 # Gateway configuration
 gateway:
@@ -186,8 +129,6 @@ gateway:
     limits:
       cpu: 100m
       memory: 64Mi
-<<<<<<< HEAD
-=======
   ingress:
     enabled: false  # Access via Grafana datasource
 
@@ -278,22 +219,13 @@ promtail:
     limits:
       cpu: 200m
       memory: 128Mi
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 # Monitoring
 monitoring:
   dashboards:
-<<<<<<< HEAD
-    enabled: false
-  rules:
-    enabled: false
-  serviceMonitor:
-    enabled: true
-=======
     enabled: true
   rules:
     enabled: true
   serviceMonitor:
     enabled: true
     namespace: monitoring
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a

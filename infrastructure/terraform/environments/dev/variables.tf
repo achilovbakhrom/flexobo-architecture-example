@@ -37,11 +37,7 @@ variable "db_password" {
 variable "domain_name" {
   description = "Root domain name for the application"
   type        = string
-<<<<<<< HEAD
-  default     = "flexobo-mock.site"
-=======
   default     = "flexobo.com"
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 }
 
 variable "opensearch_password" {

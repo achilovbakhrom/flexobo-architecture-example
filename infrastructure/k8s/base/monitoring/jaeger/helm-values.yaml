@@ -21,22 +21,6 @@ collector:
     type: ClusterIP
     grpc:
       port: 14250
-<<<<<<< HEAD
-      name: grpc
-    http:
-      port: 14268
-      name: http
-    otlp:
-      grpc:
-        port: 4317
-        name: otlp-grpc
-      http:
-        port: 4318
-        name: otlp-http
-    zipkin:
-      port: 9411
-      name: zipkin
-=======
     http:
       port: 14268
     otlp:
@@ -46,7 +30,6 @@ collector:
         port: 4318
     zipkin:
       port: 9411
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
 # Query configuration
 query:

@@ -17,16 +17,9 @@ spec:
         app: chat-service
         tier: backend
     spec:
-<<<<<<< HEAD
-      enableServiceLinks: false
-      containers:
-        - name: chat-service
-          image: 677109604279.dkr.ecr.us-east-1.amazonaws.com/flexobo/chat-service:latest
-=======
       containers:
         - name: chat-service
           image: ACCOUNT_ID.dkr.ecr.REGION.amazonaws.com/flexobo/chat-service:latest
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           imagePullPolicy: Always
           ports:
             - containerPort: 3006
@@ -37,19 +30,10 @@ spec:
             - secretRef:
                 name: flexobo-secrets
           env:
-<<<<<<< HEAD
-            - name: HOST
-              value: "0.0.0.0"
-            - name: PORT
-              value: "3006"
-            - name: DATABASE_URL
-              value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=chat&sslmode=no-verify"
-=======
             - name: PORT
               value: "3006"
             - name: DATABASE_URL
               value: "postgresql://postgres:$(DB_PASSWORD)@$(DB_HOST):5432/flexobo?schema=chat"
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
           resources:
             requests:
               memory: "256Mi"
@@ -58,22 +42,14 @@ spec:
               memory: "512Mi"
               cpu: "500m"
           readinessProbe:
-<<<<<<< HEAD
-            tcpSocket:
-=======
             httpGet:
               path: /health
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
               port: 3006
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-<<<<<<< HEAD
-            tcpSocket:
-=======
             httpGet:
               path: /health
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
               port: 3006
             initialDelaySeconds: 30
             periodSeconds: 30

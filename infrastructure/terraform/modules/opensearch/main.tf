@@ -96,11 +96,7 @@ resource "aws_opensearch_domain" "jaeger" {
           AWS = "*"
         }
         Action   = "es:*"
-<<<<<<< HEAD
-        Resource = "arn:aws:es:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:domain/${local.domain_name}/*"
-=======
         Resource = "arn:aws:es:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:domain/${local.domain_name}/*"
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
         Condition = var.vpc_enabled ? {} : {
           IpAddress = {
             "aws:SourceIp" = var.allowed_cidr_blocks

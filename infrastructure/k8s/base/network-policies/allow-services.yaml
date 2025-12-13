@@ -40,8 +40,6 @@ spec:
             matchLabels:
               kubernetes.io/metadata.name: istio-system
 ---
-<<<<<<< HEAD
-=======
 # Auth Service: Allow from all services (authentication)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -82,7 +80,6 @@ spec:
         - protocol: TCP
           port: 6379
 ---
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Main Service: Allow from Kong and other services
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -143,11 +140,7 @@ spec:
         - protocol: TCP
           port: 50051
 ---
-<<<<<<< HEAD
-# Users Service: Allow from main-service
-=======
 # Users Service: Allow from main-service and auth-service
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -163,17 +156,12 @@ spec:
   ingress:
     - from:
         - podSelector:
-<<<<<<< HEAD
-            matchLabels:
-              app: main-service
-=======
             matchExpressions:
               - key: app
                 operator: In
                 values:
                   - main-service
                   - auth-service
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
       ports:
         - protocol: TCP
           port: 3000

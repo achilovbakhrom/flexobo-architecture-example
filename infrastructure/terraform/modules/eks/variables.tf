@@ -72,15 +72,6 @@ variable "node_max_size" {
   default     = 5
 }
 
-<<<<<<< HEAD
-variable "node_disk_size" {
-  description = "Disk size in GB for worker nodes"
-  type        = number
-  default     = 50
-}
-
-=======
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 # Spot Node Group Configuration
 variable "enable_spot_nodes" {
   description = "Enable spot instance node group"

@@ -83,7 +83,6 @@ locals {
 module "route53" {
   source = "../../modules/route53"
 
-<<<<<<< HEAD
   project_name              = var.project_name
   domain_name               = var.domain_name
   environment               = var.environment
@@ -95,19 +94,6 @@ module "route53" {
   rancher_alb_dns_name      = ""    # Same ALB for Rancher
   rancher_alb_zone_id       = ""    # Same zone
   create_health_check       = false # Enable after deployment
-=======
-  domain_name              = var.domain_name
-  environment              = var.environment
-  create_api_record        = true
-  create_monitoring_records = true
-  create_rancher_record    = true  # Rancher will be on dev cluster
-  alb_dns_name             = ""     # Will be updated after ALB is created
-  alb_zone_id              = ""     # Will be updated after ALB is created
-  rancher_alb_dns_name     = ""     # Same ALB for Rancher
-  rancher_alb_zone_id      = ""     # Same zone
-  create_health_check      = false  # Enable after deployment
-  enable_dnssec            = false  # Can enable later
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   tags = local.common_tags
 }
@@ -116,20 +102,12 @@ module "route53" {
 module "acm" {
   source = "../../modules/acm"
 
-<<<<<<< HEAD
   project_name              = var.project_name
   domain_name               = var.domain_name
   environment               = var.environment
   zone_id                   = module.route53.zone_id
   create_validation_records = true
   create_environment_cert   = true # Create dev.flexobo.com cert
-=======
-  domain_name                = var.domain_name
-  environment                = var.environment
-  route53_zone_id            = module.route53.zone_id
-  create_validation_records  = true
-  create_environment_cert    = true  # Create dev.flexobo.com cert
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   tags = local.common_tags
 
@@ -145,13 +123,8 @@ module "s3" {
   create_files_bucket = true
 
   # Dev retention settings (cost-optimized)
-<<<<<<< HEAD
   backup_transition_days    = 30
-  backup_expiration_days    = 60
-=======
-  backup_retention_days   = 30
-  backup_glacier_days     = 60
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
+  backup_expiration_days    = 90
   monitoring_retention_days = 30
 
   tags = local.common_tags
@@ -165,36 +138,20 @@ module "opensearch" {
   environment  = var.environment
 
   # Dev sizing (free tier eligible)
-<<<<<<< HEAD
   instance_type   = "t3.small.search"
   instance_count  = 1
   ebs_volume_size = 10
-=======
-  instance_type  = "t3.small.search"
-  instance_count = 1
-  volume_size    = 10
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   # VPC configuration
   vpc_enabled = true
   vpc_id      = module.vpc.vpc_id
-<<<<<<< HEAD
   subnet_ids  = [module.vpc.private_subnet_ids[0]] # Single subnet for dev
-=======
-  subnet_ids  = [module.vpc.private_subnet_ids[0]]  # Single subnet for dev
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   # Access configuration
   master_user_name     = "admin"
   master_user_password = var.opensearch_password
   allowed_cidr_blocks  = [var.vpc_cidr]
 
-<<<<<<< HEAD
-=======
-  # Retention (cost-optimized for dev)
-  index_retention_days = 7
-
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   tags = local.common_tags
 
   depends_on = [module.vpc]
@@ -219,21 +176,10 @@ module "secrets_manager" {
   opensearch_password = var.opensearch_password
 
   # Third-party API keys (empty for dev, set via console/CI)
-<<<<<<< HEAD
   stripe_secret_key     = var.stripe_secret_key
   stripe_webhook_secret = var.stripe_webhook_secret
   telegram_bot_token    = var.telegram_bot_token
   click_secret_key      = var.click_secret_key
-=======
-  stripe_secret_key      = var.stripe_secret_key
-  stripe_webhook_secret  = var.stripe_webhook_secret
-  telegram_bot_token     = var.telegram_bot_token
-  click_secret_key       = var.click_secret_key
-
-  # OIDC for External Secrets Operator
-  oidc_provider_arn = module.eks.oidc_provider_arn
-  oidc_issuer_url   = module.eks.cluster_oidc_issuer_url
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   # KMS for dev (optional, can be disabled for cost)
   create_kms_key = false
@@ -252,11 +198,7 @@ module "vpc" {
   vpc_cidr           = var.vpc_cidr
   cluster_name       = local.cluster_name
   enable_nat_gateway = true
-<<<<<<< HEAD
   single_nat_gateway = true # Cost saving for dev
-=======
-  single_nat_gateway = true  # Cost saving for dev
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   tags = local.common_tags
 }
@@ -279,11 +221,7 @@ module "iam" {
 
   project_name    = var.project_name
   environment     = var.environment
-<<<<<<< HEAD
   oidc_issuer_url = "" # Will be updated after EKS is created
-=======
-  oidc_issuer_url = ""  # Will be updated after EKS is created
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   tags = local.common_tags
 }
@@ -298,23 +236,13 @@ module "eks" {
   node_role_arn             = module.iam.eks_nodes_role_arn
   subnet_ids                = module.vpc.private_subnet_ids
   cluster_security_group_id = module.security_groups.eks_cluster_sg_id
-<<<<<<< HEAD
-
-  # Dev sizing (t3.large for sufficient resources)
-  node_instance_types = ["t3.large"]
-  node_desired_size   = 2
-  node_min_size       = 2
-  node_max_size       = 6
-  node_disk_size      = 50  # 50GB to avoid disk pressure
-=======
-  ebs_csi_driver_role_arn   = ""  # Will be created after OIDC provider
+  ebs_csi_driver_role_arn   = "" # Will be created after OIDC provider
 
   # Dev sizing (t3.small for cost optimization)
   node_instance_types = ["t3.small"]
   node_desired_size   = 2
   node_min_size       = 2
   node_max_size       = 4
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   enable_spot_nodes   = false
 
   tags = local.common_tags
@@ -345,7 +273,6 @@ module "rds" {
   security_group_id = module.security_groups.rds_sg_id
 
   # Dev sizing
-<<<<<<< HEAD
   instance_class               = "db.t3.micro"
   allocated_storage            = 20
   max_allocated_storage        = 50
@@ -354,16 +281,6 @@ module "rds" {
   backup_retention_period      = 7
   deletion_protection          = false
   skip_final_snapshot          = true
-=======
-  instance_class                = "db.t3.micro"
-  allocated_storage             = 20
-  max_allocated_storage         = 50
-  multi_az                      = false
-  performance_insights_enabled  = false
-  backup_retention_period       = 7
-  deletion_protection           = false
-  skip_final_snapshot           = true
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 
   master_password = var.db_password
 
@@ -377,11 +294,7 @@ module "ecr" {
   source = "../../modules/ecr"
 
   project_name   = var.project_name
-<<<<<<< HEAD
   images_to_keep = 5 # Less images for dev
-=======
-  images_to_keep = 5  # Less images for dev
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
   scan_on_push   = true
 
   tags = local.common_tags

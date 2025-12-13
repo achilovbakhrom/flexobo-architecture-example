@@ -1,6 +1,4 @@
 apiVersion: networking.k8s.io/v1
-<<<<<<< HEAD
-=======
 kind: IngressClass
 metadata:
   name: alb
@@ -10,42 +8,11 @@ spec:
   controller: ingress.k8s.aws/alb
 ---
 apiVersion: networking.k8s.io/v1
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
 kind: Ingress
 metadata:
   name: flexobo-ingress
   namespace: flexobo
   annotations:
-<<<<<<< HEAD
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:677109604279:certificate/15aab3c5-edd4-4f08-a02e-95079265d06d
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/healthcheck-path: /
-    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
-    alb.ingress.kubernetes.io/success-codes: 200-404
-    alb.ingress.kubernetes.io/group.name: flexobo-dev
-spec:
-  ingressClassName: alb
-  rules:
-    # Main Service (port 3008)
-    - host: dev-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: main-service
-                port:
-                  number: 3008
-    # Users Service (port 3005)
-    - host: dev-users-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-=======
     kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
@@ -65,20 +32,12 @@ spec:
         paths:
           # Users Service - Authentication endpoints
           - path: /api/v1/auth
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             pathType: Prefix
             backend:
               service:
                 name: users-service
                 port:
                   number: 3005
-<<<<<<< HEAD
-    # Chat Service (port 3006)
-    - host: dev-chat-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-=======
           - path: /api/v1/users
             pathType: Prefix
             backend:
@@ -89,37 +48,21 @@ spec:
 
           # Chat Service
           - path: /api/v1/chat
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             pathType: Prefix
             backend:
               service:
                 name: chat-service
                 port:
                   number: 3006
-<<<<<<< HEAD
-    # File Service (port 3007)
-    - host: dev-file-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-=======
 
           # File Service
           - path: /api/v1/files
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             pathType: Prefix
             backend:
               service:
                 name: file-service
                 port:
                   number: 3007
-<<<<<<< HEAD
-    # Billing Service (port 3009)
-    - host: dev-billing-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-=======
 
           # Main Service (default)
           - path: /api/v1
@@ -132,41 +75,18 @@ spec:
 
           # Billing Service
           - path: /api/v1/billing
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             pathType: Prefix
             backend:
               service:
                 name: billing-service
                 port:
                   number: 3009
-<<<<<<< HEAD
-    # Notification Service (port 3010)
-    - host: dev-notification-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-=======
 
           # Notification Service (SSE)
           - path: /api/v1/notifications
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
             pathType: Prefix
             backend:
               service:
                 name: notification-service
                 port:
                   number: 3010
-<<<<<<< HEAD
-    # Telegram Service (port 3012)
-    - host: dev-telegram-api.flexobo-mock.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: telegram-service
-                port:
-                  number: 3012
-=======
->>>>>>> b52bf1b21edabe00c94bd5ea88572ef807a79f9a
