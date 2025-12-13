@@ -46,6 +46,8 @@ export class UpdateUserProfileHandler
         phoneNumber: command.phoneNumber,
         language: command.language,
         avatar: command.avatar,
+        countryId: command.countryId,
+        city: command.city,
       });
 
       await this.store.save(user);

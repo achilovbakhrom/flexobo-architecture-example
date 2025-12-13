@@ -1,6 +1,8 @@
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { join } from 'path';
 import { MainModule } from './main.module';
 import {
   TransformResponseInterceptor,
@@ -69,6 +71,24 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  // gRPC microservice
+  const grpcPort = process.env.GRPC_PORT || '50051';
+  app.connectMicroservice<MicroserviceOptions>({
+    transport: Transport.GRPC,
+    options: {
+      package: 'reference_data',
+      protoPath: join(
+        process.cwd(),
+        'libs/shared-kernel/src/lib/grpc/proto/reference-data.proto'
+      ),
+      url: `0.0.0.0:${grpcPort}`,
+    },
+  });
+
+  await app.startAllMicroservices();
+  Logger.log(`gRPC server running on port ${grpcPort}`);
+
+  // HTTP server
   const port = process.env.PORT || 3004;
   await app.listen(port);
   Logger.log(

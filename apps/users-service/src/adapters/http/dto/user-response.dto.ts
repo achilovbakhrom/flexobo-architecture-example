@@ -2,7 +2,30 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../../domain';
 import { TokenResponseDto } from './token.dto';
 import { USER_LANGS } from './profile.dto';
-import { Expose, Transform } from 'class-transformer';
+import { Expose, Transform, Type } from 'class-transformer';
+
+export class CountryResponseDto {
+  @ApiProperty({
+    example: '550e8400-e29b-41d4-a716-446655440000',
+    description: 'Country ID',
+  })
+  @Expose()
+  _id!: string;
+
+  @ApiProperty({
+    example: 'UZ',
+    description: 'Country code',
+  })
+  @Expose()
+  code!: string;
+
+  @ApiProperty({
+    example: 'Uzbekistan',
+    description: 'Country name',
+  })
+  @Expose()
+  name!: string;
+}
 
 export class UserResponseDto {
   @ApiProperty({
@@ -60,6 +83,21 @@ export class UserResponseDto {
   })
   @Expose()
   avatar?: string;
+
+  @ApiPropertyOptional({
+    type: CountryResponseDto,
+    description: 'Country information',
+  })
+  @Expose()
+  @Type(() => CountryResponseDto)
+  country?: CountryResponseDto;
+
+  @ApiPropertyOptional({
+    example: 'Tashkent',
+    description: 'City name',
+  })
+  @Expose()
+  city?: string;
 
   @ApiProperty({
     enum: UserRole,

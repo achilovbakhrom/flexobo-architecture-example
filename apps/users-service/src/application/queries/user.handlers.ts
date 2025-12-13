@@ -16,16 +16,33 @@ import {
   IUser,
   IValidateTokenResult,
   UserStatus,
+  REFERENCE_DATA_SERVICE,
+  IReferenceDataService,
 } from '../../ports';
 
 @QueryHandler(GetUserByIdQuery)
 export class GetUserByIdHandler implements IQueryHandler<GetUserByIdQuery, IUser | null> {
   constructor(
-    @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository
+    @Inject(USER_REPOSITORY) private readonly userRepository: IUserRepository,
+    @Inject(REFERENCE_DATA_SERVICE) private readonly refDataService: IReferenceDataService
   ) {}
 
   async execute(query: GetUserByIdQuery): Promise<IUser | null> {
-    return this.userRepository.findById(query.userId);
+    const user = await this.userRepository.findById(query.userId);
+
+    if (!user) return null;
+
+    // Fetch country data via gRPC if countryId exists
+    if (user.countryId) {
+      const country = await this.refDataService.getCountryById(
+        user.countryId,
+        user.language || 'en'
+      );
+
+      return { ...user, country: country || undefined };
+    }
+
+    return user;
   }
 }
 

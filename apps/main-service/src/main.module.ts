@@ -22,6 +22,7 @@ import { CompanyController } from './adapters/http/v1/company.controller';
 import { SavedSearchController } from './adapters/http/v1/saved-search.controller';
 import { LocationController } from './adapters/http/v1/location.controller';
 import { StatisticsController } from './adapters/http/v1/statistics.controller';
+import { ReferenceDataGrpcController } from './adapters/grpc/reference-data.grpc.controller';
 
 // Auth (from shared-kernel)
 import {
@@ -479,6 +480,7 @@ const QueryHandlers = [
     StatisticsController,
     ReferenceDataController,
     ReferenceDataAdminController,
+    ReferenceDataGrpcController, // gRPC Controller
   ],
   providers: [
     // Auth Guard (from shared-kernel)
